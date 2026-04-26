@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xxd \"c:/Users/allar/OneDrive/Desktop/mi primer app/intento ahora/appviajes32/app/\\(tabs\\)/_layout.tsx\")",
+      "Bash(npx expo *)"
+    ]
+  }
+}

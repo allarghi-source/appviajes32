@@ -1,9 +1,13 @@
-import { Image, StyleSheet, Text, View } from 'react-native';
-
+import { useRouter } from 'expo-router';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 export default function Onboarding() {
+  const router = useRouter();
  return (
   <View style={styles.container}>
-
+<Image
+  source={require('../assets/images/planet.png')}
+  style={styles.planet}
+/>
   <View style={styles.content}>
     <Image
       source={require('../assets/images/myworld-logo.png')}
@@ -24,7 +28,7 @@ export default function Onboarding() {
 <View style={styles.features}>
 
   <View style={styles.featureRow}>
-    <Text style={styles.featureIcon}>🌍</Text>
+    <Text style={styles.featureIcon}>◎</Text>
     <View>
       <Text style={styles.featureTitle}>Registrá tus viajes</Text>
       <Text style={styles.featureDesc}>Cada ciudad, cada país</Text>
@@ -32,7 +36,7 @@ export default function Onboarding() {
   </View>
 
   <View style={styles.featureRow}>
-    <Text style={styles.featureIcon}>⭐</Text>
+    <Text style={styles.featureIcon}>★</Text>
     <View>
       <Text style={styles.featureTitle}>Ganá XP</Text>
       <Text style={styles.featureDesc}>Subí de nivel viajando</Text>
@@ -40,7 +44,7 @@ export default function Onboarding() {
   </View>
 
   <View style={styles.featureRow}>
-    <Text style={styles.featureIcon}>📖</Text>
+    <Text style={styles.featureIcon}>▣</Text>
     <View>
       <Text style={styles.featureTitle}>Tu pasaporte</Text>
       <Text style={styles.featureDesc}>Historial de viajes y stats</Text>
@@ -48,11 +52,17 @@ export default function Onboarding() {
   </View>
 
 </View>
-  <View style={styles.footer}>
-    <Text style={styles.button}>
-      CREAR MI PERFIL →
+ <View style={styles.footer}>
+  <TouchableOpacity
+    style={styles.button}
+    activeOpacity={0.85}
+    onPress={() => router.push('/profile')}
+  >
+    <Text style={styles.buttonText}>
+      CREAR MI PASAPORTE →
     </Text>
-  </View>
+  </TouchableOpacity>
+</View>
 
 </View>
 );
@@ -62,9 +72,9 @@ const styles = StyleSheet.create({
  container: {
   flex: 1,
   backgroundColor: '#01050d',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  paddingTop: 60,
+  justifyContent: 'flex-start',
+  alignItems: 'stretch',
+  paddingTop: 30,
 },
   logo: {
     width: 200,
@@ -73,7 +83,7 @@ const styles = StyleSheet.create({
   title: {
   color: '#ffffff',
   fontSize: 36,
-  marginTop: 10,
+  marginTop: -30,
   fontFamily: 'serif',
 },
 my: {
@@ -97,35 +107,45 @@ xp: {
 },
 subtitle: {
   marginTop: 8,
-  fontSize: 13,
-  color: '#cfcfcf',
-  letterSpacing: 2,
-  fontWeight: '500',
+  maxWidth: 330,
+  textAlign: 'center',
+  alignSelf: 'center',
+  fontSize: 12,
+  color: '#9FB3C8',
+  letterSpacing: 0.8,
 },
 content: {
-  flex: 1,
-  justifyContent: 'center',
+  flex: 0,
+  justifyContent: 'flex-start',
   alignItems: 'center',
+  marginTop: 70,
 },
 
 footer: {
   width: '100%',
   paddingBottom: 30,
-  alignItems: 'center',
-  marginTop: 100,
+  
+  marginTop: 'auto',
+  
 },
 
 button: {
+  marginHorizontal: 20,
+  paddingVertical: 18,
+  borderRadius: 16,
+  alignItems: 'center',
   backgroundColor: '#d4af37',
-  color: '#000',
-  paddingVertical: 16,
-  paddingHorizontal: 40,
-  borderRadius: 25,
-  fontWeight: 'bold',
+},
+buttonText: {
+  color: '#1a1a1a',
+  fontSize: 14,
+  fontWeight: '700',
+  letterSpacing: 1,
 },
 features: {
-  marginTop: 30,
+  marginTop: 60,
   gap: 18,
+  alignSelf: 'center',
 },
 
 featureRow: {
@@ -135,7 +155,10 @@ featureRow: {
 },
 
 featureIcon: {
-  fontSize: 18,
+  fontSize: 22,
+  color: '#f0d060',
+  width: 34,
+  textAlign: 'center',
 },
 
 featureTitle: {
@@ -146,5 +169,13 @@ featureTitle: {
 featureDesc: {
   color: '#888',
   fontSize: 12,
+},
+planet: {
+  position: 'absolute',
+  bottom: 80,
+  width: '120%',
+  height: 300,
+  alignSelf: 'center',
+  opacity: 0.9,
 },
 });
