@@ -13,6 +13,14 @@ import Svg, {
   Path,
   Rect
 } from 'react-native-svg';
+import NavBar from '../components/NavBar';
+import {
+  StatsResult,
+  Trip,
+  calcularStats,
+  formatHoras,
+  formatKm,
+} from '../utils/statsEngine';
 
 // ─── ICONS ────────────────────────────────────────────────────────────────────
 
@@ -51,46 +59,6 @@ const UserSilhouette = () => (
   <Svg width={40} height={40} viewBox="0 0 28 28" opacity={0.2}>
     <Circle cx={14} cy={10} r={6} fill="#4a3c28" />
     <Path d="M2 26 Q2 18 14 18 Q26 18 26 26" fill="#4a3c28" />
-  </Svg>
-);
-
-// Nav icons
-const PassportNavIcon = ({ active }: { active?: boolean }) => (
-  <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={active ? '#c9a227' : '#666'} strokeWidth={1.5} strokeLinecap="round">
-    <Rect x={4} y={2} width={16} height={20} rx={2} />
-    <Line x1={4} y1={8} x2={20} y2={8} />
-    <Line x1={9} y1={2} x2={9} y2={8} />
-  </Svg>
-);
-
-const TimelineNavIcon = () => (
-  <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth={1.5} strokeLinecap="round">
-    <Line x1={12} y1={2} x2={12} y2={22} />
-    <Circle cx={12} cy={6} r={2} />
-    <Circle cx={12} cy={13} r={2} />
-    <Circle cx={12} cy={20} r={2} />
-  </Svg>
-);
-
-const MapNavIcon = () => (
-  <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth={1.5} strokeLinecap="round">
-    <Circle cx={12} cy={12} r={10} />
-    <Path d="M2 12 Q6 8 12 12 Q18 16 22 12" />
-    <Line x1={12} y1={2} x2={12} y2={22} />
-  </Svg>
-);
-
-const AddNavIcon = () => (
-  <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth={1.5} strokeLinecap="round">
-    <Line x1={12} y1={5} x2={12} y2={19} />
-    <Line x1={5} y1={12} x2={19} y2={12} />
-  </Svg>
-);
-
-const SettingsNavIcon = () => (
-  <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth={1.5} strokeLinecap="round">
-    <Circle cx={12} cy={12} r={3} />
-    <Path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12" />
   </Svg>
 );
 
@@ -135,24 +103,35 @@ const Stamp = ({ size, top, bottom, left, right, rotate, color, label }: StampPr
   );
 };
 
-// ─── MEDAL ────────────────────────────────────────────────────────────────────
+// ─── MEDAL DINÁMICA ───────────────────────────────────────────────────────────
 
-const BronzeMedal = () => (
-  <View style={styles.medalWrap}>
-    {/* Ribbons */}
-    <View style={styles.medalRibbons}>
-      <View style={styles.medalRibL} />
-      <View style={styles.medalRibR} />
-    </View>
-    {/* Circle */}
-    <View style={styles.medalCircle}>
-      <View style={styles.medalInner}>
-        <Text style={styles.medalIcon}>✈</Text>
-        <Text style={styles.medalText}>NOVATO</Text>
+type MedalTier = 'bronce' | 'plata' | 'oro';
+
+const MEDAL_COLORS: Record<MedalTier, {
+  ribL: string; ribR: string; circle: string; border: string; text: string; icon: string;
+}> = {
+  bronce: { ribL: '#a0522d', ribR: '#cd7f32', circle: '#cd7f32', border: '#8b4513', text: '#3a1800', icon: '✈' },
+  plata:  { ribL: '#6a7580', ribR: '#9eaab5', circle: '#c0c0c0', border: '#808080', text: '#1a1a2e', icon: '◆' },
+  oro:    { ribL: '#b8860b', ribR: '#e8c840', circle: '#ffd700', border: '#b8860b', text: '#3a1800', icon: '★' },
+};
+
+const Medal = ({ tier, rank }: { tier: MedalTier; rank: string }) => {
+  const c = MEDAL_COLORS[tier];
+  return (
+    <View style={styles.medalWrap}>
+      <View style={styles.medalRibbons}>
+        <View style={[styles.medalRibL, { backgroundColor: c.ribL }]} />
+        <View style={[styles.medalRibR, { backgroundColor: c.ribR }]} />
+      </View>
+      <View style={[styles.medalCircle, { backgroundColor: c.circle, borderColor: c.border }]}>
+        <View style={styles.medalInner}>
+          <Text style={[styles.medalIcon, { color: c.text }]}>{c.icon}</Text>
+          <Text style={[styles.medalText, { color: c.text }]}>{rank.toUpperCase()}</Text>
+        </View>
       </View>
     </View>
-  </View>
-);
+  );
+};
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
@@ -166,18 +145,28 @@ interface UserData {
 export default function PassportOpen() {
   const router = useRouter();
   const [userData, setUserData] = useState<UserData | null>(null);
+  const [stats, setStats] = useState<StatsResult | null>(null);
+  const [wishlistCount, setWishlistCount] = useState(0);
 
-useEffect(() => {
-  const loadData = async () => {
-    const data = await AsyncStorage.getItem('userData');
-    if (data) {
-      setUserData(JSON.parse(data));
-    }
-  };
+  useEffect(() => {
+    const loadData = async () => {
+      const data = await AsyncStorage.getItem('userData');
+      if (data) setUserData(JSON.parse(data));
 
-  loadData();
-}, []);
-if (!userData) return null;
+      const raw = await AsyncStorage.getItem('trips');
+      const allTrips: Trip[] = raw ? JSON.parse(raw) : [];
+      setWishlistCount(allTrips.filter((t) => t.tipo === 'wishlist').length);
+      setStats(calcularStats(allTrips));
+    };
+    loadData();
+  }, []);
+
+  if (!userData) return null;
+
+  const xpProgress = Math.max(2, Math.round((stats?.progresoRango ?? 0) * 100));
+  const xpLabel = stats?.siguienteRango ? `${stats.siguienteRango} →` : 'MÁXIMO ★';
+  const hasKm = stats && stats.kmTotales > 0;
+
   return (
    <View style={{ flex: 1, backgroundColor: '#01050d' }}>
 
@@ -196,16 +185,27 @@ if (!userData) return null;
           {/* Content */}
           <Text style={styles.pageTitle}>Mis estadísticas</Text>
 
-          <StatRow label="Continentes" value="0" />
-          <StatRow label="Países visitados" value="0" />
-          <StatRow label="Ciudades visitadas" value="0" />
-          <StatRow label="Quiero visitar" value="0" />
-          <StatRow label="Km recorridos" value="—" dim />
-          <StatRow label="Horas de vuelo" value="—" dim noBorder />
+          <StatRow label="Continentes" value={stats ? String(stats.continentesVisitados) : '0'} />
+          <StatRow label="Países visitados" value={stats ? String(stats.paisesVisitados) : '0'} />
+          <StatRow label="Ciudades visitadas" value={stats ? String(stats.ciudadesVisitadas) : '0'} />
+          <StatRow label="Quiero visitar" value={String(wishlistCount)} />
+          <StatRow
+            label="Km recorridos"
+            value={hasKm ? formatKm(stats!.kmTotales) : '—'}
+            dim={!hasKm}
+          />
+          <StatRow
+            label="Horas de vuelo"
+            value={hasKm ? formatHoras(stats!.horasVuelo) : '—'}
+            dim={!hasKm}
+            noBorder
+          />
 
-          <View style={styles.spaceBox}>
-            <Text style={styles.spaceBoxText}>✦  Cargá tus viajes para ver{'\n'}    tu dato espacial 🚀</Text>
-          </View>
+          {!hasKm && (
+            <View style={styles.spaceBox}>
+              <Text style={styles.spaceBoxText}>✦  Cargá tus viajes para ver{'\n'}    tu dato espacial 🚀</Text>
+            </View>
+          )}
         </View>
 
         {/* ── PAGE 2: IDENTITY ── */}
@@ -233,14 +233,14 @@ if (!userData) return null;
               <View style={[styles.photoCorner, { bottom: 4, left: 4, borderBottomWidth: 2, borderLeftWidth: 2 }]} />
               <View style={[styles.photoCorner, { bottom: 4, right: 4, borderBottomWidth: 2, borderRightWidth: 2 }]} />
               {userData?.foto ? (
-  <Image
-    source={{ uri: userData?.foto }}
-    style={{ width: '100%', height: '100%' }}
-    resizeMode="cover"
-  />
-) : (
-  <UserSilhouette />
-)}
+                <Image
+                  source={{ uri: userData.foto }}
+                  style={{ width: '100%', height: '100%' }}
+                  resizeMode="cover"
+                />
+              ) : (
+                <UserSilhouette />
+              )}
             </View>
 
             {/* Data col */}
@@ -253,8 +253,11 @@ if (!userData) return null;
               <Text style={[styles.fieldValue, { fontSize: 13 }]}>{userData?.nacionalidad}</Text>
             </View>
 
-            {/* Medal */}
-            <BronzeMedal />
+            {/* Medalla dinámica según rango */}
+            <Medal
+              tier={stats?.rangoTier ?? 'bronce'}
+              rank={stats?.rangoActual ?? 'Novato'}
+            />
           </View>
 
           <View style={{ height: 10 }} />
@@ -263,11 +266,11 @@ if (!userData) return null;
           {/* XP row */}
           <View style={styles.xpRow}>
             <Text style={styles.xpLabel}>XP</Text>
-            <Text style={styles.xpValue}>000</Text>
+            <Text style={styles.xpValue}>{stats?.xpTotal ?? 0}</Text>
             <View style={styles.xpBarWrap}>
-              <View style={styles.xpBar} />
+              <View style={[styles.xpBar, { width: `${xpProgress}%` }]} />
             </View>
-            <Text style={styles.xpNext}>CORSARIO →</Text>
+            <Text style={styles.xpNext}>{xpLabel}</Text>
           </View>
 
           {/* MRZ */}
@@ -277,23 +280,13 @@ if (!userData) return null;
           </View>
 
           <TouchableOpacity onPress={() => router.push('/passportcover')}>
-  <Text style={styles.closeHint}>Tocar para cerrar</Text>
-</TouchableOpacity>
+            <Text style={styles.closeHint}>Tocar para cerrar</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
-      {/* Bottom nav */}
-      {/*}
-      <View style={styles.bottomNav}>
-        <NavItem label="Pasaporte" icon={<PassportNavIcon active />} active />
-        <NavItem label="Timeline" icon={<TimelineNavIcon />} />
-        <NavItem label="Mapa" icon={<MapNavIcon />} />
-        <NavItem label="Cargar" icon={<AddNavIcon />} />
-        <NavItem label="Ajustes" icon={<SettingsNavIcon />} />
-      </View>
-        */}
+      <NavBar />
     </View>
-    
   );
 }
 
@@ -313,19 +306,6 @@ const StatRow = ({ label, value, dim, noBorder }: StatRowProps) => (
   </View>
 );
 
-interface NavItemProps {
-  label: string;
-  icon: React.ReactNode;
-  active?: boolean;
-}
-
-const NavItem = ({ label, icon, active }: NavItemProps) => (
-  <TouchableOpacity style={[styles.navItem, !active && { opacity: 0.4 }]}>
-    {icon}
-    <Text style={[styles.navLabel, active && { color: '#c9a227' }]}>{label}</Text>
-  </TouchableOpacity>
-);
-
 // ─── STYLES ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
@@ -341,7 +321,6 @@ const styles = StyleSheet.create({
     borderColor: '#1e3458',
   },
 
-  // Status bar
   statusbar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -361,14 +340,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  // Gear
   gearRow: {
     alignItems: 'flex-end',
     paddingRight: 6,
     paddingBottom: 8,
   },
 
-  // Passport wrap
   passportWrap: {
     marginTop: 70,
     borderRadius: 10,
@@ -382,7 +359,6 @@ const styles = StyleSheet.create({
     borderColor: '#c8b48a',
   },
 
-  // Passport page
   passportPage: {
     backgroundColor: '#f0e8d0',
     position: 'relative',
@@ -396,7 +372,6 @@ const styles = StyleSheet.create({
     borderTopColor: '#c8b48a',
   },
 
-  // Page 1: Stats
   pageTitle: {
     fontFamily: 'Georgia',
     fontSize: 9,
@@ -449,7 +424,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
-  // Page 2: Identity
   countryHeader: {
     alignItems: 'center',
     marginBottom: 14,
@@ -536,11 +510,7 @@ const styles = StyleSheet.create({
   medalRibL: {
     width: 13,
     height: 16,
-    backgroundColor: '#a0522d',
     marginRight: -3,
-    // clip-path approximation via skew/shape
-    borderTopLeftRadius: 0,
-    borderTopRightRadius: 0,
     borderBottomLeftRadius: 4,
     borderBottomRightRadius: 4,
     transform: [{ skewX: '-10deg' }],
@@ -548,10 +518,7 @@ const styles = StyleSheet.create({
   medalRibR: {
     width: 13,
     height: 16,
-    backgroundColor: '#cd7f32',
     marginLeft: -3,
-    borderTopLeftRadius: 0,
-    borderTopRightRadius: 0,
     borderBottomLeftRadius: 4,
     borderBottomRightRadius: 4,
     transform: [{ skewX: '10deg' }],
@@ -560,9 +527,7 @@ const styles = StyleSheet.create({
     width: 46,
     height: 46,
     borderRadius: 23,
-    backgroundColor: '#cd7f32',
     borderWidth: 2,
-    borderColor: '#8b4513',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -584,13 +549,11 @@ const styles = StyleSheet.create({
   medalIcon: {
     fontSize: 14,
     lineHeight: 16,
-    color: '#3a1800',
   },
   medalText: {
     fontFamily: 'Georgia',
     fontSize: 5.5,
     fontWeight: '700',
-    color: '#3a1800',
     letterSpacing: 0.3,
     textTransform: 'uppercase',
     textAlign: 'center',
@@ -627,7 +590,6 @@ const styles = StyleSheet.create({
   },
   xpBar: {
     height: '100%',
-    width: '3%',
     backgroundColor: '#c9a227',
     borderRadius: 2,
   },
@@ -664,7 +626,6 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
 
-  // Bottom nav
   bottomNav: {
     flexDirection: 'row',
     justifyContent: 'space-around',

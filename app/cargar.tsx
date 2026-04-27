@@ -1,3 +1,4 @@
+import NavBar from '../components/NavBar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
@@ -26,7 +27,7 @@ interface TripData {
   tipo: TripType;
   ciudad: string;
   pais: string;
-  coords: null;
+  coords: { lat: number; lng: number } | null;
   fechaInicio: string | null;
   fotos: string[];
   portada: string | null;
@@ -53,6 +54,9 @@ export default function CargarViaje() {
   const [anio, setAnio] = useState('');
   const [nota, setNota] = useState('');
   const [fotos, setFotos] = useState<string[]>([]);
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [geoStatus, setGeoStatus] = useState<'idle' | 'buscando' | 'encontrada' | 'no_encontrada' | 'error'>('idle');
+  const [geoNombre, setGeoNombre] = useState('');
   const chainIdRef = useRef<string | null>(null);
 
   function resetForm() {
@@ -63,6 +67,42 @@ export default function CargarViaje() {
     setAnio('');
     setNota('');
     setFotos([]);
+    setCoords(null);
+    setGeoStatus('idle');
+    setGeoNombre('');
+  }
+
+  function resetGeo() {
+    setCoords(null);
+    setGeoStatus('idle');
+    setGeoNombre('');
+  }
+
+  async function buscarUbicacion() {
+    if (!ciudad.trim() || !pais.trim()) {
+      Alert.alert('Faltan datos', 'Ingresá ciudad y país antes de buscar la ubicación.');
+      return;
+    }
+    setGeoStatus('buscando');
+    setCoords(null);
+    setGeoNombre('');
+    try {
+      const q = encodeURIComponent(`${ciudad.trim()}, ${pais.trim()}`);
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1`,
+        { headers: { 'User-Agent': 'MyWorldXP/1.0', 'Accept-Language': 'es' } }
+      );
+      const data = await res.json();
+      if (data.length > 0) {
+        setCoords({ lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) });
+        setGeoNombre(data[0].display_name);
+        setGeoStatus('encontrada');
+      } else {
+        setGeoStatus('no_encontrada');
+      }
+    } catch {
+      setGeoStatus('error');
+    }
   }
 
   async function pickImage() {
@@ -116,6 +156,10 @@ export default function CargarViaje() {
       Alert.alert('Falta información', 'El país es obligatorio.');
       return false;
     }
+    if (!coords) {
+      Alert.alert('Ubicación requerida', 'Buscá y confirmá la ubicación antes de guardar.');
+      return false;
+    }
     if (tipo === 'real') {
       if (!dia.trim() || !mes.trim() || !anio.trim()) {
         Alert.alert('Falta información', 'La fecha de inicio es obligatoria para viajes reales.');
@@ -132,7 +176,7 @@ export default function CargarViaje() {
       tipo,
       ciudad: ciudad.trim(),
       pais: pais.trim(),
-      coords: null,
+      coords,
       fechaInicio: esReal ? buildFechaInicio(dia, mes, anio) : null,
       fotos: esReal ? fotos : [],
       portada: esReal && fotos.length > 0 ? fotos[0] : null,
@@ -262,7 +306,7 @@ export default function CargarViaje() {
             placeholder="Ciudad"
             placeholderTextColor={MUTED}
             value={ciudad}
-            onChangeText={setCiudad}
+            onChangeText={(t) => { setCiudad(t); if (geoStatus === 'encontrada') resetGeo(); }}
             returnKeyType="next"
           />
           <TextInput
@@ -270,13 +314,36 @@ export default function CargarViaje() {
             placeholder="País"
             placeholderTextColor={MUTED}
             value={pais}
-            onChangeText={setPais}
+            onChangeText={(t) => { setPais(t); if (geoStatus === 'encontrada') resetGeo(); }}
             returnKeyType="done"
           />
 
-          <TouchableOpacity style={styles.outlineBtn} activeOpacity={0.8}>
-            <Text style={styles.outlineBtnText}>Buscar ubicación</Text>
+          <TouchableOpacity
+            style={[styles.outlineBtn, geoStatus === 'buscando' && styles.outlineBtnDisabled]}
+            onPress={buscarUbicacion}
+            activeOpacity={0.8}
+            disabled={geoStatus === 'buscando'}
+          >
+            <Text style={styles.outlineBtnText}>
+              {geoStatus === 'buscando' ? 'Buscando...' : 'Buscar ubicación'}
+            </Text>
           </TouchableOpacity>
+
+          {geoStatus === 'encontrada' && (
+            <View style={styles.geoFound}>
+              <Text style={styles.geoCheck}>✓</Text>
+              <Text style={styles.geoFoundText} numberOfLines={2}>{geoNombre}</Text>
+            </View>
+          )}
+
+          {(geoStatus === 'no_encontrada' || geoStatus === 'error') && (
+            <View style={styles.geoNotFound}>
+              <Text style={styles.geoNotFoundText}>
+                Ubicación no encontrada. Revisá la ciudad y el país.
+              </Text>
+            </View>
+          )}
+
           <TouchableOpacity style={styles.outlineBtn} activeOpacity={0.8}>
             <Text style={styles.outlineBtnText}>Elegir país de la lista</Text>
           </TouchableOpacity>
@@ -354,6 +421,7 @@ export default function CargarViaje() {
 
         <View style={styles.bottomSpacer} />
       </KeyboardAwareScrollView>
+      <NavBar />
     </View>
   );
 }
@@ -559,6 +627,49 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
+  outlineBtnDisabled: {
+    opacity: 0.5,
+  },
+
+  geoFound: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: 'rgba(212,175,55,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(212,175,55,0.35)',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginBottom: 10,
+  },
+  geoCheck: {
+    fontSize: 16,
+    color: GOLD,
+    fontWeight: '700',
+    marginTop: 1,
+  },
+  geoFoundText: {
+    flex: 1,
+    fontSize: 13,
+    color: GOLD,
+    lineHeight: 18,
+  },
+
+  geoNotFound: {
+    backgroundColor: 'rgba(180,40,40,0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(180,40,40,0.3)',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginBottom: 10,
+  },
+  geoNotFoundText: {
+    fontSize: 13,
+    color: '#e07070',
+    lineHeight: 18,
+  },
 
   // Action buttons
   buttonsSection: {
@@ -593,6 +704,6 @@ const styles = StyleSheet.create({
   },
 
   bottomSpacer: {
-    height: 20,
+    height: 88,
   },
 });
