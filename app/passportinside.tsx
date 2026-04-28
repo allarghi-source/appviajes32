@@ -9,7 +9,6 @@ import {
 } from 'react-native';
 import Svg, {
   Circle,
-  Line,
   Path,
   Rect
 } from 'react-native-svg';
@@ -167,6 +166,50 @@ export default function PassportOpen() {
   const xpLabel = stats?.siguienteRango ? `${stats.siguienteRango} →` : 'MÁXIMO ★';
   const hasKm = stats && stats.kmTotales > 0;
 
+const formatOneDecimal = (value: number) => {
+  const rounded = Math.round(value * 10) / 10;
+  return rounded % 1 === 0 ? String(rounded) : rounded.toFixed(1);
+};
+
+const getSpaceReference = (km: number) => {
+  if (!km || km <= 0) return null;
+const icon = '◉ ';
+  const references = [
+    { name: 'la Luna', emoji: '🌙', km: 10900 },
+    { name: 'Marte', emoji: '🔴', km: 21000 },
+    { name: 'la Tierra', emoji: '🌍', km: 40075 },
+    { name: 'Neptuno', emoji: '🔵', km: 154000 },
+  ];
+
+  for (const ref of references) {
+    const turns = km / ref.km;
+
+    if (turns < 2) {
+      if (turns < 1) {
+        return `${icon}Recorriste el ${Math.round(turns * 100)}% de una vuelta a ${ref.name}`;
+      }
+
+      return `${icon}Le diste ${formatOneDecimal(turns)} vueltas a ${ref.name}`;
+    }
+  }
+
+  const moonTrip = km / 384000;
+
+  if (moonTrip < 1) {
+    return `${icon}Recorriste el ${Math.round(moonTrip * 100)}% del viaje a la Luna`;
+  }
+
+  const jupiterTurns = km / 440000;
+
+  if (jupiterTurns < 1) {
+    return `${icon}Le diste ${formatOneDecimal(jupiterTurns)} vueltas a Júpiter`;
+  }
+
+  return `Le diste ${formatOneDecimal(jupiterTurns)} vueltas a Júpiter 🟠`;
+};
+
+
+
   return (
    <View style={{ flex: 1, backgroundColor: '#01050d' }}>
 
@@ -183,7 +226,7 @@ export default function PassportOpen() {
           <Stamp size={70} top={120} right={-15} rotate={5} color="rgba(100,30,140,0.08)" label={'DUBAI\nARRIVAL\n2023'} />
 
           {/* Content */}
-          <Text style={styles.pageTitle}>Mis estadísticas</Text>
+          <Text style={styles.pageTitle}>Mi recorrido</Text>
 
           <StatRow label="Continentes" value={stats ? String(stats.continentesVisitados) : '0'} />
           <StatRow label="Países visitados" value={stats ? String(stats.paisesVisitados) : '0'} />
@@ -200,12 +243,20 @@ export default function PassportOpen() {
             dim={!hasKm}
             noBorder
           />
+          {stats && stats.kmTotales > 0 ? (
+  <View style={styles.spaceBox}>
+    <Text style={styles.spaceBoxText}>
+      {getSpaceReference(stats.kmTotales)}
+    </Text>
+  </View>
+) : (
+  <View style={styles.spaceBox}>
+    <Text style={styles.spaceBoxText}>
+      ✦  Cargá tus viajes para ver{'\n'}    tu dato espacial 🚀
+    </Text>
+  </View>
+)}
 
-          {!hasKm && (
-            <View style={styles.spaceBox}>
-              <Text style={styles.spaceBoxText}>✦  Cargá tus viajes para ver{'\n'}    tu dato espacial 🚀</Text>
-            </View>
-          )}
         </View>
 
         {/* ── PAGE 2: IDENTITY ── */}
@@ -260,7 +311,7 @@ export default function PassportOpen() {
             />
           </View>
 
-          <View style={{ height: 10 }} />
+          
           <View style={styles.divider} />
 
           {/* XP row */}
@@ -270,7 +321,7 @@ export default function PassportOpen() {
             <View style={styles.xpBarWrap}>
               <View style={[styles.xpBar, { width: `${xpProgress}%` }]} />
             </View>
-            <Text style={styles.xpNext}>{xpLabel}</Text>
+            <Text style={styles.rankText}>{xpLabel}</Text>
           </View>
 
           {/* MRZ */}
@@ -347,7 +398,7 @@ const styles = StyleSheet.create({
   },
 
   passportWrap: {
-    marginTop: 70,
+    marginTop: 40,
     borderRadius: 10,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -373,37 +424,38 @@ const styles = StyleSheet.create({
   },
 
   pageTitle: {
-    fontFamily: 'Georgia',
-    fontSize: 9,
-    letterSpacing: 4,
-    color: '#1a3a6e',
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    marginBottom: 14,
-    opacity: 0.85,
-  },
+  fontFamily: 'Georgia',
+  fontSize: 16,
+  letterSpacing: 2,
+  color: '#1a3a6e',
+  fontWeight: '700',
+  textTransform: 'uppercase',
+  textAlign: 'center',
+  marginBottom: 18,
+},
 
   statRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 7,
+    paddingVertical: 5,
     borderBottomWidth: 0.5,
     borderBottomColor: 'rgba(100,80,40,0.13)',
   },
   statLabel: {
-    fontFamily: 'Georgia',
-    fontSize: 12,
-    color: '#4a3c28',
-    flex: 1,
-  },
+  fontFamily: 'ShareTechMono-regular',
+  fontSize: 16,
+  color: '#4a3c28',
+  flex: 1,
+  letterSpacing: 0.5,
+},
   statValue: {
-    fontFamily: 'Courier',
+    fontFamily: 'ShareTechMono-regular',
     fontSize: 16,
     fontWeight: '700',
     color: '#1a3a6e',
     letterSpacing: 2,
-    minWidth: 36,
+    minWidth: 50,
     textAlign: 'right',
   },
 
@@ -418,9 +470,11 @@ const styles = StyleSheet.create({
   },
   spaceBoxText: {
     fontFamily: 'Courier',
-    fontSize: 10,
+    fontSize: 12,
     color: '#1a3a6e',
-    lineHeight: 16,
+    fontWeight: '600',
+lineHeight: 18,
+    
     letterSpacing: 0.5,
   },
 
@@ -430,7 +484,7 @@ const styles = StyleSheet.create({
   },
   countryName: {
     fontFamily: 'Georgia',
-    fontSize: 11,
+    fontSize: 15,
     letterSpacing: 2,
     color: '#1a3a6e',
     fontWeight: '700',
@@ -438,7 +492,7 @@ const styles = StyleSheet.create({
   },
   passportNum: {
     fontFamily: 'Courier',
-    fontSize: 9,
+    fontSize: 11,
     color: '#9a8060',
     letterSpacing: 3,
     marginTop: 3,
@@ -447,19 +501,19 @@ const styles = StyleSheet.create({
   divider: {
     height: 0.5,
     backgroundColor: 'rgba(100,80,40,0.2)',
-    marginVertical: 10,
+    marginVertical: 6,
   },
 
   idSection: {
     flexDirection: 'row',
-    gap: 14,
+    gap: 18,
     alignItems: 'flex-start',
   },
 
   photoBox: {
-    width: 88,
-    height: 108,
-    borderWidth: 1.5,
+    width: 110,
+    height: 140,
+    borderWidth: 2.5,
     borderColor: '#c9a227',
     borderRadius: 4,
     flexShrink: 0,
@@ -477,7 +531,7 @@ const styles = StyleSheet.create({
   },
 
   dataCol: {
-    flex: 1,
+    flex: 0.75,
   },
   fieldLabel: {
     fontFamily: 'Georgia',
@@ -498,11 +552,13 @@ const styles = StyleSheet.create({
   },
 
   // Medal
-  medalWrap: {
-    flexDirection: 'column',
-    alignItems: 'center',
-    flexShrink: 0,
-  },
+ medalWrap: {
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  flexShrink: 0,
+  marginLeft: 2,
+},
   medalRibbons: {
     flexDirection: 'row',
     marginBottom: -3,
@@ -524,9 +580,9 @@ const styles = StyleSheet.create({
     transform: [{ skewX: '10deg' }],
   },
   medalCircle: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
@@ -537,8 +593,8 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   medalInner: {
-    width: 38,
-    height: 38,
+    width: 60,
+    height: 60,
     borderRadius: 19,
     borderWidth: 1,
     borderColor: 'rgba(139,69,19,0.4)',
@@ -547,12 +603,12 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   medalIcon: {
-    fontSize: 14,
+    fontSize: 24,
     lineHeight: 16,
   },
   medalText: {
     fontFamily: 'Georgia',
-    fontSize: 5.5,
+    fontSize: 8,
     fontWeight: '700',
     letterSpacing: 0.3,
     textTransform: 'uppercase',
@@ -561,11 +617,23 @@ const styles = StyleSheet.create({
 
   // XP row
   xpRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 10,
-  },
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 10,
+  marginTop: 8,
+  backgroundColor: '#0a1f44',
+  paddingVertical: 6,
+  paddingHorizontal: 12,
+  borderRadius: 10,
+  borderWidth: 1,
+  borderColor: 'rgba(80,140,255,0.25)',
+
+  shadowColor: '#4da3ff',
+shadowOffset: { width: 0, height: 0 },
+shadowOpacity: 0.6,
+shadowRadius: 8,
+elevation: 6,
+},
   xpLabel: {
     fontFamily: 'Georgia',
     fontSize: 9,
@@ -581,17 +649,17 @@ const styles = StyleSheet.create({
     color: '#c9a227',
     letterSpacing: 2,
   },
-  xpBarWrap: {
-    flex: 1,
-    height: 4,
-    backgroundColor: 'rgba(201,162,39,0.2)',
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
+xpBarWrap: {
+  flex: 1,
+  height: 6,
+  backgroundColor: 'rgba(255,255,255,0.1)',
+  borderRadius: 3,
+  overflow: 'hidden',
+},
   xpBar: {
     height: '100%',
     backgroundColor: '#c9a227',
-    borderRadius: 2,
+    borderRadius: 3,
   },
   xpNext: {
     fontFamily: 'Courier',
@@ -600,6 +668,13 @@ const styles = StyleSheet.create({
     opacity: 0.6,
     letterSpacing: 1,
   },
+  rankText: {
+  fontFamily: 'ShareTechMono',
+  fontSize: 12,
+  color: '#ffffff',
+  letterSpacing: 1.5,
+  marginLeft: 4,
+},
 
   // MRZ
   mrz: {
@@ -616,15 +691,16 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
 
-  closeHint: {
-    textAlign: 'center',
-    marginTop: 10,
-    fontFamily: 'Georgia',
-    fontSize: 9,
-    color: '#c9a227',
-    letterSpacing: 2,
-    opacity: 0.7,
-  },
+ closeHint: {
+  textAlign: 'center',
+  marginTop: 6,
+  fontFamily: 'Georgia',
+  fontSize: 11,
+  fontWeight: '600',
+  color: '#8fbfff',
+  letterSpacing: 1,
+  opacity: 1,
+},
 
   bottomNav: {
     flexDirection: 'row',

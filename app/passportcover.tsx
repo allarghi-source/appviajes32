@@ -73,6 +73,26 @@ export default function PassportCover() {
     <View style={styles.screenContainer}>
       {/* Passport card */}
       <TouchableOpacity
+  onPress={() => router.push('/settings')}
+  style={{
+    position: 'absolute',
+    top: 60,
+    right: 25,
+    zIndex: 10,
+    padding: 6,
+  }}
+>
+  <Text
+    style={{
+      color: 'rgba(212,175,55,0.6)',
+      fontSize: 16,
+      fontFamily: 'Georgia',
+    }}
+  >
+    ⚙
+  </Text>
+</TouchableOpacity>
+      <TouchableOpacity
   style={styles.passport}
   activeOpacity={0.9}
   onPress={() => router.push('/passportinside')}

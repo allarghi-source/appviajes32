@@ -1,11 +1,15 @@
 import NavBar from '../components/NavBar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
+import { LinearGradient } from 'expo-linear-gradient';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
+  Animated,
   Image,
+  Keyboard,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -45,31 +49,159 @@ function buildFechaInicio(dia: string, mes: string, anio: string): string {
   return `${dia.padStart(2, '0')}/${mes.padStart(2, '0')}/${anio}`;
 }
 
+// ─── WHEEL PICKER ─────────────────────────────────────────────────────────────
+
+const ITEM_H = 36;
+const VISIBLE_ITEMS = 3;
+const WHEEL_H = ITEM_H * VISIBLE_ITEMS; // 108
+const WHEEL_PAD = ITEM_H;              // 1 item of padding so first/last can center
+
+const DAYS = Array.from({ length: 31 }, (_, i) => ({
+  label: String(i + 1).padStart(2, '0'),
+  value: String(i + 1),
+}));
+
+const MONTHS = [
+  { label: 'Ene', value: '1' },  { label: 'Feb', value: '2' },
+  { label: 'Mar', value: '3' },  { label: 'Abr', value: '4' },
+  { label: 'May', value: '5' },  { label: 'Jun', value: '6' },
+  { label: 'Jul', value: '7' },  { label: 'Ago', value: '8' },
+  { label: 'Sep', value: '9' },  { label: 'Oct', value: '10' },
+  { label: 'Nov', value: '11' }, { label: 'Dic', value: '12' },
+];
+
+const CUR_YEAR = new Date().getFullYear();
+const YEARS = Array.from({ length: CUR_YEAR - 1969 }, (_, i) => ({
+  label: String(1970 + i),
+  value: String(1970 + i),
+}));
+
+interface WheelItem { label: string; value: string; }
+
+const WheelColumn = ({
+  items,
+  initialIndex,
+  onChange,
+  width = 80,
+}: {
+  items: WheelItem[];
+  initialIndex: number;
+  onChange: (value: string) => void;
+  width?: number;
+}) => {
+  const scrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: Math.max(0, initialIndex) * ITEM_H, animated: false });
+    }, 80);
+    return () => clearTimeout(t);
+  }, []);
+
+  const handleEnd = (e: any) => {
+    const y = e.nativeEvent.contentOffset.y;
+    const index = Math.max(0, Math.min(Math.round(y / ITEM_H), items.length - 1));
+    onChange(items[index].value);
+  };
+
+  return (
+    <View style={{ width, height: WHEEL_H, overflow: 'hidden' }}>
+      <ScrollView
+        ref={scrollRef}
+        style={{ flex: 1 }}
+        showsVerticalScrollIndicator={false}
+        snapToInterval={ITEM_H}
+        decelerationRate="fast"
+        nestedScrollEnabled
+        onMomentumScrollEnd={handleEnd}
+        onScrollEndDrag={handleEnd}
+        contentContainerStyle={{ paddingVertical: WHEEL_PAD }}
+      >
+        {items.map((item, i) => (
+          <View key={i} style={{ height: ITEM_H, alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={styles.wheelItem}>{item.label}</Text>
+          </View>
+        ))}
+      </ScrollView>
+      <LinearGradient
+        colors={[SURFACE, 'transparent']}
+        pointerEvents="none"
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, height: ITEM_H }}
+      />
+      <LinearGradient
+        colors={['transparent', SURFACE]}
+        pointerEvents="none"
+        style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: ITEM_H }}
+      />
+    </View>
+  );
+};
+
+// ─── TOGGLE CONSTANTS ─────────────────────────────────────────────────────────
+
+const TRACK_W = 64;
+const THUMB_D = 28;
+const THUMB_TRAVEL = TRACK_W - THUMB_D - 4;
+
+// ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
+
+const todayInit = new Date();
+
 export default function CargarViaje() {
   const [tipo, setTipo] = useState<TripType>('real');
   const [ciudad, setCiudad] = useState('');
   const [pais, setPais] = useState('');
-  const [dia, setDia] = useState('');
-  const [mes, setMes] = useState('');
-  const [anio, setAnio] = useState('');
+  const [dia, setDia] = useState(String(todayInit.getDate()));
+  const [mes, setMes] = useState(String(todayInit.getMonth() + 1));
+  const [anio, setAnio] = useState(String(todayInit.getFullYear()));
   const [nota, setNota] = useState('');
   const [fotos, setFotos] = useState<string[]>([]);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [geoStatus, setGeoStatus] = useState<'idle' | 'buscando' | 'encontrada' | 'no_encontrada' | 'error'>('idle');
   const [geoNombre, setGeoNombre] = useState('');
+  const [formKey, setFormKey] = useState(0);
   const chainIdRef = useRef<string | null>(null);
+  const scrollRef = useRef<any>(null);
+
+  // Toggle animation
+  const toggleAnim = useRef(new Animated.Value(0)).current;
+
+  function animateToggle(to: number) {
+    Animated.spring(toggleAnim, {
+      toValue: to,
+      useNativeDriver: false,
+      friction: 7,
+      tension: 130,
+    }).start();
+  }
+
+  function handleToggle(newTipo: TripType) {
+    setTipo(newTipo);
+    animateToggle(newTipo === 'real' ? 0 : 1);
+  }
+
+  const thumbLeft = toggleAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [2, THUMB_TRAVEL],
+  });
 
   function resetForm() {
+    const t = new Date();
     setCiudad('');
     setPais('');
-    setDia('');
-    setMes('');
-    setAnio('');
+    setDia(String(t.getDate()));
+    setMes(String(t.getMonth() + 1));
+    setAnio(String(t.getFullYear()));
     setNota('');
     setFotos([]);
     setCoords(null);
     setGeoStatus('idle');
     setGeoNombre('');
+    setFormKey((k) => k + 1);
+    setTimeout(() => {
+      scrollRef.current?.scrollToPosition?.(0, 0, false);
+      scrollRef.current?.scrollTo?.({ x: 0, y: 0, animated: false });
+    }, 50);
   }
 
   function resetGeo() {
@@ -105,39 +237,45 @@ export default function CargarViaje() {
     }
   }
 
-  async function pickImage() {
+  function handleCargarFotos() {
     if (fotos.length >= 4) {
       Alert.alert('Máximo 4 fotos', 'Ya cargaste el máximo de fotos permitidas.');
       return;
     }
+    Alert.alert('Cargar fotos', '', [
+      { text: 'Elegir de galería', onPress: pickImages },
+      { text: 'Tomar foto', onPress: takePhoto },
+      { text: 'Cancelar', style: 'cancel' },
+    ]);
+  }
+
+  async function pickImages() {
+    if (fotos.length >= 4) return;
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permiso necesario', 'Necesitamos acceso a tu galería.');
       return;
     }
+    const remaining = 4 - fotos.length;
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.8,
-      allowsMultipleSelection: false,
+      allowsMultipleSelection: true,
+      selectionLimit: remaining,
     });
-    if (!result.canceled && result.assets[0]) {
-      setFotos((prev) => [...prev, result.assets[0].uri]);
+    if (!result.canceled && result.assets.length > 0) {
+      setFotos((prev) => [...prev, ...result.assets.map((a) => a.uri)].slice(0, 4));
     }
   }
 
   async function takePhoto() {
-    if (fotos.length >= 4) {
-      Alert.alert('Máximo 4 fotos', 'Ya cargaste el máximo de fotos permitidas.');
-      return;
-    }
+    if (fotos.length >= 4) return;
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permiso necesario', 'Necesitamos acceso a tu cámara.');
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({
-      quality: 0.8,
-    });
+    const result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
     if (!result.canceled && result.assets[0]) {
       setFotos((prev) => [...prev, result.assets[0].uri]);
     }
@@ -196,6 +334,7 @@ export default function CargarViaje() {
 
   async function handleGuardar() {
     if (!validate()) return;
+    Keyboard.dismiss();
     try {
       const trip = buildTrip(null);
       await saveTrip(trip);
@@ -209,6 +348,7 @@ export default function CargarViaje() {
 
   async function handleGuardarYAgregarDestino() {
     if (!validate()) return;
+    Keyboard.dismiss();
     try {
       if (!chainIdRef.current) {
         chainIdRef.current = genId();
@@ -222,78 +362,93 @@ export default function CargarViaje() {
     }
   }
 
+  const dayIdx = Math.max(0, DAYS.findIndex((d) => d.value === dia));
+  const monthIdx = Math.max(0, MONTHS.findIndex((m) => m.value === mes));
+  const yearIdx = Math.max(0, YEARS.findIndex((y) => y.value === anio));
+
   return (
     <View style={styles.root}>
       <KeyboardAwareScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.scroll}
         enableOnAndroid
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}
-        <Text style={styles.title}>Cargar viaje</Text>
+        <Text style={styles.title}>Cargar Viaje</Text>
         <Text style={styles.subtitle}>Registrá tu experiencia o tu próximo destino</Text>
 
-        {/* Toggle tipo */}
-        <View style={styles.toggleContainer}>
+        {/* Toggle tipo — animated switch */}
+        <View style={styles.toggleRow}>
           <TouchableOpacity
-            style={[styles.toggleBtn, tipo === 'real' && styles.toggleBtnActive]}
-            onPress={() => setTipo('real')}
-            activeOpacity={0.8}
+            style={styles.toggleLabelWrap}
+            onPress={() => handleToggle('real')}
+            activeOpacity={0.7}
           >
-            <Text style={[styles.toggleText, tipo === 'real' && styles.toggleTextActive]}>
+            <Text style={[styles.toggleLabel, tipo === 'real' && styles.toggleLabelActive]}>
               Ya lo hice
             </Text>
           </TouchableOpacity>
+
           <TouchableOpacity
-            style={[styles.toggleBtn, tipo === 'wishlist' && styles.toggleBtnActive]}
-            onPress={() => setTipo('wishlist')}
-            activeOpacity={0.8}
+            onPress={() => handleToggle(tipo === 'real' ? 'wishlist' : 'real')}
+            activeOpacity={0.85}
           >
-            <Text style={[styles.toggleText, tipo === 'wishlist' && styles.toggleTextActive]}>
+            <View style={styles.toggleTrack}>
+              <Animated.View style={[styles.toggleThumb, { left: thumbLeft }]} />
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.toggleLabelWrap}
+            onPress={() => handleToggle('wishlist')}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.toggleLabel, tipo === 'wishlist' && styles.toggleLabelActive]}>
               Lo quiero hacer
             </Text>
           </TouchableOpacity>
         </View>
 
-        {/* Sección fotos — solo para real */}
+        {/* Fotos — solo para real */}
         {tipo === 'real' && (
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>Fotos ({fotos.length}/4)</Text>
-            <Text style={styles.sectionHint}>La primera foto será la portada del viaje.</Text>
 
-            <View style={styles.photosRow}>
-              {fotos.map((uri, i) => (
-                <View key={i} style={styles.photoWrapper}>
-                  <Image source={{ uri }} style={styles.photoThumb} />
-                  {i === 0 && (
-                    <View style={styles.photoCoverBadge}>
-                      <Text style={styles.photoCoverText}>Portada</Text>
-                    </View>
-                  )}
-                  <TouchableOpacity
-                    style={styles.photoRemoveBtn}
-                    onPress={() => removePhoto(i)}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <Text style={styles.photoRemoveText}>✕</Text>
-                  </TouchableOpacity>
-                </View>
-              ))}
+            {fotos.length < 4 && (
+              <TouchableOpacity style={styles.photoCard} onPress={handleCargarFotos} activeOpacity={0.8}>
+                <Text style={styles.photoCardIcon}>✦</Text>
+                <Text style={styles.photoCardText}>Cargar fotos</Text>
+                <Text style={styles.photoCardHint}>Galería · Cámara</Text>
+              </TouchableOpacity>
+            )}
 
-              {fotos.length < 4 && (
-                <View style={styles.addPhotoGroup}>
-                  <TouchableOpacity style={styles.addPhotoBtn} onPress={pickImage} activeOpacity={0.8}>
-                    <Text style={styles.addPhotoIcon}>🖼</Text>
-                    <Text style={styles.addPhotoLabel}>Galería</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.addPhotoBtn} onPress={takePhoto} activeOpacity={0.8}>
-                    <Text style={styles.addPhotoIcon}>📷</Text>
-                    <Text style={styles.addPhotoLabel}>Cámara</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
+            {fotos.length > 0 && (
+              <View style={styles.photosRow}>
+                {fotos.map((uri, i) => (
+                  <View key={i} style={styles.photoWrapper}>
+                    <Image source={{ uri }} style={styles.photoThumb} />
+                    {i === 0 && (
+                      <View style={styles.photoCoverBadge}>
+                        <Text style={styles.photoCoverText}>Portada</Text>
+                      </View>
+                    )}
+                    <TouchableOpacity
+                      style={styles.photoRemoveBtn}
+                      onPress={() => removePhoto(i)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Text style={styles.photoRemoveText}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {fotos.length === 0 && (
+              <Text style={styles.photoHint}>La primera foto será la portada del viaje.</Text>
+            )}
           </View>
         )}
 
@@ -319,68 +474,43 @@ export default function CargarViaje() {
           />
 
           <TouchableOpacity
-            style={[styles.outlineBtn, geoStatus === 'buscando' && styles.outlineBtnDisabled]}
+            style={[
+              styles.outlineBtn,
+              geoStatus === 'buscando' && styles.outlineBtnDisabled,
+              geoStatus === 'encontrada' && styles.outlineBtnSuccess,
+            ]}
             onPress={buscarUbicacion}
             activeOpacity={0.8}
             disabled={geoStatus === 'buscando'}
           >
-            <Text style={styles.outlineBtnText}>
-              {geoStatus === 'buscando' ? 'Buscando...' : 'Buscar ubicación'}
+            <Text style={[
+              styles.outlineBtnText,
+              geoStatus === 'encontrada' && styles.outlineBtnTextSuccess,
+              (geoStatus === 'no_encontrada' || geoStatus === 'error') && styles.outlineBtnTextError,
+            ]}>
+              {geoStatus === 'buscando' ? 'Buscando...'
+                : geoStatus === 'encontrada' ? '✓  Ubicación encontrada'
+                : geoStatus === 'no_encontrada' ? 'No encontrada — intentá de nuevo'
+                : geoStatus === 'error' ? 'Error al buscar — intentá de nuevo'
+                : 'Buscar ubicación'}
             </Text>
           </TouchableOpacity>
-
-          {geoStatus === 'encontrada' && (
-            <View style={styles.geoFound}>
-              <Text style={styles.geoCheck}>✓</Text>
-              <Text style={styles.geoFoundText} numberOfLines={2}>{geoNombre}</Text>
-            </View>
-          )}
-
-          {(geoStatus === 'no_encontrada' || geoStatus === 'error') && (
-            <View style={styles.geoNotFound}>
-              <Text style={styles.geoNotFoundText}>
-                Ubicación no encontrada. Revisá la ciudad y el país.
-              </Text>
-            </View>
-          )}
 
           <TouchableOpacity style={styles.outlineBtn} activeOpacity={0.8}>
             <Text style={styles.outlineBtnText}>Elegir país de la lista</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Fecha — solo para real */}
+        {/* Fecha — solo para real, wheel picker */}
         {tipo === 'real' && (
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>Fecha de inicio</Text>
-            <View style={styles.dateRow}>
-              <TextInput
-                style={[styles.input, styles.datePart]}
-                placeholder="DD"
-                placeholderTextColor={MUTED}
-                value={dia}
-                onChangeText={(t) => setDia(t.replace(/\D/g, '').slice(0, 2))}
-                keyboardType="number-pad"
-                maxLength={2}
-              />
-              <TextInput
-                style={[styles.input, styles.datePart]}
-                placeholder="MM"
-                placeholderTextColor={MUTED}
-                value={mes}
-                onChangeText={(t) => setMes(t.replace(/\D/g, '').slice(0, 2))}
-                keyboardType="number-pad"
-                maxLength={2}
-              />
-              <TextInput
-                style={[styles.input, styles.dateYear]}
-                placeholder="AAAA"
-                placeholderTextColor={MUTED}
-                value={anio}
-                onChangeText={(t) => setAnio(t.replace(/\D/g, '').slice(0, 4))}
-                keyboardType="number-pad"
-                maxLength={4}
-              />
+            <View key={formKey} style={styles.wheelContainer}>
+              {/* Highlight bar at center row */}
+              <View pointerEvents="none" style={styles.wheelHighlight} />
+              <WheelColumn items={DAYS} initialIndex={dayIdx} onChange={setDia} width={70} />
+              <WheelColumn items={MONTHS} initialIndex={monthIdx} onChange={setMes} width={88} />
+              <WheelColumn items={YEARS} initialIndex={yearIdx} onChange={setAnio} width={96} />
             </View>
           </View>
         )}
@@ -436,45 +566,63 @@ const styles = StyleSheet.create({
     paddingTop: 64,
     paddingBottom: 40,
   },
+
+  // Title — premium serif centered
   title: {
-    fontSize: 28,
+    fontFamily: 'Georgia',
+    fontSize: 26,
     fontWeight: '700',
     color: GOLD,
-    letterSpacing: 0.5,
-    marginBottom: 6,
+    letterSpacing: 2.5,
+    textTransform: 'uppercase',
+    textAlign: 'center',
+    marginBottom: 8,
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: 13,
     color: MUTED,
-    marginBottom: 32,
+    textAlign: 'center',
+    letterSpacing: 0.3,
+    marginBottom: 36,
   },
 
-  // Toggle
-  toggleContainer: {
+  // Toggle — animated switch with labels
+  toggleRow: {
     flexDirection: 'row',
-    backgroundColor: SURFACE,
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: 32,
-    borderWidth: 1,
-    borderColor: BORDER,
-  },
-  toggleBtn: {
-    flex: 1,
-    paddingVertical: 10,
     alignItems: 'center',
-    borderRadius: 9,
+    justifyContent: 'center',
+    gap: 14,
+    marginBottom: 32,
   },
-  toggleBtnActive: {
-    backgroundColor: GOLD,
+  toggleLabelWrap: {
+    flex: 1,
+    alignItems: 'center',
   },
-  toggleText: {
-    fontSize: 14,
+  toggleLabel: {
+    fontSize: 13,
     fontWeight: '600',
     color: MUTED,
+    textAlign: 'center',
   },
-  toggleTextActive: {
-    color: BG,
+  toggleLabelActive: {
+    color: GOLD,
+  },
+  toggleTrack: {
+    width: TRACK_W,
+    height: THUMB_D + 4,
+    borderRadius: (THUMB_D + 4) / 2,
+    borderWidth: 1,
+    borderColor: GOLD,
+    backgroundColor: 'rgba(212,175,55,0.15)',
+    position: 'relative',
+  },
+  toggleThumb: {
+    position: 'absolute',
+    top: 2,
+    width: THUMB_D,
+    height: THUMB_D,
+    borderRadius: THUMB_D / 2,
+    backgroundColor: GOLD,
   },
 
   // Sections
@@ -488,12 +636,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
     textTransform: 'uppercase',
     marginBottom: 12,
-  },
-  sectionHint: {
-    fontSize: 12,
-    color: MUTED,
-    marginBottom: 12,
-    marginTop: -6,
   },
   optional: {
     fontSize: 11,
@@ -520,23 +662,40 @@ const styles = StyleSheet.create({
     paddingTop: 13,
   },
 
-  // Date
-  dateRow: {
-    flexDirection: 'row',
-    gap: 8,
+  // Photo card
+  photoCard: {
+    backgroundColor: SURFACE,
+    borderWidth: 1,
+    borderColor: 'rgba(212,175,55,0.4)',
+    borderRadius: 12,
+    height: 108,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+    gap: 5,
   },
-  datePart: {
-    flex: 1,
-    textAlign: 'center',
-    marginBottom: 0,
+  photoCardIcon: {
+    fontSize: 20,
+    color: GOLD,
   },
-  dateYear: {
-    flex: 1.8,
-    textAlign: 'center',
-    marginBottom: 0,
+  photoCardText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: TEXT,
+    letterSpacing: 0.5,
+  },
+  photoCardHint: {
+    fontSize: 12,
+    color: MUTED,
+    letterSpacing: 0.3,
+  },
+  photoHint: {
+    fontSize: 12,
+    color: MUTED,
+    marginTop: -4,
   },
 
-  // Photos
+  // Photos grid
   photosRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -587,32 +746,40 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
   },
-  addPhotoGroup: {
+
+  // Wheel picker
+  wheelContainer: {
     flexDirection: 'row',
-    gap: 10,
-  },
-  addPhotoBtn: {
-    width: 80,
-    height: 80,
     backgroundColor: SURFACE,
     borderWidth: 1,
     borderColor: BORDER,
-    borderRadius: 8,
-    borderStyle: 'dashed',
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    position: 'relative',
+    overflow: 'hidden',
+    gap: 0,
   },
-  addPhotoIcon: {
-    fontSize: 22,
+  wheelHighlight: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: ITEM_H,
+    height: ITEM_H,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: GOLD,
+    opacity: 0.35,
+    zIndex: 1,
   },
-  addPhotoLabel: {
-    fontSize: 10,
-    color: MUTED,
-    fontWeight: '600',
+  wheelItem: {
+    fontSize: 18,
+    color: TEXT,
+    fontFamily: 'Georgia',
+    letterSpacing: 0.5,
   },
 
-  // Outline buttons (placeholders)
+  // Outline buttons
   outlineBtn: {
     borderWidth: 1,
     borderColor: BORDER,
@@ -629,6 +796,17 @@ const styles = StyleSheet.create({
   },
   outlineBtnDisabled: {
     opacity: 0.5,
+  },
+  outlineBtnSuccess: {
+    borderColor: 'rgba(212,175,55,0.5)',
+    backgroundColor: 'rgba(212,175,55,0.07)',
+  },
+  outlineBtnTextSuccess: {
+    color: GOLD,
+    fontWeight: '600',
+  },
+  outlineBtnTextError: {
+    color: '#e07070',
   },
 
   geoFound: {

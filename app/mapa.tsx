@@ -1,12 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
-import { Animated, Image, StyleSheet, Text, View } from 'react-native';
-import MapView, { Callout, Marker, Region } from 'react-native-maps';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import MapView, { Marker, Region } from 'react-native-maps';
+import Svg, { Circle, Path } from 'react-native-svg';
 import NavBar from '../components/NavBar';
 
 const GOLD = '#d4af37';
-const GREEN = '#3ecf72';
+const GREEN = '#1a3a6e';
 const BG = '#01050d';
 
 interface Trip {
@@ -20,6 +21,14 @@ interface Trip {
   coords: { lat: number; lng: number } | null;
 }
 
+interface TripGroup {
+  key: string;
+  lat: number;
+  lng: number;
+  trips: Trip[];
+  hasReal: boolean;
+}
+
 const WORLD: Region = {
   latitude: 20,
   longitude: 10,
@@ -27,63 +36,42 @@ const WORLD: Region = {
   longitudeDelta: 130,
 };
 
-// ─── PINES CUSTOM ─────────────────────────────────────────────────────────────
+// ─── PINES TIPO ALFILER ───────────────────────────────────────────────────────
 
 function PinReal() {
   return (
-    <View style={pin.wrap}>
-      <View style={[pin.circle, { backgroundColor: GREEN, borderColor: '#25a35a' }]}>
-        <Text style={pin.icon}>✈</Text>
-      </View>
-      <View style={[pin.tail, { borderTopColor: GREEN }]} />
-    </View>
+    <Svg width={22} height={30} viewBox="0 0 22 30">
+      <Path
+        d="M11 1C5.5 1 1 5.5 1 11C1 18.5 11 29 11 29C11 29 21 18.5 21 11C21 5.5 16.5 1 11 1Z"
+        fill={GREEN}
+        stroke="#0d2550"
+        strokeWidth={1}
+      />
+      <Circle cx={11} cy={11} r={3.5} fill="rgba(255,255,255,0.9)" />
+    </Svg>
   );
 }
 
 function PinWishlist() {
   return (
-    <View style={pin.wrap}>
-      <View style={[pin.circle, { backgroundColor: GOLD, borderColor: '#a88620' }]}>
-        <Text style={pin.icon}>★</Text>
-      </View>
-      <View style={[pin.tail, { borderTopColor: GOLD }]} />
-    </View>
+    <Svg width={22} height={30} viewBox="0 0 22 30">
+      <Path
+        d="M11 1C5.5 1 1 5.5 1 11C1 18.5 11 29 11 29C11 29 21 18.5 21 11C21 5.5 16.5 1 11 1Z"
+        fill={GOLD}
+        stroke="#a88620"
+        strokeWidth={1}
+      />
+      <Circle cx={11} cy={11} r={3.5} fill="rgba(255,255,255,0.9)" />
+    </Svg>
   );
 }
-
-const pin = StyleSheet.create({
-  wrap: { alignItems: 'center' },
-  circle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.4,
-    shadowRadius: 4,
-    elevation: 6,
-  },
-  icon: { fontSize: 15, color: '#fff' },
-  tail: {
-    width: 0,
-    height: 0,
-    borderLeftWidth: 5,
-    borderRightWidth: 5,
-    borderTopWidth: 7,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    marginTop: -1,
-  },
-});
 
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 
 export default function Mapa() {
   const router = useRouter();
   const [trips, setTrips] = useState<Trip[]>([]);
+  const [selectedGroup, setSelectedGroup] = useState<Trip[] | null>(null);
   const opacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -96,8 +84,23 @@ export default function Mapa() {
     Animated.timing(opacity, { toValue: 1, duration: 700, useNativeDriver: true }).start();
   }, []);
 
-  const realCount = trips.filter((t) => t.tipo === 'real').length;
-  const wishCount = trips.filter((t) => t.tipo === 'wishlist').length;
+  // Group trips by rounded coordinate so overlapping pins merge
+  const groups = useMemo<TripGroup[]>(() => {
+    const map: Record<string, Trip[]> = {};
+    for (const t of trips) {
+      if (!t.coords) continue;
+      const key = `${t.coords.lat.toFixed(3)},${t.coords.lng.toFixed(3)}`;
+      if (!map[key]) map[key] = [];
+      map[key].push(t);
+    }
+    return Object.entries(map).map(([key, tripList]) => ({
+      key,
+      lat: tripList[0].coords!.lat,
+      lng: tripList[0].coords!.lng,
+      trips: tripList,
+      hasReal: tripList.some((t) => t.tipo === 'real'),
+    }));
+  }, [trips]);
 
   return (
     <View style={styles.root}>
@@ -113,73 +116,96 @@ export default function Mapa() {
           pitchEnabled={false}
           toolbarEnabled={false}
         >
-          {trips.map((trip) => {
-            if (!trip.coords) return null;
-            const isReal = trip.tipo === 'real';
-            const cover = trip.portada ?? trip.fotos[0] ?? null;
-
-            return (
-              <Marker
-                key={trip.id}
-                coordinate={{ latitude: trip.coords.lat, longitude: trip.coords.lng }}
-                tracksViewChanges={false}
-                onCalloutPress={!isReal ? () => router.push('/cargar') : undefined}
-              >
-                {isReal ? <PinReal /> : <PinWishlist />}
-
-                <Callout tooltip>
-                  {isReal ? (
-                    <View style={styles.callout}>
-                      {cover ? (
-                        <Image source={{ uri: cover }} style={styles.calloutImg} />
-                      ) : (
-                        <View style={styles.calloutImgEmpty}>
-                          <Text style={styles.calloutImgEmptyIcon}>✈</Text>
-                        </View>
-                      )}
-                      <View style={styles.calloutBody}>
-                        <Text style={styles.calloutCity}>{trip.ciudad}</Text>
-                        <Text style={styles.calloutCountry}>{trip.pais}</Text>
-                        {trip.fechaInicio ? (
-                          <Text style={styles.calloutDate}>◆ {trip.fechaInicio}</Text>
-                        ) : null}
-                      </View>
-                    </View>
-                  ) : (
-                    <View style={styles.callout}>
-                      <View style={styles.calloutBody}>
-                        <View style={styles.wishBadge}>
-                          <Text style={styles.wishBadgeText}>DESTINO FUTURO</Text>
-                        </View>
-                        <Text style={styles.calloutCity}>{trip.ciudad}</Text>
-                        <Text style={styles.calloutCountry}>{trip.pais}</Text>
-                        <View style={styles.calloutBtn}>
-                          <Text style={styles.calloutBtnText}>Cargar viaje →</Text>
-                        </View>
-                      </View>
-                    </View>
-                  )}
-                </Callout>
-              </Marker>
-            );
-          })}
+          {groups.map((group) => (
+            <Marker
+              key={group.key}
+              coordinate={{ latitude: group.lat, longitude: group.lng }}
+              tracksViewChanges={false}
+              onPress={() => setSelectedGroup(group.trips)}
+            >
+              {group.hasReal ? <PinReal /> : <PinWishlist />}
+            </Marker>
+          ))}
         </MapView>
 
-        {/* Leyenda */}
-        <View style={styles.legend}>
-          <View style={styles.legendRow}>
-            <View style={[styles.legendDot, { backgroundColor: GREEN }]} />
-            <Text style={styles.legendText}>
-              {realCount} {realCount === 1 ? 'realizado' : 'realizados'}
-            </Text>
+        {/* Overlay card — aparece al tocar un pin */}
+        {selectedGroup && (
+          <View style={styles.overlayWrap}>
+            <TouchableOpacity
+              style={styles.overlayBackdrop}
+              activeOpacity={1}
+              onPress={() => setSelectedGroup(null)}
+            />
+            <View style={styles.overlayCard}>
+              <View style={styles.overlayHandle} />
+              <View style={styles.overlayHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.overlayCity}>{selectedGroup[0].ciudad}</Text>
+                  <Text style={styles.overlayCountry}>{selectedGroup[0].pais}</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.overlayCloseBtn}
+                  onPress={() => setSelectedGroup(null)}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Text style={styles.overlayCloseText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView
+                style={styles.overlayScroll}
+                nestedScrollEnabled
+                showsVerticalScrollIndicator={false}
+              >
+                {selectedGroup.map((trip) => {
+                  const cover = trip.portada ?? trip.fotos[0] ?? null;
+                  const isReal = trip.tipo === 'real';
+                  return (
+                    <TouchableOpacity
+                      key={trip.id}
+                      style={styles.tripRow}
+                      activeOpacity={isReal ? 1 : 0.7}
+                      onPress={
+                        !isReal
+                          ? () => { setSelectedGroup(null); router.push('/cargar'); }
+                          : undefined
+                      }
+                    >
+                      {cover ? (
+                        <Image source={{ uri: cover }} style={styles.tripRowImg} />
+                      ) : (
+                        <View style={[
+                          styles.tripRowImgEmpty,
+                          { borderColor: isReal ? GREEN : GOLD },
+                        ]}>
+                          <View style={[
+                            styles.tripRowImgDot,
+                            { backgroundColor: isReal ? GREEN : GOLD },
+                          ]} />
+                        </View>
+                      )}
+                      <View style={styles.tripRowInfo}>
+                        <Text style={styles.tripRowCity}>{trip.ciudad}</Text>
+                        <Text style={styles.tripRowCountry}>{trip.pais}</Text>
+                        {isReal && trip.fechaInicio ? (
+                          <Text style={styles.tripRowDate}>◆ {trip.fechaInicio}</Text>
+                        ) : !isReal ? (
+                          <View style={styles.tripRowBadge}>
+                            <Text style={styles.tripRowBadgeText}>DESTINO FUTURO</Text>
+                          </View>
+                        ) : null}
+                      </View>
+                      {!isReal && (
+                        <Text style={styles.tripRowArrow}>→</Text>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+                <View style={{ height: 8 }} />
+              </ScrollView>
+            </View>
           </View>
-          <View style={styles.legendRow}>
-            <View style={[styles.legendDot, { backgroundColor: GOLD }]} />
-            <Text style={styles.legendText}>
-              {wishCount} {wishCount === 1 ? 'futuro' : 'futuros'}
-            </Text>
-          </View>
-        </View>
+        )}
       </Animated.View>
 
       <NavBar />
@@ -201,113 +227,148 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // Leyenda
-  legend: {
+  // Overlay backdrop + card
+  overlayWrap: {
     position: 'absolute',
-    top: 52,
-    right: 14,
-    backgroundColor: 'rgba(1,5,13,0.85)',
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(212,175,55,0.18)',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'flex-end',
   },
-  legendRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  overlayBackdrop: {
+    flex: 1,
   },
-  legendDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  legendText: {
-    fontSize: 12,
-    color: '#e8e0d0',
-    fontWeight: '500',
-  },
-
-  // Callout base
-  callout: {
+  overlayCard: {
     backgroundColor: '#0d1a2e',
-    borderRadius: 14,
-    overflow: 'hidden',
-    minWidth: 190,
-    maxWidth: 230,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(212,175,55,0.22)',
+    maxHeight: '55%',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.45,
-    shadowRadius: 10,
-    elevation: 10,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 16,
   },
-  calloutImg: {
-    width: '100%',
-    height: 100,
+  overlayHandle: {
+    width: 36,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignSelf: 'center',
+    marginTop: 10,
+    marginBottom: 4,
   },
-  calloutImgEmpty: {
-    width: '100%',
-    height: 70,
+  overlayHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: 18,
+    paddingTop: 10,
+    paddingBottom: 12,
+    borderBottomWidth: 0.5,
+    borderBottomColor: 'rgba(212,175,55,0.12)',
+  },
+  overlayCity: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#e8e0d0',
+    letterSpacing: 0.3,
+  },
+  overlayCountry: {
+    fontSize: 12,
+    color: '#4a5a6a',
+    marginTop: 2,
+  },
+  overlayCloseBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  overlayCloseText: {
+    fontSize: 12,
+    color: '#6b7a8d',
+    fontWeight: '700',
+  },
+  overlayScroll: {
+    paddingTop: 4,
+  },
+
+  // Trip rows inside overlay
+  tripRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 0.5,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+    gap: 12,
+  },
+  tripRowImg: {
+    width: 52,
+    height: 52,
+    borderRadius: 8,
+    flexShrink: 0,
+  },
+  tripRowImgEmpty: {
+    width: 52,
+    height: 52,
+    borderRadius: 8,
+    borderWidth: 1,
+    flexShrink: 0,
     backgroundColor: '#0b1525',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  calloutImgEmptyIcon: {
-    fontSize: 28,
-    opacity: 0.25,
+  tripRowImgDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    opacity: 0.5,
   },
-  calloutBody: {
-    padding: 13,
-    gap: 3,
+  tripRowInfo: {
+    flex: 1,
+    gap: 2,
   },
-  calloutCity: {
-    fontSize: 15,
+  tripRowCity: {
+    fontSize: 14,
     fontWeight: '700',
     color: '#e8e0d0',
   },
-  calloutCountry: {
+  tripRowCountry: {
     fontSize: 12,
     color: '#4a5a6a',
-    marginTop: 1,
   },
-  calloutDate: {
-    marginTop: 6,
+  tripRowDate: {
     fontSize: 11,
     color: GOLD,
     fontWeight: '600',
     letterSpacing: 0.3,
+    marginTop: 3,
   },
-
-  // Wishlist callout extras
-  wishBadge: {
+  tripRowBadge: {
     alignSelf: 'flex-start',
     backgroundColor: 'rgba(212,175,55,0.12)',
-    borderRadius: 5,
-    paddingVertical: 3,
-    paddingHorizontal: 7,
-    marginBottom: 6,
+    borderRadius: 4,
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    marginTop: 4,
   },
-  wishBadgeText: {
+  tripRowBadgeText: {
     fontSize: 9,
     color: GOLD,
     fontWeight: '700',
-    letterSpacing: 1.2,
+    letterSpacing: 1,
   },
-  calloutBtn: {
-    marginTop: 10,
-    backgroundColor: GOLD,
-    borderRadius: 8,
-    paddingVertical: 9,
-    alignItems: 'center',
-  },
-  calloutBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#01050d',
-    letterSpacing: 0.3,
+  tripRowArrow: {
+    fontSize: 16,
+    color: GOLD,
+    opacity: 0.6,
+    flexShrink: 0,
   },
 });

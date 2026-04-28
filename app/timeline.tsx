@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
+  Dimensions,
   FlatList,
   Image,
   StyleSheet,
@@ -14,10 +15,29 @@ import NavBar from '../components/NavBar';
 
 const BG = '#01050d';
 const GOLD = '#d4af37';
-const SURFACE = '#0b1525';
 const BORDER = '#1a2d46';
 const TEXT = '#e8e0d0';
 const MUTED = '#4a5a6a';
+
+const { height: SCREEN_H } = Dimensions.get('window');
+
+// Layout constants
+const CARD_H = 215;
+const CAPTION_H = 66;
+const ITEM_MB = 40;
+const ITEM_H = CARD_H + CAPTION_H + ITEM_MB;
+const AXIS_X = 36;      // left edge of the golden line (2px wide, center at 37)
+const CARD_START = 68;  // paddingLeft of the list → where cards begin
+const DOT_R = 7;        // radius of axis dot
+const HEADER_H = 130;   // approximate header height
+const LIST_PT = 24;
+
+// Precomputed connector geometry (relative to card-left = CARD_START)
+const AXIS_CENTER_X = AXIS_X + 1;                    // 37 (screen)
+const DOT_LEFT = AXIS_CENTER_X - DOT_R - CARD_START; // -34 (rel. to card)
+const BAR_LEFT = DOT_LEFT + DOT_R * 2;               // -20
+const BAR_W = -BAR_LEFT;                             // 20
+const CHAIN_WRAP_LEFT = AXIS_CENTER_X - CARD_START - 2; // -29 (centers 4px dot on axis)
 
 interface Trip {
   id: string;
@@ -54,58 +74,78 @@ function formatDate(s: string | null): string {
 function TripCard({
   trip,
   index,
+  scrollY,
   onPress,
+  isChained,
 }: {
   trip: Trip;
   index: number;
+  scrollY: Animated.Value;
   onPress: () => void;
+  isChained: boolean;
 }) {
-  const opacity = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(20)).current;
+  // Scroll Y value at which this card is centered on screen
+  const itemCenterInContent = LIST_PT + index * ITEM_H + CARD_H / 2;
+  const optimalScroll = HEADER_H + itemCenterInContent - SCREEN_H / 2;
 
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(opacity, {
-        toValue: 1,
-        duration: 400,
-        delay: Math.min(index, 8) * 75,
-        useNativeDriver: true,
-      }),
-      Animated.timing(translateY, {
-        toValue: 0,
-        duration: 400,
-        delay: Math.min(index, 8) * 75,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, []);
+  const scale = scrollY.interpolate({
+    inputRange: [optimalScroll - ITEM_H, optimalScroll, optimalScroll + ITEM_H],
+    outputRange: [0.82, 1, 0.82],
+    extrapolate: 'clamp',
+  });
+
+  const opacity = scrollY.interpolate({
+    inputRange: [optimalScroll - ITEM_H, optimalScroll, optimalScroll + ITEM_H],
+    outputRange: [0.38, 1, 0.38],
+    extrapolate: 'clamp',
+  });
 
   const cover = trip.portada ?? trip.fotos[0] ?? null;
 
   return (
-    <Animated.View style={[styles.cardWrap, { opacity, transform: [{ translateY }] }]}>
-      <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.75}>
+    <Animated.View style={[styles.itemWrap, { opacity, transform: [{ scale }] }]}>
+
+      {/* Multi-destination connector: 3 dots between this and previous chained card */}
+      {isChained && (
+        <View style={styles.chainWrap}>
+          <View style={styles.chainDot} />
+          <View style={styles.chainDot} />
+          <View style={styles.chainDot} />
+        </View>
+      )}
+
+      {/* Axis dot – sits on top of the golden line */}
+      <View style={styles.axisDot} />
+
+      {/* Short horizontal bar from dot to card edge */}
+      <View style={styles.axisBar} />
+
+      {/* Main card: image fills the whole rectangle */}
+      <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
         {cover ? (
-          <Image source={{ uri: cover }} style={styles.cover} />
+          <Image source={{ uri: cover }} style={styles.cardImage} resizeMode="cover" />
         ) : (
-          <View style={[styles.cover, styles.coverEmpty]}>
-            <Text style={styles.coverEmptyIcon}>✈</Text>
+          <View style={[styles.cardImage, styles.cardImageEmpty]}>
+            <Text style={styles.noPhotoIcon}>✈</Text>
           </View>
         )}
+        {/* Dark vignette at bottom for legibility */}
+        <View style={styles.cardVignette} />
+      </TouchableOpacity>
 
-        <View style={styles.info}>
-          <Text style={styles.city} numberOfLines={1}>{trip.ciudad}</Text>
-          <Text style={styles.country} numberOfLines={1}>{trip.pais}</Text>
+      {/* Caption below the card */}
+      <View style={styles.caption}>
+        <Text style={styles.captionCity} numberOfLines={1}>{trip.ciudad}</Text>
+        <View style={styles.captionRow}>
+          <Text style={styles.captionCountry}>{trip.pais}</Text>
           {trip.fechaInicio ? (
-            <View style={styles.dateRow}>
-              <Text style={styles.dateDot}>◆</Text>
-              <Text style={styles.date}>{formatDate(trip.fechaInicio)}</Text>
-            </View>
+            <>
+              <Text style={styles.captionSep}>·</Text>
+              <Text style={styles.captionDate}>{formatDate(trip.fechaInicio)}</Text>
+            </>
           ) : null}
         </View>
-
-        <Text style={styles.arrow}>›</Text>
-      </TouchableOpacity>
+      </View>
     </Animated.View>
   );
 }
@@ -116,6 +156,7 @@ export default function Timeline() {
   const router = useRouter();
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
+  const scrollY = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     async function load() {
@@ -158,19 +199,35 @@ export default function Timeline() {
           </Text>
         </View>
       ) : (
-        <FlatList
-          data={trips}
-          keyExtractor={(t) => t.id}
-          contentContainerStyle={styles.list}
-          showsVerticalScrollIndicator={false}
-          renderItem={({ item, index }) => (
-            <TripCard
-              trip={item}
-              index={index}
-              onPress={() => router.push(`/detalle?id=${item.id}`)}
-            />
-          )}
-        />
+        <View style={styles.listContainer}>
+          {/* Fixed golden vertical axis – stays still while cards scroll */}
+          <View style={styles.axisLine} pointerEvents="none" />
+
+          <FlatList
+            data={trips}
+            keyExtractor={(t) => t.id}
+            contentContainerStyle={styles.list}
+            showsVerticalScrollIndicator={false}
+            scrollEventThrottle={16}
+            onScroll={Animated.event(
+              [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+              { useNativeDriver: false }
+            )}
+            renderItem={({ item, index }) => {
+              const prev = index > 0 ? trips[index - 1] : null;
+              const isChained = !!(item.chainId && prev?.chainId === item.chainId);
+              return (
+                <TripCard
+                  trip={item}
+                  index={index}
+                  scrollY={scrollY}
+                  onPress={() => router.push(`/detalle?id=${item.id}`)}
+                  isChained={isChained}
+                />
+              );
+            }}
+          />
+        </View>
       )}
 
       <NavBar />
@@ -181,10 +238,7 @@ export default function Timeline() {
 // ─── STYLES ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: BG,
-  },
+  root: { flex: 1, backgroundColor: BG },
 
   header: {
     paddingTop: 60,
@@ -206,99 +260,149 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
 
-  list: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 20,
+  listContainer: {
+    flex: 1,
+    position: 'relative',
   },
 
-  cardWrap: {
-    marginBottom: 14,
+  // ── Golden vertical axis (fixed, behind cards) ──
+  axisLine: {
+    position: 'absolute',
+    left: AXIS_X,
+    top: 0,
+    bottom: 0,
+    width: 2,
+    backgroundColor: GOLD,
+    opacity: 0.6,
   },
-  card: {
-    flexDirection: 'row',
+
+  list: {
+    paddingLeft: CARD_START,
+    paddingRight: 20,
+    paddingTop: LIST_PT,
+    paddingBottom: 120,
+  },
+
+  itemWrap: {
+    marginBottom: ITEM_MB,
+    position: 'relative',
+  },
+
+  // Dot that sits centered on the axis line
+  axisDot: {
+    position: 'absolute',
+    left: DOT_LEFT,
+    top: CARD_H / 2 - DOT_R,
+    width: DOT_R * 2,
+    height: DOT_R * 2,
+    borderRadius: DOT_R,
+    backgroundColor: GOLD,
+    borderWidth: 2,
+    borderColor: BG,
+    zIndex: 2,
+  },
+
+  // Short horizontal bar connecting dot to card left edge
+  axisBar: {
+    position: 'absolute',
+    left: BAR_LEFT,
+    top: CARD_H / 2 - 1,
+    width: BAR_W,
+    height: 2,
+    backgroundColor: GOLD,
+    opacity: 0.4,
+  },
+
+  // Three dots between chained (multi-destination) cards
+  chainWrap: {
+    position: 'absolute',
+    left: CHAIN_WRAP_LEFT,
+    top: -(ITEM_MB / 2 + 8),
+    width: 4,
     alignItems: 'center',
-    backgroundColor: SURFACE,
-    borderRadius: 14,
+    gap: 5,
+  },
+  chainDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: GOLD,
+    opacity: 0.55,
+  },
+
+  // ── Card: image fills the full rectangle ──
+  card: {
+    height: CARD_H,
+    borderRadius: 20,
+    overflow: 'hidden',
     borderWidth: 1,
     borderColor: BORDER,
-    borderLeftWidth: 3,
-    borderLeftColor: GOLD,
-    padding: 12,
-    gap: 14,
   },
-
-  cover: {
-    width: 72,
-    height: 72,
-    borderRadius: 10,
-    flexShrink: 0,
+  cardImage: {
+    width: '100%',
+    height: '100%',
   },
-  coverEmpty: {
+  cardImageEmpty: {
     backgroundColor: '#0d1a2e',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: BORDER,
   },
-  coverEmptyIcon: {
-    fontSize: 28,
-    opacity: 0.35,
+  noPhotoIcon: {
+    fontSize: 40,
+    opacity: 0.25,
+  },
+  cardVignette: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 80,
+    backgroundColor: 'rgba(1,5,13,0.52)',
   },
 
-  info: {
-    flex: 1,
+  // ── Caption below card ──
+  caption: {
+    marginTop: 10,
+    paddingHorizontal: 4,
     gap: 3,
   },
-  city: {
+  captionCity: {
     fontSize: 17,
     fontWeight: '700',
     color: TEXT,
     letterSpacing: 0.2,
   },
-  country: {
-    fontSize: 13,
+  captionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  captionCountry: {
+    fontSize: 12,
     color: MUTED,
     letterSpacing: 0.3,
   },
-  dateRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    marginTop: 5,
+  captionSep: {
+    fontSize: 10,
+    color: MUTED,
+    opacity: 0.5,
   },
-  dateDot: {
-    fontSize: 6,
-    color: GOLD,
-  },
-  date: {
+  captionDate: {
     fontSize: 11,
     color: GOLD,
     fontWeight: '600',
     letterSpacing: 0.4,
   },
 
-  arrow: {
-    fontSize: 22,
-    color: MUTED,
-    marginRight: 2,
-  },
-
+  // ── Empty / loading states ──
   center: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 40,
   },
-  muted: {
-    fontSize: 14,
-    color: MUTED,
-  },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: 16,
-    opacity: 0.25,
-  },
+  muted: { fontSize: 14, color: MUTED },
+  emptyIcon: { fontSize: 48, marginBottom: 16, opacity: 0.25 },
   emptyTitle: {
     fontSize: 18,
     fontWeight: '700',
