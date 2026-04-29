@@ -103,9 +103,29 @@ function evaluate(trips: Trip[], stats: StatsResult): Set<string> {
   }
 
   // "Constante": real trips in 2+ different calendar years
-  const years = new Set(
-    real.map((t) => t.fechaInicio?.split('/')[2]).filter((y): y is string => !!y && y.length === 4)
-  );
+ const yearsArray = Array.from(
+  new Set(
+    real
+      .map((t) => t.fechaInicio?.split('/')[2])
+      .filter((y): y is string => !!y && y.length === 4)
+      .map((y) => parseInt(y))
+  )
+).sort((a, b) => a - b);
+
+// chequea 4 años consecutivos
+let consecutiveYears = 1;
+
+for (let i = 1; i < yearsArray.length; i++) {
+  if (yearsArray[i] === yearsArray[i - 1] + 1) {
+    consecutiveYears++;
+    if (consecutiveYears >= 4) {
+      // desbloquear "Constante"
+      break;
+    }
+  } else {
+    consecutiveYears = 1;
+  }
+}
 
   // Continent presence
   const conts   = new Set(stats.continentesNombres);
@@ -145,8 +165,9 @@ function evaluate(trips: Trip[], stats: StatsResult): Set<string> {
 
   // ── Actividad ──
   if (sinDesarmar)       earned.add('sin_desarmar');
-  if (years.size >= 2)   earned.add('constante');
-
+  if (consecutiveYears >= 4) {
+  earned.add('constante');
+}
   // ── Especiales ──
   if (europa && asia)    earned.add('marco_polo');
   if (america && europa) earned.add('colon');
