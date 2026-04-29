@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
+import { loadBadgeCount } from '../utils/achievementsEngine';
 import {
   Image, StyleSheet,
   Text,
@@ -146,6 +147,7 @@ export default function PassportOpen() {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [stats, setStats] = useState<StatsResult | null>(null);
   const [wishlistCount, setWishlistCount] = useState(0);
+  const [badgeCount, setBadgeCount] = useState(0);
 
   useEffect(() => {
     const loadData = async () => {
@@ -156,6 +158,8 @@ export default function PassportOpen() {
       const allTrips: Trip[] = raw ? JSON.parse(raw) : [];
       setWishlistCount(allTrips.filter((t) => t.tipo === 'wishlist').length);
       setStats(calcularStats(allTrips));
+      const bc = await loadBadgeCount();
+      setBadgeCount(bc);
     };
     loadData();
   }, []);
@@ -304,11 +308,22 @@ const icon = '◉ ';
               <Text style={[styles.fieldValue, { fontSize: 13 }]}>{userData?.nacionalidad}</Text>
             </View>
 
-            {/* Medalla dinámica según rango */}
-            <Medal
-              tier={stats?.rangoTier ?? 'bronce'}
-              rank={stats?.rangoActual ?? 'Novato'}
-            />
+            {/* Medalla dinámica según rango — tappable, con badge de logros nuevos */}
+            <TouchableOpacity
+              onPress={() => router.push('/medallero')}
+              activeOpacity={0.75}
+              style={styles.medalTouchable}
+            >
+              <Medal
+                tier={stats?.rangoTier ?? 'bronce'}
+                rank={stats?.rangoActual ?? 'Novato'}
+              />
+              {badgeCount > 0 && (
+                <View style={styles.medalBadge}>
+                  <Text style={styles.medalBadgeText}>{badgeCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
           </View>
 
           
@@ -719,5 +734,31 @@ xpBarWrap: {
     letterSpacing: 0.5,
     color: '#888',
     textTransform: 'uppercase',
+  },
+
+  // Medal touchable + badge
+  medalTouchable: {
+    position: 'relative',
+  },
+  medalBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -6,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#d94040',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: '#f0e8d0',
+    zIndex: 10,
+  },
+  medalBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#fff',
+    lineHeight: 13,
   },
 });

@@ -1,6 +1,9 @@
 import NavBar from '../components/NavBar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
+import { AchievementPopup } from '../components/AchievementPopup';
+import { Achievement, checkAndSaveAchievements } from '../utils/achievementsEngine';
+import { calcularStats, Trip as StatsTrip } from '../utils/statsEngine';
 import { LinearGradient } from 'expo-linear-gradient';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import React, { useEffect, useRef, useState } from 'react';
@@ -160,6 +163,7 @@ export default function CargarViaje() {
   const [geoStatus, setGeoStatus] = useState<'idle' | 'buscando' | 'encontrada' | 'no_encontrada' | 'error'>('idle');
   const [geoNombre, setGeoNombre] = useState('');
   const [formKey, setFormKey] = useState(0);
+  const [pendingAchievements, setPendingAchievements] = useState<Achievement[]>([]);
   const chainIdRef = useRef<string | null>(null);
   const scrollRef = useRef<any>(null);
 
@@ -332,6 +336,18 @@ export default function CargarViaje() {
     await AsyncStorage.setItem('trips', JSON.stringify(existing));
   }
 
+  async function _checkAchievements() {
+    try {
+      const raw = await AsyncStorage.getItem('trips');
+      const allTrips = raw ? JSON.parse(raw) : [];
+      const stats = calcularStats(allTrips as StatsTrip[]);
+      const newOnes = await checkAndSaveAchievements(allTrips as StatsTrip[], stats);
+      if (newOnes.length > 0) setPendingAchievements(newOnes);
+    } catch {
+      // silencioso — los logros no deben bloquear el flujo principal
+    }
+  }
+
   async function handleGuardar() {
     if (!validate()) return;
     Keyboard.dismiss();
@@ -341,6 +357,7 @@ export default function CargarViaje() {
       chainIdRef.current = null;
       resetForm();
       Alert.alert('¡Guardado!', `Tu ${tipo === 'real' ? 'viaje' : 'destino'} fue guardado correctamente.`);
+      _checkAchievements();
     } catch {
       Alert.alert('Error', 'No se pudo guardar. Intentá de nuevo.');
     }
@@ -357,6 +374,7 @@ export default function CargarViaje() {
       await saveTrip(trip);
       resetForm();
       Alert.alert('Destino guardado', 'Cargá el siguiente destino del mismo viaje.');
+      _checkAchievements();
     } catch {
       Alert.alert('Error', 'No se pudo guardar. Intentá de nuevo.');
     }
@@ -552,6 +570,12 @@ export default function CargarViaje() {
         <View style={styles.bottomSpacer} />
       </KeyboardAwareScrollView>
       <NavBar />
+      {pendingAchievements.length > 0 && (
+        <AchievementPopup
+          achievements={pendingAchievements}
+          onDone={() => setPendingAchievements([])}
+        />
+      )}
     </View>
   );
 }

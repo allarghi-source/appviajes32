@@ -1,12 +1,14 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import NavBar from '../components/NavBar';
 import {
   ALL_CONTINENTS,
   StatsResult,
   Trip,
   calcularStats,
+  getContinent,
 } from '../utils/statsEngine';
 
 const BG = '#01050d';
@@ -21,6 +23,58 @@ const TIER_COLOR: Record<string, string> = {
   plata: '#c0c0c0',
   oro: '#ffd700',
 };
+
+// Países soberanos por continente (denominador para el porcentaje)
+const CONTINENT_TOTAL_COUNTRIES: Record<string, number> = {
+  'América del Norte': 23,
+  'América del Sur': 12,
+  'Europa': 44,
+  'África': 54,
+  'Asia': 48,
+  'Oceanía': 14,
+};
+
+// Siluetas geográficas por continente — viewBox 0 0 64 64 (todos los puntos dentro del rango)
+const CONTINENT_PATHS: Record<string, string[]> = {
+  // Ancha arriba (Canadá), se estrecha hacia Centroamérica abajo a la derecha
+  'América del Norte': [
+    'M4,8 Q18,4 34,4 Q50,4 58,12 Q62,20 58,28 Q60,36 54,42 Q50,48 44,50 Q38,56 32,56 Q24,54 16,48 Q8,40 6,28 Q2,18 4,8 Z',
+  ],
+  // Pera: ancha al norte con bulge de Brasil al este, estrecha al sur
+  'América del Sur': [
+    'M16,5 Q28,2 42,6 Q54,14 58,26 Q60,38 54,50 Q46,60 36,62 Q24,62 16,52 Q8,42 8,28 Q8,16 16,5 Z',
+  ],
+  // Compacta e irregular (Iberia abajo-izquierda, Escandinavia arriba)
+  'Europa': [
+    'M18,5 Q32,2 44,6 Q54,12 58,22 Q60,30 54,36 Q58,44 48,50 Q36,54 24,52 Q12,48 6,38 Q2,28 6,16 Q10,6 18,5 Z',
+  ],
+  // Norte plano, bulge oeste (Golfo de Guinea), taper claro hacia el Cabo
+  'África': [
+    'M14,5 Q28,3 44,6 Q54,12 58,22 Q60,32 56,42 Q52,52 42,58 Q34,62 26,60 Q16,54 10,44 Q4,32 4,20 Q6,10 14,5 Z',
+  ],
+  // El más grande y ancho: ocupa casi todo el viewBox horizontalmente
+  'Asia': [
+    'M4,16 Q14,8 30,5 Q46,3 58,8 Q62,14 60,24 Q62,34 58,42 Q60,50 50,56 Q38,62 24,62 Q12,60 6,52 Q2,42 2,30 Q2,22 4,16 Z',
+  ],
+  // Australia (rectangular con costa norte irregular) + silueta NZ
+  'Oceanía': [
+    'M6,22 Q20,14 36,14 Q46,12 52,18 Q58,20 60,30 Q62,42 52,52 Q40,60 24,58 Q10,54 4,42 Q2,32 6,22 Z',
+    'M55,10 Q57,8 60,12 Q59,16 56,16 Q54,14 55,10 Z',
+  ],
+};
+
+function ContinentShape({ name, visited }: { name: string; visited: boolean }) {
+  const paths = CONTINENT_PATHS[name];
+  if (!paths) return null;
+  const color = visited ? GOLD : MUTED;
+  return (
+    <Svg width={58} height={58} viewBox="0 0 64 64">
+      {paths.map((d, i) => (
+        <Path key={i} d={d} fill={color} />
+      ))}
+    </Svg>
+  );
+}
 
 // ─── BARRA DE XP ──────────────────────────────────────────────────────────────
 
@@ -63,9 +117,17 @@ function XpSection({ stats }: { stats: StatsResult }) {
   );
 }
 
-// ─── CONTINENTES ──────────────────────────────────────────────────────────────
+// ─── CONTINENTES (GRID) ───────────────────────────────────────────────────────
 
-function ContinentesSection({ stats }: { stats: StatsResult }) {
+function ContinentesSection({
+  stats,
+  continentCounts,
+  continentUniqueCountries,
+}: {
+  stats: StatsResult;
+  continentCounts: Record<string, number>;
+  continentUniqueCountries: Record<string, number>;
+}) {
   const pct = Math.round(stats.porcentajeContinentes * 100);
   const visited = new Set(stats.continentesNombres);
 
@@ -78,23 +140,35 @@ function ContinentesSection({ stats }: { stats: StatsResult }) {
         </Text>
       </View>
 
-      {/* Barra general */}
       <View style={styles.progressWrap}>
         <View style={[styles.progressFill, { width: `${pct}%`, backgroundColor: GOLD }]} />
       </View>
       <Text style={styles.pctText}>{pct}% del mundo explorado</Text>
 
-      {/* Lista de continentes */}
-      <View style={styles.continentList}>
+      <View style={styles.continentGrid}>
         {ALL_CONTINENTS.map((cont) => {
           const done = visited.has(cont);
+          const trips = continentCounts[cont] ?? 0;
+          const uniqueVisited = continentUniqueCountries[cont] ?? 0;
+          const totalInContinent = CONTINENT_TOTAL_COUNTRIES[cont] ?? 1;
+          const contPct = done ? Math.round((uniqueVisited / totalInContinent) * 100) : 0;
+
           return (
-            <View key={cont} style={styles.continentRow}>
-              <View style={[styles.continentDot, done ? styles.continentDotOn : styles.continentDotOff]} />
-              <Text style={[styles.continentName, !done && styles.continentNameOff]}>
+            <View key={cont} style={[styles.continentCard, !done && styles.continentCardOff]}>
+              <View pointerEvents="none" style={styles.continentShapeWrap}>
+                <ContinentShape name={cont} visited={done} />
+              </View>
+              <Text style={[styles.continentPct, !done && styles.continentPctOff]}>
+                {done ? `${contPct}%` : '—'}
+              </Text>
+              <Text style={[styles.continentCardName, !done && styles.continentCardNameOff]}>
                 {cont}
               </Text>
-              {done && <Text style={styles.continentCheck}>✓</Text>}
+              <Text style={[styles.continentCardTrips, !done && styles.continentCardTripsOff]}>
+                {trips > 0
+                  ? `${trips} ${trips === 1 ? 'viaje' : 'viajes'}`
+                  : 'Sin visitar'}
+              </Text>
             </View>
           );
         })}
@@ -145,10 +219,40 @@ function TopPaisesSection({ stats }: { stats: StatsResult }) {
   );
 }
 
+// ─── TOP CIUDADES ─────────────────────────────────────────────────────────────
+
+function TopCiudadesSection({
+  topCiudades,
+}: {
+  topCiudades: Array<{ ciudad: string; visitas: number }>;
+}) {
+  if (topCiudades.length === 0) return null;
+
+  return (
+    <View style={styles.card}>
+      <Text style={styles.cardLabel}>TOP CIUDADES MÁS VISITADAS</Text>
+      <View style={styles.cityList}>
+        {topCiudades.map(({ ciudad, visitas }, i) => (
+          <View key={ciudad} style={styles.cityRow}>
+            <Text style={styles.paisRank}>#{i + 1}</Text>
+            <Text style={styles.cityName}>{ciudad}</Text>
+            <Text style={styles.cityCount}>
+              {visitas} {visitas === 1 ? 'viaje' : 'viajes'}
+            </Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 
 export default function Estadisticas() {
   const [stats, setStats] = useState<StatsResult | null>(null);
+  const [continentCounts, setContinentCounts] = useState<Record<string, number>>({});
+  const [continentUniqueCountries, setContinentUniqueCountries] = useState<Record<string, number>>({});
+  const [topCiudades, setTopCiudades] = useState<Array<{ ciudad: string; visitas: number }>>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -157,6 +261,44 @@ export default function Estadisticas() {
         const raw = await AsyncStorage.getItem('trips');
         const allTrips: Trip[] = raw ? JSON.parse(raw) : [];
         setStats(calcularStats(allTrips));
+
+        const realTrips = allTrips.filter((t) => t.tipo === 'real');
+
+        // Misma normalización que statsEngine usa internamente
+        const normPais = (s: string) =>
+          s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+
+        const contMap: Record<string, number> = {};
+        const contCountrySets: Record<string, Set<string>> = {};
+
+        for (const trip of realTrips) {
+          const cont = getContinent(trip.pais);
+          if (cont) {
+            contMap[cont] = (contMap[cont] ?? 0) + 1;
+            if (!contCountrySets[cont]) contCountrySets[cont] = new Set();
+            contCountrySets[cont].add(normPais(trip.pais));
+          }
+        }
+
+        const uniqueByContinent: Record<string, number> = {};
+        for (const [cont, set] of Object.entries(contCountrySets)) {
+          uniqueByContinent[cont] = set.size;
+        }
+
+        setContinentCounts(contMap);
+        setContinentUniqueCountries(uniqueByContinent);
+
+        const cityMap: Record<string, number> = {};
+        for (const trip of realTrips) {
+          if (trip.ciudad) {
+            cityMap[trip.ciudad] = (cityMap[trip.ciudad] ?? 0) + 1;
+          }
+        }
+        const sorted = Object.entries(cityMap)
+          .sort(([, a], [, b]) => b - a)
+          .slice(0, 10)
+          .map(([ciudad, visitas]) => ({ ciudad, visitas }));
+        setTopCiudades(sorted);
       } finally {
         setLoading(false);
       }
@@ -188,8 +330,13 @@ export default function Estadisticas() {
           contentContainerStyle={styles.scrollContent}
         >
           <XpSection stats={stats} />
-          <ContinentesSection stats={stats} />
+          <ContinentesSection
+            stats={stats}
+            continentCounts={continentCounts}
+            continentUniqueCountries={continentUniqueCountries}
+          />
           <TopPaisesSection stats={stats} />
+          <TopCiudadesSection topCiudades={topCiudades} />
           <View style={styles.bottomSpacer} />
         </ScrollView>
       )}
@@ -309,45 +456,69 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
-  // Continentes
+  // Continentes – barra general
   pctText: {
     fontSize: 12,
     color: MUTED,
     marginBottom: 16,
     marginTop: 4,
   },
-  continentList: {
-    gap: 10,
-  },
-  continentRow: {
+
+  // Continentes – grid de tarjetas
+  continentGrid: {
     flexDirection: 'row',
-    alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 10,
   },
-  continentDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  continentCard: {
+    width: '47%',
+    backgroundColor: 'rgba(212,175,55,0.07)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(212,175,55,0.3)',
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    overflow: 'hidden',
   },
-  continentDotOn: {
-    backgroundColor: GOLD,
+  continentCardOff: {
+    backgroundColor: 'rgba(26,45,70,0.25)',
+    borderColor: BORDER,
   },
-  continentDotOff: {
-    backgroundColor: BORDER,
+  continentShapeWrap: {
+    position: 'absolute',
+    right: -8,
+    top: -4,
+    opacity: 0.13,
   },
-  continentName: {
-    flex: 1,
-    fontSize: 14,
-    color: TEXT,
-    fontWeight: '500',
+  continentPct: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: GOLD,
+    letterSpacing: -0.5,
+    marginBottom: 3,
   },
-  continentNameOff: {
+  continentPctOff: {
+    fontSize: 22,
     color: MUTED,
   },
-  continentCheck: {
+  continentCardName: {
     fontSize: 12,
+    fontWeight: '600',
+    color: TEXT,
+    marginBottom: 4,
+    lineHeight: 16,
+  },
+  continentCardNameOff: {
+    color: MUTED,
+  },
+  continentCardTrips: {
+    fontSize: 11,
     color: GOLD,
-    fontWeight: '700',
+    opacity: 0.7,
+  },
+  continentCardTripsOff: {
+    color: MUTED,
+    opacity: 1,
   },
 
   // Top países
@@ -395,6 +566,26 @@ const styles = StyleSheet.create({
     backgroundColor: GOLD,
     borderRadius: 2,
     opacity: 0.7,
+  },
+
+  // Top ciudades
+  cityList: {
+    gap: 12,
+  },
+  cityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  cityName: {
+    flex: 1,
+    fontSize: 14,
+    color: TEXT,
+    fontWeight: '600',
+  },
+  cityCount: {
+    fontSize: 12,
+    color: MUTED,
   },
 
   // Empty state
