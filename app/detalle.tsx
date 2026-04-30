@@ -35,6 +35,7 @@ interface Trip {
   fotos: string[];
   portada: string | null;
   nota: string;
+  tipsViaje?: string;
   xp: number;
   distancia: number;
   chainId: string | null;
@@ -60,13 +61,28 @@ export default function DetalleViaje() {
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
   const router = useRouter();
 
+
+  
   const [trip, setTrip] = useState<Trip | null>(null);
   const [nota, setNota] = useState('');
+  const scrollViewRef = useRef<ScrollView>(null);
   const [editingNota, setEditingNota] = useState(false);
+  const [tipsViaje, setTipsViaje] = useState('');
+  const [editingTips, setEditingTips] = useState(false);
+  const [tipsInputHeight, setTipsInputHeight] = useState(120);
   const [saving, setSaving] = useState(false);
+  const paddedYRef = useRef(0);
+  const tipsCardYRef = useRef(0);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(28)).current;
+
+  const scrollToTipsCard = () => {
+    setTimeout(() => {
+      const y = paddedYRef.current + tipsCardYRef.current;
+      scrollViewRef.current?.scrollTo({ y: Math.max(0, y - 80), animated: true });
+    }, 350);
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -78,6 +94,7 @@ export default function DetalleViaje() {
         if (found) {
           setTrip(found);
           setNota(found.nota);
+          setTipsViaje(found.tipsViaje || '');
           Animated.parallel([
             Animated.timing(fadeAnim, { toValue: 1, duration: 360, useNativeDriver: true }),
             Animated.timing(slideAnim, { toValue: 0, duration: 360, useNativeDriver: true }),
@@ -161,7 +178,12 @@ export default function DetalleViaje() {
       <Animated.View
         style={[styles.animatedContent, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}
       >
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <ScrollView
+  showsVerticalScrollIndicator={false}
+  keyboardShouldPersistTaps="handled"
+  contentContainerStyle={{ paddingBottom: 80 }}
+  ref={scrollViewRef}
+>
 
           {/* ── GALERÍA ─────────────────────────────────────────────────────── */}
           {hasPhotos && (
@@ -223,7 +245,10 @@ export default function DetalleViaje() {
           )}
 
           {/* ── SECCIÓN PRINCIPAL ───────────────────────────────────────────── */}
-          <View style={styles.padded}>
+          <View
+            style={styles.padded}
+            onLayout={(e) => { paddedYRef.current = e.nativeEvent.layout.y; }}
+          >
 
             {/* Ubicación */}
             <View style={styles.locationCard}>
@@ -292,6 +317,91 @@ export default function DetalleViaje() {
                 <Text style={styles.notaEmpty}>Sin comentario</Text>
               )}
             </View>
+<View
+  style={styles.infoCard}
+  onLayout={(e) => { tipsCardYRef.current = e.nativeEvent.layout.y; }}
+>
+  <View style={styles.notaHeader}>
+    <Text style={styles.cardLabel}>TIPS DE VIAJE</Text>
+    {!editingTips && (
+      <TouchableOpacity onPress={() => setEditingTips(true)} activeOpacity={0.7}>
+        <Text style={styles.editLink}>
+          {tipsViaje ? 'Editar' : '+ Agregar'}
+        </Text>
+      </TouchableOpacity>
+    )}
+  </View>
+
+
+  {editingTips ? (
+    <>
+      <TextInput
+        style={[styles.notaInput, { height: Math.max(120, tipsInputHeight) }]}
+        autoFocus={true}
+        value={tipsViaje}
+        onChangeText={setTipsViaje}
+        onFocus={scrollToTipsCard}
+        onContentSizeChange={(e) => {
+          const newH = e.nativeEvent.contentSize.height + 28;
+          if (newH > tipsInputHeight) {
+            setTipsInputHeight(newH);
+            setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 60);
+          }
+        }}
+        multiline
+        maxLength={500}
+        placeholder="Cargar datos útiles de este destino, bares, restaurantes, lugares imperdibles..."
+        placeholderTextColor="#6fa8dc"
+        textAlignVertical="top"
+      />
+
+      <View style={styles.notaActions}>
+        <TouchableOpacity
+          style={styles.cancelBtn}
+          onPress={() => {
+            setTipsViaje(trip.tipsViaje || '');
+            setEditingTips(false);
+          }}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.cancelText}>Cancelar</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
+          onPress={async () => {
+            if (!trip) return;
+            await persistTrip({
+              ...trip,
+              tipsViaje: tipsViaje.trim(),
+            });
+            setEditingTips(false);
+          }}
+          disabled={saving}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.saveText}>
+            {saving ? 'Guardando...' : 'Guardar'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </>
+  ) : (
+  <TouchableOpacity
+    activeOpacity={0.8}
+    onPress={() => setEditingTips(true)}
+  >
+    {tipsViaje ? (
+      <Text style={styles.notaText}>{tipsViaje}</Text>
+    ) : (
+      <Text style={[styles.notaEmpty, { color: '#6fa8dc' }]}>
+        Cargar datos útiles de este destino, bares, restaurantes, lugares imperdibles...
+      </Text>
+    )}
+  </TouchableOpacity>
+)}
+  
+</View>
 
             <View style={styles.bottomSpacer} />
           </View>

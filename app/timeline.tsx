@@ -248,10 +248,14 @@ const styles = StyleSheet.create({
     borderBottomColor: BORDER,
   },
   headerTitle: {
-    fontSize: 28,
+    fontFamily: 'Georgia',
+    fontSize: 26,
     fontWeight: '700',
     color: GOLD,
-    letterSpacing: 0.5,
+    letterSpacing: 2.5,
+    textTransform: 'uppercase',
+    textAlign: 'center',
+    marginBottom: 8,
   },
   headerSub: {
     marginTop: 4,

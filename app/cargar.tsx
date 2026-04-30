@@ -4,7 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { AchievementPopup } from '../components/AchievementPopup';
 import { Achievement, checkAndSaveAchievements } from '../utils/achievementsEngine';
 import { calcularStats, Trip as StatsTrip } from '../utils/statsEngine';
-import { LinearGradient } from 'expo-linear-gradient';
+import { useLocalSearchParams } from 'expo-router';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -52,90 +52,77 @@ function buildFechaInicio(dia: string, mes: string, anio: string): string {
   return `${dia.padStart(2, '0')}/${mes.padStart(2, '0')}/${anio}`;
 }
 
-// ─── WHEEL PICKER ─────────────────────────────────────────────────────────────
+// ─── DATE DROPDOWN DATA ───────────────────────────────────────────────────────
 
-const ITEM_H = 36;
-const VISIBLE_ITEMS = 3;
-const WHEEL_H = ITEM_H * VISIBLE_ITEMS; // 108
-const WHEEL_PAD = ITEM_H;              // 1 item of padding so first/last can center
+interface DropItem { label: string; value: string; }
 
-const DAYS = Array.from({ length: 31 }, (_, i) => ({
+const DAYS: DropItem[] = Array.from({ length: 31 }, (_, i) => ({
   label: String(i + 1).padStart(2, '0'),
   value: String(i + 1),
 }));
 
-const MONTHS = [
-  { label: 'Ene', value: '1' },  { label: 'Feb', value: '2' },
-  { label: 'Mar', value: '3' },  { label: 'Abr', value: '4' },
-  { label: 'May', value: '5' },  { label: 'Jun', value: '6' },
-  { label: 'Jul', value: '7' },  { label: 'Ago', value: '8' },
-  { label: 'Sep', value: '9' },  { label: 'Oct', value: '10' },
-  { label: 'Nov', value: '11' }, { label: 'Dic', value: '12' },
+const MONTHS: DropItem[] = [
+  { label: 'Enero',      value: '1'  }, { label: 'Febrero',   value: '2'  },
+  { label: 'Marzo',      value: '3'  }, { label: 'Abril',     value: '4'  },
+  { label: 'Mayo',       value: '5'  }, { label: 'Junio',     value: '6'  },
+  { label: 'Julio',      value: '7'  }, { label: 'Agosto',    value: '8'  },
+  { label: 'Septiembre', value: '9'  }, { label: 'Octubre',   value: '10' },
+  { label: 'Noviembre',  value: '11' }, { label: 'Diciembre', value: '12' },
 ];
 
-const CUR_YEAR = new Date().getFullYear();
-const YEARS = Array.from({ length: CUR_YEAR - 1969 }, (_, i) => ({
-  label: String(1970 + i),
-  value: String(1970 + i),
+// Newest first so recent years are at the top
+const YEARS: DropItem[] = Array.from({ length: 2035 - 1980 + 1 }, (_, i) => ({
+  label: String(2035 - i),
+  value: String(2035 - i),
 }));
 
-interface WheelItem { label: string; value: string; }
+// ─── DROPDOWN LIST COMPONENT ──────────────────────────────────────────────────
 
-const WheelColumn = ({
+const DropdownList = ({
   items,
-  initialIndex,
-  onChange,
-  width = 80,
+  selected,
+  onSelect,
 }: {
-  items: WheelItem[];
-  initialIndex: number;
-  onChange: (value: string) => void;
-  width?: number;
+  items: DropItem[];
+  selected: string;
+  onSelect: (value: string) => void;
 }) => {
-  const scrollRef = useRef<ScrollView>(null);
+  const listRef = useRef<ScrollView>(null);
 
   useEffect(() => {
-    const t = setTimeout(() => {
-      scrollRef.current?.scrollTo({ y: Math.max(0, initialIndex) * ITEM_H, animated: false });
-    }, 80);
-    return () => clearTimeout(t);
+    const idx = items.findIndex((item) => item.value === selected);
+    if (idx > 1) {
+      setTimeout(() => {
+        listRef.current?.scrollTo({ y: (idx - 1) * 47, animated: false });
+      }, 60);
+    }
   }, []);
 
-  const handleEnd = (e: any) => {
-    const y = e.nativeEvent.contentOffset.y;
-    const index = Math.max(0, Math.min(Math.round(y / ITEM_H), items.length - 1));
-    onChange(items[index].value);
-  };
-
   return (
-    <View style={{ width, height: WHEEL_H, overflow: 'hidden' }}>
+    <View style={styles.dropList}>
       <ScrollView
-        ref={scrollRef}
-        style={{ flex: 1 }}
-        showsVerticalScrollIndicator={false}
-        snapToInterval={ITEM_H}
-        decelerationRate="fast"
+        ref={listRef}
         nestedScrollEnabled
-        onMomentumScrollEnd={handleEnd}
-        onScrollEndDrag={handleEnd}
-        contentContainerStyle={{ paddingVertical: WHEEL_PAD }}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-        {items.map((item, i) => (
-          <View key={i} style={{ height: ITEM_H, alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={styles.wheelItem}>{item.label}</Text>
-          </View>
-        ))}
+        {items.map((item) => {
+          const isSel = item.value === selected;
+          return (
+            <TouchableOpacity
+              key={item.value}
+              style={[styles.dropListItem, isSel && styles.dropListItemSelected]}
+              onPress={() => onSelect(item.value)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.dropListText, isSel && styles.dropListTextSelected]}>
+                {item.label}
+              </Text>
+              {isSel && <Text style={styles.dropListCheck}>✓</Text>}
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
-      <LinearGradient
-        colors={[SURFACE, 'transparent']}
-        pointerEvents="none"
-        style={{ position: 'absolute', top: 0, left: 0, right: 0, height: ITEM_H }}
-      />
-      <LinearGradient
-        colors={['transparent', SURFACE]}
-        pointerEvents="none"
-        style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: ITEM_H }}
-      />
     </View>
   );
 };
@@ -148,26 +135,43 @@ const THUMB_TRAVEL = TRACK_W - THUMB_D - 4;
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
-const todayInit = new Date();
-
 export default function CargarViaje() {
+  // Parámetros opcionales cuando se llega desde el mapa (pin wishlist)
+  const {
+    ciudad: pCiudad = '',
+    pais: pPais = '',
+    lat: pLat = '',
+    lng: pLng = '',
+    wishlistId: pWishlistId = '',
+  } = useLocalSearchParams<{
+    ciudad?: string;
+    pais?: string;
+    lat?: string;
+    lng?: string;
+    wishlistId?: string;
+  }>();
+  const hasParamCoords = !!(pLat && pLng);
+
   const [tipo, setTipo] = useState<TripType>('real');
-  const [ciudad, setCiudad] = useState('');
-  const [pais, setPais] = useState('');
-  const [dia, setDia] = useState(String(todayInit.getDate()));
-  const [mes, setMes] = useState(String(todayInit.getMonth() + 1));
-  const [anio, setAnio] = useState(String(todayInit.getFullYear()));
+  const [ciudad, setCiudad] = useState(pCiudad);
+  const [pais, setPais] = useState(pPais);
+  const [dia, setDia] = useState('');
+  const [mes, setMes] = useState('');
+  const [anio, setAnio] = useState('');
+  const [openDropdown, setOpenDropdown] = useState<'dia' | 'mes' | 'anio' | null>(null);
   const [nota, setNota] = useState('');
   const [fotos, setFotos] = useState<string[]>([]);
-  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [geoStatus, setGeoStatus] = useState<'idle' | 'buscando' | 'encontrada' | 'no_encontrada' | 'error'>('idle');
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
+    hasParamCoords ? { lat: parseFloat(pLat), lng: parseFloat(pLng) } : null
+  );
+  const [geoStatus, setGeoStatus] = useState<'idle' | 'buscando' | 'encontrada' | 'no_encontrada' | 'error'>(
+    hasParamCoords ? 'encontrada' : 'idle'
+  );
   const [geoNombre, setGeoNombre] = useState('');
-  const [formKey, setFormKey] = useState(0);
   const [pendingAchievements, setPendingAchievements] = useState<Achievement[]>([]);
   const chainIdRef = useRef<string | null>(null);
   const scrollRef = useRef<any>(null);
 
-  // Toggle animation
   const toggleAnim = useRef(new Animated.Value(0)).current;
 
   function animateToggle(to: number) {
@@ -181,6 +185,7 @@ export default function CargarViaje() {
 
   function handleToggle(newTipo: TripType) {
     setTipo(newTipo);
+    setOpenDropdown(null);
     animateToggle(newTipo === 'real' ? 0 : 1);
   }
 
@@ -190,18 +195,17 @@ export default function CargarViaje() {
   });
 
   function resetForm() {
-    const t = new Date();
     setCiudad('');
     setPais('');
-    setDia(String(t.getDate()));
-    setMes(String(t.getMonth() + 1));
-    setAnio(String(t.getFullYear()));
+    setDia('');
+    setMes('');
+    setAnio('');
+    setOpenDropdown(null);
     setNota('');
     setFotos([]);
     setCoords(null);
     setGeoStatus('idle');
     setGeoNombre('');
-    setFormKey((k) => k + 1);
     setTimeout(() => {
       scrollRef.current?.scrollToPosition?.(0, 0, false);
       scrollRef.current?.scrollTo?.({ x: 0, y: 0, animated: false });
@@ -336,6 +340,12 @@ export default function CargarViaje() {
     await AsyncStorage.setItem('trips', JSON.stringify(existing));
   }
 
+  async function deleteWishlistTrip(id: string) {
+    const raw = await AsyncStorage.getItem('trips');
+    const all: TripData[] = raw ? JSON.parse(raw) : [];
+    await AsyncStorage.setItem('trips', JSON.stringify(all.filter((t) => t.id !== id)));
+  }
+
   async function _checkAchievements() {
     try {
       const raw = await AsyncStorage.getItem('trips');
@@ -354,6 +364,7 @@ export default function CargarViaje() {
     try {
       const trip = buildTrip(null);
       await saveTrip(trip);
+      if (pWishlistId) await deleteWishlistTrip(pWishlistId);
       chainIdRef.current = null;
       resetForm();
       Alert.alert('¡Guardado!', `Tu ${tipo === 'real' ? 'viaje' : 'destino'} fue guardado correctamente.`);
@@ -372,6 +383,7 @@ export default function CargarViaje() {
       }
       const trip = buildTrip(chainIdRef.current);
       await saveTrip(trip);
+      if (pWishlistId) await deleteWishlistTrip(pWishlistId);
       resetForm();
       Alert.alert('Destino guardado', 'Cargá el siguiente destino del mismo viaje.');
       _checkAchievements();
@@ -380,9 +392,15 @@ export default function CargarViaje() {
     }
   }
 
-  const dayIdx = Math.max(0, DAYS.findIndex((d) => d.value === dia));
-  const monthIdx = Math.max(0, MONTHS.findIndex((m) => m.value === mes));
-  const yearIdx = Math.max(0, YEARS.findIndex((y) => y.value === anio));
+  const locationConfirmed = geoStatus === 'encontrada';
+
+  const diaLabel = dia ? dia.padStart(2, '0') : '';
+  const mesLabel = mes ? (MONTHS.find((m) => m.value === mes)?.label ?? '') : '';
+  const anioLabel = anio || '';
+
+  function toggleDrop(key: 'dia' | 'mes' | 'anio') {
+    setOpenDropdown((prev) => (prev === key ? null : key));
+  }
 
   return (
     <View style={styles.root}>
@@ -397,7 +415,7 @@ export default function CargarViaje() {
         <Text style={styles.title}>Cargar Viaje</Text>
         <Text style={styles.subtitle}>Registrá tu experiencia o tu próximo destino</Text>
 
-        {/* Toggle tipo — animated switch */}
+        {/* Toggle tipo */}
         <View style={styles.toggleRow}>
           <TouchableOpacity
             style={styles.toggleLabelWrap}
@@ -519,17 +537,70 @@ export default function CargarViaje() {
           </TouchableOpacity>
         </View>
 
-        {/* Fecha — solo para real, wheel picker */}
+        {/* Fecha — solo para real, dropdowns */}
         {tipo === 'real' && (
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>Fecha de inicio</Text>
-            <View key={formKey} style={styles.wheelContainer}>
-              {/* Highlight bar at center row */}
-              <View pointerEvents="none" style={styles.wheelHighlight} />
-              <WheelColumn items={DAYS} initialIndex={dayIdx} onChange={setDia} width={70} />
-              <WheelColumn items={MONTHS} initialIndex={monthIdx} onChange={setMes} width={88} />
-              <WheelColumn items={YEARS} initialIndex={yearIdx} onChange={setAnio} width={96} />
+
+            <View style={styles.dropRow}>
+              {/* DÍA */}
+              <TouchableOpacity
+                style={[styles.dropBtn, openDropdown === 'dia' && styles.dropBtnOpen, { flex: 1 }]}
+                onPress={() => toggleDrop('dia')}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.dropBtnText, !diaLabel && styles.dropBtnPlaceholder]}>
+                  {diaLabel || 'DD'}
+                </Text>
+                <Text style={styles.dropChevron}>{openDropdown === 'dia' ? '▴' : '▾'}</Text>
+              </TouchableOpacity>
+
+              {/* MES */}
+              <TouchableOpacity
+                style={[styles.dropBtn, openDropdown === 'mes' && styles.dropBtnOpen, { flex: 2 }]}
+                onPress={() => toggleDrop('mes')}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.dropBtnText, !mesLabel && styles.dropBtnPlaceholder]}>
+                  {mesLabel || 'Mes'}
+                </Text>
+                <Text style={styles.dropChevron}>{openDropdown === 'mes' ? '▴' : '▾'}</Text>
+              </TouchableOpacity>
+
+              {/* AÑO */}
+              <TouchableOpacity
+                style={[styles.dropBtn, openDropdown === 'anio' && styles.dropBtnOpen, { flex: 1.5 }]}
+                onPress={() => toggleDrop('anio')}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.dropBtnText, !anioLabel && styles.dropBtnPlaceholder]}>
+                  {anioLabel || 'AAAA'}
+                </Text>
+                <Text style={styles.dropChevron}>{openDropdown === 'anio' ? '▴' : '▾'}</Text>
+              </TouchableOpacity>
             </View>
+
+            {openDropdown === 'dia' && (
+              <DropdownList
+                items={DAYS}
+                selected={dia}
+                onSelect={(v) => { setDia(v); setOpenDropdown(null); }}
+              />
+            )}
+            {openDropdown === 'mes' && (
+              <DropdownList
+                items={MONTHS}
+                selected={mes}
+                onSelect={(v) => { setMes(v); setOpenDropdown(null); }}
+              />
+            )}
+            {openDropdown === 'anio' && (
+              <DropdownList
+                items={YEARS}
+                selected={anio}
+                onSelect={(v) => { setAnio(v); setOpenDropdown(null); }}
+              />
+            )}
           </View>
         )}
 
@@ -550,7 +621,12 @@ export default function CargarViaje() {
 
         {/* Botones */}
         <View style={styles.buttonsSection}>
-          <TouchableOpacity style={styles.primaryBtn} onPress={handleGuardar} activeOpacity={0.85}>
+          <TouchableOpacity
+            style={[styles.primaryBtn, !locationConfirmed && styles.primaryBtnDisabled]}
+            onPress={handleGuardar}
+            activeOpacity={locationConfirmed ? 0.85 : 1}
+            disabled={!locationConfirmed}
+          >
             <Text style={styles.primaryBtnText}>
               {tipo === 'real' ? 'Guardar viaje' : 'Guardar destino'}
             </Text>
@@ -558,11 +634,14 @@ export default function CargarViaje() {
 
           {tipo === 'real' && (
             <TouchableOpacity
-              style={styles.secondaryBtn}
+              style={[styles.secondaryBtn, !locationConfirmed && styles.secondaryBtnDisabled]}
               onPress={handleGuardarYAgregarDestino}
-              activeOpacity={0.85}
+              activeOpacity={locationConfirmed ? 0.85 : 1}
+              disabled={!locationConfirmed}
             >
-              <Text style={styles.secondaryBtnText}>Guardar y agregar destino</Text>
+              <Text style={[styles.secondaryBtnText, !locationConfirmed && styles.secondaryBtnTextDisabled]}>
+                Guardar y agregar destino
+              </Text>
             </TouchableOpacity>
           )}
         </View>
@@ -591,7 +670,6 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
 
-  // Title — premium serif centered
   title: {
     fontFamily: 'Georgia',
     fontSize: 26,
@@ -610,7 +688,6 @@ const styles = StyleSheet.create({
     marginBottom: 36,
   },
 
-  // Toggle — animated switch with labels
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -649,7 +726,6 @@ const styles = StyleSheet.create({
     backgroundColor: GOLD,
   },
 
-  // Sections
   section: {
     marginBottom: 28,
   },
@@ -669,7 +745,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0,
   },
 
-  // Inputs
   input: {
     backgroundColor: SURFACE,
     borderWidth: 1,
@@ -686,7 +761,6 @@ const styles = StyleSheet.create({
     paddingTop: 13,
   },
 
-  // Photo card
   photoCard: {
     backgroundColor: SURFACE,
     borderWidth: 1,
@@ -698,28 +772,11 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     gap: 5,
   },
-  photoCardIcon: {
-    fontSize: 20,
-    color: GOLD,
-  },
-  photoCardText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: TEXT,
-    letterSpacing: 0.5,
-  },
-  photoCardHint: {
-    fontSize: 12,
-    color: MUTED,
-    letterSpacing: 0.3,
-  },
-  photoHint: {
-    fontSize: 12,
-    color: MUTED,
-    marginTop: -4,
-  },
+  photoCardIcon: { fontSize: 20, color: GOLD },
+  photoCardText: { fontSize: 15, fontWeight: '600', color: TEXT, letterSpacing: 0.5 },
+  photoCardHint: { fontSize: 12, color: MUTED, letterSpacing: 0.3 },
+  photoHint: { fontSize: 12, color: MUTED, marginTop: -4 },
 
-  // Photos grid
   photosRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -735,75 +792,98 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: GOLD,
   },
-  photoThumb: {
-    width: '100%',
-    height: '100%',
-  },
+  photoThumb: { width: '100%', height: '100%' },
   photoCoverBadge: {
     position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+    bottom: 0, left: 0, right: 0,
     backgroundColor: 'rgba(212,175,55,0.85)',
     alignItems: 'center',
     paddingVertical: 2,
   },
-  photoCoverText: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: BG,
-    letterSpacing: 0.5,
-  },
+  photoCoverText: { fontSize: 9, fontWeight: '700', color: BG, letterSpacing: 0.5 },
   photoRemoveBtn: {
     position: 'absolute',
-    top: 4,
-    right: 4,
+    top: 4, right: 4,
     backgroundColor: 'rgba(1,5,13,0.75)',
     borderRadius: 10,
-    width: 20,
-    height: 20,
+    width: 20, height: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  photoRemoveText: {
-    color: TEXT,
-    fontSize: 10,
-    fontWeight: '700',
-  },
+  photoRemoveText: { color: TEXT, fontSize: 10, fontWeight: '700' },
 
-  // Wheel picker
-  wheelContainer: {
+  // ── Date dropdowns ──────────────────────────────────────────────────────────
+  dropRow: {
     flexDirection: 'row',
+    gap: 8,
+  },
+  dropBtn: {
     backgroundColor: SURFACE,
     borderWidth: 1,
     borderColor: BORDER,
-    borderRadius: 12,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 13,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-    overflow: 'hidden',
-    gap: 0,
+    justifyContent: 'space-between',
+    minWidth: 0,
   },
-  wheelHighlight: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: ITEM_H,
-    height: ITEM_H,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
+  dropBtnOpen: {
     borderColor: GOLD,
-    opacity: 0.35,
-    zIndex: 1,
+    backgroundColor: 'rgba(212,175,55,0.05)',
   },
-  wheelItem: {
-    fontSize: 18,
+  dropBtnText: {
     color: TEXT,
-    fontFamily: 'Georgia',
-    letterSpacing: 0.5,
+    fontSize: 15,
+    fontWeight: '500',
+    flex: 1,
+  },
+  dropBtnPlaceholder: {
+    color: MUTED,
+    fontWeight: '400',
+  },
+  dropChevron: {
+    color: MUTED,
+    fontSize: 11,
+    marginLeft: 4,
+  },
+  dropList: {
+    marginTop: 6,
+    backgroundColor: SURFACE,
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 10,
+    overflow: 'hidden',
+    maxHeight: 198,
+  },
+  dropListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(30,48,80,0.5)',
+  },
+  dropListItemSelected: {
+    backgroundColor: 'rgba(212,175,55,0.08)',
+  },
+  dropListText: {
+    flex: 1,
+    color: TEXT,
+    fontSize: 15,
+  },
+  dropListTextSelected: {
+    color: GOLD,
+    fontWeight: '600',
+  },
+  dropListCheck: {
+    color: GOLD,
+    fontSize: 14,
+    fontWeight: '700',
   },
 
-  // Outline buttons
+  // ── Outline buttons ─────────────────────────────────────────────────────────
   outlineBtn: {
     borderWidth: 1,
     borderColor: BORDER,
@@ -813,25 +893,14 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     backgroundColor: SURFACE,
   },
-  outlineBtnText: {
-    color: MUTED,
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  outlineBtnDisabled: {
-    opacity: 0.5,
-  },
+  outlineBtnText: { color: MUTED, fontSize: 14, fontWeight: '500' },
+  outlineBtnDisabled: { opacity: 0.5 },
   outlineBtnSuccess: {
     borderColor: 'rgba(212,175,55,0.5)',
     backgroundColor: 'rgba(212,175,55,0.07)',
   },
-  outlineBtnTextSuccess: {
-    color: GOLD,
-    fontWeight: '600',
-  },
-  outlineBtnTextError: {
-    color: '#e07070',
-  },
+  outlineBtnTextSuccess: { color: GOLD, fontWeight: '600' },
+  outlineBtnTextError: { color: '#e07070' },
 
   geoFound: {
     flexDirection: 'row',
@@ -845,19 +914,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     marginBottom: 10,
   },
-  geoCheck: {
-    fontSize: 16,
-    color: GOLD,
-    fontWeight: '700',
-    marginTop: 1,
-  },
-  geoFoundText: {
-    flex: 1,
-    fontSize: 13,
-    color: GOLD,
-    lineHeight: 18,
-  },
-
+  geoCheck: { fontSize: 16, color: GOLD, fontWeight: '700', marginTop: 1 },
+  geoFoundText: { flex: 1, fontSize: 13, color: GOLD, lineHeight: 18 },
   geoNotFound: {
     backgroundColor: 'rgba(180,40,40,0.10)',
     borderWidth: 1,
@@ -867,13 +925,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     marginBottom: 10,
   },
-  geoNotFoundText: {
-    fontSize: 13,
-    color: '#e07070',
-    lineHeight: 18,
-  },
+  geoNotFoundText: { fontSize: 13, color: '#e07070', lineHeight: 18 },
 
-  // Action buttons
+  // ── Action buttons ──────────────────────────────────────────────────────────
   buttonsSection: {
     gap: 12,
     marginTop: 8,
@@ -883,6 +937,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
+  },
+  primaryBtnDisabled: {
+    opacity: 0.35,
   },
   primaryBtnText: {
     color: BG,
@@ -898,14 +955,19 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     alignItems: 'center',
   },
+  secondaryBtnDisabled: {
+    borderColor: BORDER,
+    opacity: 0.35,
+  },
   secondaryBtnText: {
     color: GOLD,
     fontSize: 15,
     fontWeight: '600',
     letterSpacing: 0.3,
   },
-
-  bottomSpacer: {
-    height: 88,
+  secondaryBtnTextDisabled: {
+    color: MUTED,
   },
+
+  bottomSpacer: { height: 88 },
 });

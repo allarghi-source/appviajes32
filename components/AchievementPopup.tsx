@@ -67,8 +67,8 @@ export function AchievementPopup({ achievements, onDone }: Props) {
       />
 
       <View style={styles.cardWrapper}>
-        {/* Close button — always closes the popup */}
-        <TouchableOpacity style={styles.closeBtn} onPress={onDone}>
+        {/* Close button — advances to next achievement or closes when last */}
+        <TouchableOpacity style={styles.closeBtn} onPress={advance}>
           <Text style={styles.closeBtnText}>✕</Text>
         </TouchableOpacity>
 

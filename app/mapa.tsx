@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView, { Marker, Region } from 'react-native-maps';
 import Svg, { Circle, Path } from 'react-native-svg';
@@ -74,13 +74,17 @@ export default function Mapa() {
   const [selectedGroup, setSelectedGroup] = useState<Trip[] | null>(null);
   const opacity = useRef(new Animated.Value(0)).current;
 
+  // Recarga pins cada vez que la pantalla vuelve al foco (ej: después de guardar un viaje)
+  useFocusEffect(
+    useCallback(() => {
+      AsyncStorage.getItem('trips').then((raw) => {
+        const all: Trip[] = raw ? JSON.parse(raw) : [];
+        setTrips(all.filter((t) => t.coords?.lat != null && t.coords?.lng != null));
+      });
+    }, [])
+  );
+
   useEffect(() => {
-    async function load() {
-      const raw = await AsyncStorage.getItem('trips');
-      const all: Trip[] = raw ? JSON.parse(raw) : [];
-      setTrips(all.filter((t) => t.coords?.lat != null && t.coords?.lng != null));
-    }
-    load();
     Animated.timing(opacity, { toValue: 1, duration: 700, useNativeDriver: true }).start();
   }, []);
 
@@ -167,7 +171,19 @@ export default function Mapa() {
                       activeOpacity={isReal ? 1 : 0.7}
                       onPress={
                         !isReal
-                          ? () => { setSelectedGroup(null); router.push('/cargar'); }
+                          ? () => {
+                              setSelectedGroup(null);
+                              router.push({
+                                pathname: '/cargar',
+                                params: {
+                                  ciudad: trip.ciudad,
+                                  pais: trip.pais,
+                                  lat: String(trip.coords?.lat ?? ''),
+                                  lng: String(trip.coords?.lng ?? ''),
+                                  wishlistId: trip.id,
+                                },
+                              });
+                            }
                           : undefined
                       }
                     >
@@ -191,12 +207,16 @@ export default function Mapa() {
                           <Text style={styles.tripRowDate}>◆ {trip.fechaInicio}</Text>
                         ) : !isReal ? (
                           <View style={styles.tripRowBadge}>
-                            <Text style={styles.tripRowBadgeText}>DESTINO FUTURO</Text>
+                            <Text style={styles.tripRowBadgeText}>PENDIENTE</Text>
                           </View>
                         ) : null}
                       </View>
                       {!isReal && (
-                        <Text style={styles.tripRowArrow}>→</Text>
+                        <View style={styles.logroAction}>
+                          <Text style={styles.logroText}>¡Lo logré!</Text>
+                          <Text style={styles.logroCheck}>✔</Text>
+                          <Text style={styles.tripRowArrow}>→</Text>
+                        </View>
                       )}
                     </TouchableOpacity>
                   );
@@ -370,5 +390,22 @@ const styles = StyleSheet.create({
     color: GOLD,
     opacity: 0.6,
     flexShrink: 0,
+  },
+
+  logroAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flexShrink: 0,
+  },
+  logroText: {
+    fontSize: 12,
+    color: GOLD,
+    fontWeight: '700',
+  },
+  logroCheck: {
+    fontSize: 12,
+    color: GOLD,
+    fontWeight: '700',
   },
 });
