@@ -63,6 +63,24 @@ function norm(s: string): string {
   return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
 }
 
+// Agrupa viajes por experiencia (chainId compartido = 1 experiencia; chainId null = experiencia individual).
+// Devuelve un Map<paisNorm, cantidadDeExperienciasEnQueAparece>.
+function countryVisitsByExperience(real: Trip[]): Map<string, number> {
+  const groups = new Map<string, Set<string>>();
+  for (const trip of real) {
+    const key = trip.chainId ?? trip.id;
+    if (!groups.has(key)) groups.set(key, new Set());
+    groups.get(key)!.add(norm(trip.pais));
+  }
+  const visits = new Map<string, number>();
+  for (const countries of groups.values()) {
+    for (const country of countries) {
+      visits.set(country, (visits.get(country) ?? 0) + 1);
+    }
+  }
+  return visits;
+}
+
 function parseDate(s: string | null): number {
   if (!s) return 0;
   const p = s.split(/[\/\-]/);
@@ -86,6 +104,10 @@ function evaluate(trips: Trip[], stats: StatsResult): Set<string> {
     cityVisits.set(key, (cityVisits.get(key) ?? 0) + 1);
   });
   const maxCity = cityVisits.size > 0 ? Math.max(...cityVisits.values()) : 0;
+
+  // Country visits grouped by experience (for Deja Vu)
+  const countryVisits = countryVisitsByExperience(real);
+  const maxCountryVisits = countryVisits.size > 0 ? Math.max(...countryVisits.values()) : 0;
 
   // Fulfilled trips: wishlist destination that also has a real trip
   const wishKeys = new Set(wishlist.map((t) => norm(t.ciudad) + '/' + norm(t.pais)));
@@ -147,7 +169,7 @@ for (let i = 1; i < yearsArray.length; i++) {
 
   // ── Comportamiento ──
   if (maxCity >= 10)                              earned.add('repetidor_cronico');
-  if ((stats.paisesMasVisitados[0]?.visitas ?? 0) >= 3) earned.add('deja_vu');
+  if (maxCountryVisits >= 3) earned.add('deja_vu');
 
   // ── Planificación ──
   if (wishlist.length >= 1)  earned.add('visualizando');

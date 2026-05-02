@@ -1,15 +1,20 @@
 import { useRouter } from 'expo-router';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, ImageBackground, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 export default function Onboarding() {
   const router = useRouter();
  return (
-  <View style={styles.container}>
+  <ImageBackground
+    source={require('../assets/images/stars.png')}
+    style={styles.container}
+    resizeMode="cover"
+  >
 <Image
   source={require('../assets/images/planet.png')}
   style={styles.planet}
 />
   <View style={styles.content}>
-    <Image
+  
+      <Image
       source={require('../assets/images/myworld-logo.png')}
       style={styles.logo}
       resizeMode="contain"
@@ -64,7 +69,7 @@ export default function Onboarding() {
   </TouchableOpacity>
 </View>
 
-</View>
+</ImageBackground>
 );
 }
 
@@ -72,10 +77,12 @@ const styles = StyleSheet.create({
  container: {
   flex: 1,
   backgroundColor: '#01050d',
+  position: 'relative',
   justifyContent: 'flex-start',
   alignItems: 'stretch',
   paddingTop: 30,
 },
+
   logo: {
     width: 200,
     height: 200,
@@ -119,6 +126,7 @@ content: {
   justifyContent: 'flex-start',
   alignItems: 'center',
   marginTop: 70,
+  
 },
 
 footer: {
@@ -146,6 +154,7 @@ features: {
   marginTop: 60,
   gap: 18,
   alignSelf: 'center',
+  
 },
 
 featureRow: {

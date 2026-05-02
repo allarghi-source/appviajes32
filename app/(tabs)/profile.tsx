@@ -15,6 +15,14 @@ const [nacionalidad, setNacionalidad] = useState('');
 const scrollRef = useRef(null);
 const [ciudad, setCiudad] = useState('');
 const [pais, setPais] = useState('');
+
+const nombreRef      = useRef<TextInput>(null);
+const apellidoRef    = useRef<TextInput>(null);
+const nacionalidadRef = useRef<TextInput>(null);
+const ciudadRef      = useRef<TextInput>(null);
+const paisRef        = useRef<TextInput>(null);
+
+const soloLetras = (t: string) => t.replace(/[^a-zA-ZÀ-ɏ ]/g, '');
  const pickImage = async () => {
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],
@@ -92,11 +100,15 @@ const [pais, setPais] = useState('');
     <Feather name="user" size={18} color="#d4af37" />
     <View style={styles.divider} />
     <TextInput
+      ref={nombreRef}
       placeholder="Nombre"
       placeholderTextColor="rgba(255,255,255,0.5)"
       style={styles.inputText}
       value={nombre}
-      onChangeText={setNombre}
+      onChangeText={(t) => setNombre(soloLetras(t))}
+      returnKeyType="next"
+      submitBehavior="submit"
+      onSubmitEditing={() => apellidoRef.current?.focus()}
     />
   </View>
 
@@ -104,11 +116,15 @@ const [pais, setPais] = useState('');
     <Feather name="user" size={18} color="#d4af37" />
     <View style={styles.divider} />
     <TextInput
+      ref={apellidoRef}
       placeholder="Apellido"
       placeholderTextColor="rgba(255,255,255,0.5)"
       style={styles.inputText}
       value={apellido}
       onChangeText={setApellido}
+      returnKeyType="next"
+      submitBehavior="submit"
+      onSubmitEditing={() => nacionalidadRef.current?.focus()}
     />
   </View>
 
@@ -116,11 +132,15 @@ const [pais, setPais] = useState('');
     <Feather name="globe" size={18} color="#d4af37" />
     <View style={styles.divider} />
     <TextInput
+      ref={nacionalidadRef}
       placeholder="Nacionalidad"
       placeholderTextColor="rgba(255,255,255,0.5)"
       style={styles.inputText}
       value={nacionalidad}
-      onChangeText={setNacionalidad}
+      onChangeText={(t) => setNacionalidad(soloLetras(t))}
+      returnKeyType="next"
+      submitBehavior="submit"
+      onSubmitEditing={() => ciudadRef.current?.focus()}
     />
   </View>
 
@@ -128,11 +148,15 @@ const [pais, setPais] = useState('');
     <Feather name="map-pin" size={18} color="#d4af37" />
     <View style={styles.divider} />
     <TextInput
+      ref={ciudadRef}
       placeholder="Ciudad"
       placeholderTextColor="rgba(255,255,255,0.5)"
       style={styles.inputText}
       value={ciudad}
       onChangeText={setCiudad}
+      returnKeyType="next"
+      submitBehavior="submit"
+      onSubmitEditing={() => paisRef.current?.focus()}
     />
   </View>
 
@@ -140,13 +164,14 @@ const [pais, setPais] = useState('');
     <Feather name="map" size={18} color="#d4af37" />
     <View style={styles.divider} />
     <TextInput
-  placeholder="País"
-  placeholderTextColor="rgba(255,255,255,0.5)"
-  style={styles.inputText}
-  value={pais}
-  onChangeText={setPais}
-  
-/>
+      ref={paisRef}
+      placeholder="País"
+      placeholderTextColor="rgba(255,255,255,0.5)"
+      style={styles.inputText}
+      value={pais}
+      onChangeText={(t) => setPais(soloLetras(t))}
+      returnKeyType="done"
+    />
   </View>
 
 
@@ -283,7 +308,8 @@ subtitle: {
   color: '#ffffff',
 },
 form: {
-  width: '85%',
+  width: '100%',
+  paddingHorizontal: 16,
   marginTop: 20,
   gap: 14,
 },

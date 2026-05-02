@@ -1,7 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { loadBadgeCount } from '../utils/achievementsEngine';
 import {
   Image, StyleSheet,
   Text,
@@ -14,6 +13,7 @@ import Svg, {
   Rect
 } from 'react-native-svg';
 import NavBar from '../components/NavBar';
+import { loadBadgeCount } from '../utils/achievementsEngine';
 import {
   StatsResult,
   Trip,
@@ -124,14 +124,17 @@ const Medal = ({ tier, rank }: { tier: MedalTier; rank: string }) => {
         <View style={[styles.medalRibR, { backgroundColor: c.ribR }]} />
       </View>
       <View style={[styles.medalCircle, { backgroundColor: c.circle, borderColor: c.border }]}>
-        <View style={styles.medalInner}>
-          <Text style={[styles.medalIcon, { color: c.text }]}>{c.icon}</Text>
-          <Text style={[styles.medalText, { color: c.text }]}>{rank.toUpperCase()}</Text>
-        </View>
+        <Text style={[styles.medalIcon, { color: c.text }]}>{c.icon}</Text>
+      </View>
+      <View style={[styles.medalRankLabel, { backgroundColor: c.circle, borderColor: c.border }]}>
+        <Text style={[styles.medalRankText, { color: c.text }]}>{rank.toUpperCase()}</Text>
       </View>
     </View>
   );
 };
+
+// Umbrales XP de cada rango (debe coincidir con RANKS en statsEngine.ts)
+const RANK_THRESHOLDS = [0, 500, 1000, 2000, 3000, 4000];
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
@@ -167,7 +170,9 @@ export default function PassportOpen() {
   if (!userData) return null;
 
   const xpProgress = Math.max(2, Math.round((stats?.progresoRango ?? 0) * 100));
-  const xpLabel = stats?.siguienteRango ? `${stats.siguienteRango} →` : 'MÁXIMO ★';
+  const _xpNow = stats?.xpTotal ?? 0;
+  const _nextThreshold = RANK_THRESHOLDS.find((t) => t > _xpNow) ?? null;
+  const xpLabel = `+${_nextThreshold !== null ? Math.max(0, _nextThreshold - _xpNow) : 0} XP`;
   const hasKm = stats && stats.kmTotales > 0;
 
 const formatOneDecimal = (value: number) => {
@@ -521,7 +526,7 @@ lineHeight: 18,
 
   idSection: {
     flexDirection: 'row',
-    gap: 18,
+    gap: 10,
     alignItems: 'flex-start',
   },
 
@@ -595,9 +600,9 @@ lineHeight: 18,
     transform: [{ skewX: '10deg' }],
   },
   medalCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
@@ -607,27 +612,26 @@ lineHeight: 18,
     shadowRadius: 3,
     elevation: 4,
   },
-  medalInner: {
-    width: 60,
-    height: 60,
-    borderRadius: 19,
-    borderWidth: 1,
-    borderColor: 'rgba(139,69,19,0.4)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 2,
-  },
   medalIcon: {
-    fontSize: 24,
-    lineHeight: 16,
+    fontSize: 28,
   },
-  medalText: {
+  medalRankLabel: {
+    marginTop: 5,
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 3,
+    borderWidth: 1,
+    alignItems: 'center',
+   alignSelf: 'flex-start',
+  },
+  medalRankText: {
     fontFamily: 'Georgia',
-    fontSize: 8,
+    fontSize: 7,
     fontWeight: '700',
-    letterSpacing: 0.3,
+    letterSpacing: 0.8,
     textTransform: 'uppercase',
     textAlign: 'center',
+    flexWrap: 'wrap',
   },
 
   // XP row

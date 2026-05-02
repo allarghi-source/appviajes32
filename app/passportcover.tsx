@@ -159,7 +159,7 @@ export default function PassportCover() {
 const styles = StyleSheet.create({
   screenContainer: {
     flex: 1,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#01050d',
     justifyContent: 'center',
     alignItems: 'center',
   },

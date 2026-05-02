@@ -37,7 +37,6 @@ const AXIS_CENTER_X = AXIS_X + 1;                    // 37 (screen)
 const DOT_LEFT = AXIS_CENTER_X - DOT_R - CARD_START; // -34 (rel. to card)
 const BAR_LEFT = DOT_LEFT + DOT_R * 2;               // -20
 const BAR_W = -BAR_LEFT;                             // 20
-const CHAIN_WRAP_LEFT = AXIS_CENTER_X - CARD_START - 2; // -29 (centers 4px dot on axis)
 
 interface Trip {
   id: string;
@@ -76,13 +75,13 @@ function TripCard({
   index,
   scrollY,
   onPress,
-  isChained,
+  isChainStart,
 }: {
   trip: Trip;
   index: number;
   scrollY: Animated.Value;
   onPress: () => void;
-  isChained: boolean;
+  isChainStart: boolean;
 }) {
   // Scroll Y value at which this card is centered on screen
   const itemCenterInContent = LIST_PT + index * ITEM_H + CARD_H / 2;
@@ -90,13 +89,13 @@ function TripCard({
 
   const scale = scrollY.interpolate({
     inputRange: [optimalScroll - ITEM_H, optimalScroll, optimalScroll + ITEM_H],
-    outputRange: [0.82, 1, 0.82],
+    outputRange: [0.75, 1, 0.75],
     extrapolate: 'clamp',
   });
 
   const opacity = scrollY.interpolate({
     inputRange: [optimalScroll - ITEM_H, optimalScroll, optimalScroll + ITEM_H],
-    outputRange: [0.38, 1, 0.38],
+    outputRange: [0.5, 1, 0.5],
     extrapolate: 'clamp',
   });
 
@@ -105,14 +104,8 @@ function TripCard({
   return (
     <Animated.View style={[styles.itemWrap, { opacity, transform: [{ scale }] }]}>
 
-      {/* Multi-destination connector: 3 dots between this and previous chained card */}
-      {isChained && (
-        <View style={styles.chainWrap}>
-          <View style={styles.chainDot} />
-          <View style={styles.chainDot} />
-          <View style={styles.chainDot} />
-        </View>
-      )}
+      {/* Chain connector: vertical line from bottom of this card to top of next chained card */}
+      {isChainStart && <View style={styles.chainLineDown} />}
 
       {/* Axis dot – sits on top of the golden line */}
       <View style={styles.axisDot} />
@@ -129,8 +122,6 @@ function TripCard({
             <Text style={styles.noPhotoIcon}>✈</Text>
           </View>
         )}
-        {/* Dark vignette at bottom for legibility */}
-        <View style={styles.cardVignette} />
       </TouchableOpacity>
 
       {/* Caption below the card */}
@@ -215,14 +206,14 @@ export default function Timeline() {
             )}
             renderItem={({ item, index }) => {
               const prev = index > 0 ? trips[index - 1] : null;
-              const isChained = !!(item.chainId && prev?.chainId === item.chainId);
+              const isChainStart = !!(prev?.chainId);
               return (
                 <TripCard
                   trip={item}
                   index={index}
                   scrollY={scrollY}
                   onPress={() => router.push(`/detalle?id=${item.id}`)}
-                  isChained={isChained}
+                  isChainStart={isChainStart}
                 />
               );
             }}
@@ -290,6 +281,7 @@ const styles = StyleSheet.create({
   itemWrap: {
     marginBottom: ITEM_MB,
     position: 'relative',
+    overflow: 'visible',
   },
 
   // Dot that sits centered on the axis line
@@ -317,21 +309,17 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
 
-  // Three dots between chained (multi-destination) cards
-  chainWrap: {
+  // Vertical line in the margin gap: drawn on the second card, going upward
+  // bottom of line (top: -ITEM_MB + height: ITEM_MB = 0) = top of this card's photo
+  chainLineDown: {
     position: 'absolute',
-    left: CHAIN_WRAP_LEFT,
-    top: -(ITEM_MB / 2 + 8),
-    width: 4,
-    alignItems: 'center',
-    gap: 5,
-  },
-  chainDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
+    left: '50%',
+    transform: [{ translateX: -1 }],
+    top: -ITEM_MB,
+    width: 2,
+    height: ITEM_MB,
     backgroundColor: GOLD,
-    opacity: 0.55,
+    opacity: 0.85,
   },
 
   // ── Card: image fills the full rectangle ──
@@ -355,15 +343,6 @@ const styles = StyleSheet.create({
     fontSize: 40,
     opacity: 0.25,
   },
-  cardVignette: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 80,
-    backgroundColor: 'rgba(1,5,13,0.52)',
-  },
-
   // ── Caption below card ──
   caption: {
     marginTop: 10,
