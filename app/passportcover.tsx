@@ -17,6 +17,9 @@ import Svg, {
 } from 'react-native-svg';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const PASSPORT_W = Math.min(SCREEN_WIDTH * 0.9, 480);
+const PASSPORT_H = Math.min(SCREEN_HEIGHT * 0.75, 780);
+const LOGO_SIZE = Math.min(260, Math.round(SCREEN_WIDTH * 0.6));
 
 const CornerOrnamentTopLeft = () => (
   <Svg width={20} height={20} viewBox="0 0 20 20">
@@ -191,8 +194,8 @@ const styles = StyleSheet.create({
   },
 
   passport: {
-    width: SCREEN_WIDTH * 0.9,
-    height: SCREEN_HEIGHT * 0.75,
+    width: PASSPORT_W,
+    height: PASSPORT_H,
     backgroundColor: '#0a1628',
     borderRadius: 12,
     overflow: 'hidden',
@@ -319,8 +322,8 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   logoImg: {
-    width: 320,
-    height: 320,
+    width: LOGO_SIZE,
+    height: LOGO_SIZE,
     shadowColor: 'rgba(212,175,55,0.55)',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.55,

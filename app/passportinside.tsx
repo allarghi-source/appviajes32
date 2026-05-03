@@ -2,7 +2,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
+  Dimensions,
   Image,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -137,6 +139,10 @@ const Medal = ({ tier, rank }: { tier: MedalTier; rank: string }) => {
 // Umbrales XP de cada rango (debe coincidir con RANKS en statsEngine.ts)
 const RANK_THRESHOLDS = [0, 500, 1000, 2000, 3000, 4000];
 
+const SCREEN_W = Dimensions.get('window').width;
+const PHOTO_W = Math.min(110, Math.round(SCREEN_W * 0.28));
+const PHOTO_H = Math.round(PHOTO_W * (140 / 110));
+
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
 interface UserData {
@@ -224,6 +230,11 @@ const icon = '◉ ';
    <View style={{ flex: 1, backgroundColor: '#01050d' }}>
 
       {/* Passport wrap */}
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: 20 }}
+        showsVerticalScrollIndicator={false}
+      >
       <View style={styles.passportWrap}>
 
         {/* ── PAGE 1: STATS ── */}
@@ -307,11 +318,11 @@ const icon = '◉ ';
             {/* Data col */}
             <View style={styles.dataCol}>
               <Text style={styles.fieldLabel}>Apellido</Text>
-              <Text style={styles.fieldValue}>{userData?.apellido}</Text>
+              <Text style={styles.fieldValue} numberOfLines={1} adjustsFontSizeToFit>{userData?.apellido}</Text>
               <Text style={styles.fieldLabel}>Nombre</Text>
-              <Text style={styles.fieldValue}>{userData?.nombre}</Text>
+              <Text style={styles.fieldValue} numberOfLines={1} adjustsFontSizeToFit>{userData?.nombre}</Text>
               <Text style={styles.fieldLabel}>Nacionalidad</Text>
-              <Text style={[styles.fieldValue, { fontSize: 13 }]}>{userData?.nacionalidad}</Text>
+              <Text style={[styles.fieldValue, { fontSize: 13 }]} numberOfLines={1} adjustsFontSizeToFit>{userData?.nacionalidad}</Text>
             </View>
 
             {/* Medalla dinámica según rango — tappable, con badge de logros nuevos */}
@@ -356,6 +367,7 @@ const icon = '◉ ';
           </TouchableOpacity>
         </View>
       </View>
+      </ScrollView>
 
       <NavBar />
     </View>
@@ -420,6 +432,7 @@ const styles = StyleSheet.create({
 
   passportWrap: {
     marginTop: 40,
+    marginHorizontal: 16,
     borderRadius: 10,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -532,8 +545,8 @@ lineHeight: 18,
   },
 
   photoBox: {
-    width: 110,
-    height: 140,
+    width: PHOTO_W,
+    height: PHOTO_H,
     borderWidth: 2.5,
     borderColor: '#c9a227',
     borderRadius: 4,

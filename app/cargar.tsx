@@ -11,6 +11,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
+  Dimensions,
   Image,
   Keyboard,
   ScrollView,
@@ -27,6 +28,10 @@ const SURFACE = '#0d1a2e';
 const BORDER = '#1e3050';
 const TEXT = '#e8e0d0';
 const MUTED = '#6b7a8d';
+
+const { width: SCREEN_W } = Dimensions.get('window');
+// On tablets (>540px) the padding grows so the content stays ~540px wide and centered
+const SIDE_PAD = Math.max(24, Math.round((SCREEN_W - 540) / 2));
 
 type TripType = 'real' | 'wishlist';
 
@@ -692,7 +697,7 @@ const styles = StyleSheet.create({
     backgroundColor: BG,
   },
   scroll: {
-    paddingHorizontal: 24,
+    paddingHorizontal: SIDE_PAD,
     paddingTop: 64,
     paddingBottom: 40,
   },
@@ -773,6 +778,7 @@ const styles = StyleSheet.create({
   },
 
   input: {
+    width: '100%',
     backgroundColor: SURFACE,
     borderWidth: 1,
     borderColor: BORDER,

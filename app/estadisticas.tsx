@@ -1,7 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import { Dimensions, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import NavBar from '../components/NavBar';
 import {
   ALL_CONTINENTS,
@@ -17,6 +16,21 @@ const SURFACE = '#0b1525';
 const BORDER = '#1a2d46';
 const TEXT = '#e8e0d0';
 const MUTED = '#4a5a6a';
+
+const { width: SCREEN_W } = Dimensions.get('window');
+// On tablets (>640px) increase side padding so cards don't stretch wall-to-wall
+const SIDE_PAD = Math.max(20, Math.round((SCREEN_W - 640) / 2));
+// On tablets show 3 continent columns, phones keep 2
+const CONT_CARD_W = SCREEN_W >= 600 ? '30%' : '47%';
+
+const CONTINENT_ICON: Record<string, number> = {
+  'América del Norte': require('../assets/continents/north_america.png'),
+  'América del Sur':  require('../assets/continents/south_america.png'),
+  'Europa':           require('../assets/continents/europe.png'),
+  'África':           require('../assets/continents/africa.png'),
+  'Asia':             require('../assets/continents/asia.png'),
+  'Oceanía':          require('../assets/continents/oceania.png'),
+};
 
 const TIER_COLOR: Record<string, string> = {
   bronce: '#cd7f32',
@@ -34,47 +48,6 @@ const CONTINENT_TOTAL_COUNTRIES: Record<string, number> = {
   'Oceanía': 14,
 };
 
-// Siluetas geográficas por continente — viewBox 0 0 64 64 (todos los puntos dentro del rango)
-const CONTINENT_PATHS: Record<string, string[]> = {
-  // Ancha arriba (Canadá), se estrecha hacia Centroamérica abajo a la derecha
-  'América del Norte': [
-    'M4,8 Q18,4 34,4 Q50,4 58,12 Q62,20 58,28 Q60,36 54,42 Q50,48 44,50 Q38,56 32,56 Q24,54 16,48 Q8,40 6,28 Q2,18 4,8 Z',
-  ],
-  // Pera: ancha al norte con bulge de Brasil al este, estrecha al sur
-  'América del Sur': [
-    'M16,5 Q28,2 42,6 Q54,14 58,26 Q60,38 54,50 Q46,60 36,62 Q24,62 16,52 Q8,42 8,28 Q8,16 16,5 Z',
-  ],
-  // Compacta e irregular (Iberia abajo-izquierda, Escandinavia arriba)
-  'Europa': [
-    'M18,5 Q32,2 44,6 Q54,12 58,22 Q60,30 54,36 Q58,44 48,50 Q36,54 24,52 Q12,48 6,38 Q2,28 6,16 Q10,6 18,5 Z',
-  ],
-  // Norte plano, bulge oeste (Golfo de Guinea), taper claro hacia el Cabo
-  'África': [
-    'M14,5 Q28,3 44,6 Q54,12 58,22 Q60,32 56,42 Q52,52 42,58 Q34,62 26,60 Q16,54 10,44 Q4,32 4,20 Q6,10 14,5 Z',
-  ],
-  // El más grande y ancho: ocupa casi todo el viewBox horizontalmente
-  'Asia': [
-    'M4,16 Q14,8 30,5 Q46,3 58,8 Q62,14 60,24 Q62,34 58,42 Q60,50 50,56 Q38,62 24,62 Q12,60 6,52 Q2,42 2,30 Q2,22 4,16 Z',
-  ],
-  // Australia (rectangular con costa norte irregular) + silueta NZ
-  'Oceanía': [
-    'M6,22 Q20,14 36,14 Q46,12 52,18 Q58,20 60,30 Q62,42 52,52 Q40,60 24,58 Q10,54 4,42 Q2,32 6,22 Z',
-    'M55,10 Q57,8 60,12 Q59,16 56,16 Q54,14 55,10 Z',
-  ],
-};
-
-function ContinentShape({ name, visited }: { name: string; visited: boolean }) {
-  const paths = CONTINENT_PATHS[name];
-  if (!paths) return null;
-  const color = visited ? GOLD : MUTED;
-  return (
-    <Svg width={58} height={58} viewBox="0 0 64 64">
-      {paths.map((d, i) => (
-        <Path key={i} d={d} fill={color} />
-      ))}
-    </Svg>
-  );
-}
 
 // ─── BARRA DE XP ──────────────────────────────────────────────────────────────
 
@@ -155,9 +128,19 @@ function ContinentesSection({
 
           return (
             <View key={cont} style={[styles.continentCard, !done && styles.continentCardOff]}>
-              <View pointerEvents="none" style={styles.continentShapeWrap}>
-                <ContinentShape name={cont} visited={done} />
-              </View>
+              {CONTINENT_ICON[cont] && (
+                <Image
+                  source={CONTINENT_ICON[cont]}
+                  style={{
+                    position: 'absolute',
+                    width: '100%',
+                    height: '100%',
+                    right: -20,
+                    resizeMode: 'cover',
+                    opacity: 0.48,
+                  }}
+                />
+              )}
               <Text style={[styles.continentPct, !done && styles.continentPctOff]}>
                 {done ? `${contPct}%` : '—'}
               </Text>
@@ -375,10 +358,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: MUTED,
     letterSpacing: 0.3,
+    textAlign: 'center',
   },
 
   scrollContent: {
-    padding: 20,
+    paddingHorizontal: SIDE_PAD,
+    paddingVertical: 20,
     gap: 14,
   },
 
@@ -475,7 +460,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   continentCard: {
-    width: '47%',
+    width: CONT_CARD_W,
     backgroundColor: 'rgba(212,175,55,0.07)',
     borderRadius: 12,
     borderWidth: 1,
@@ -487,12 +472,6 @@ const styles = StyleSheet.create({
   continentCardOff: {
     backgroundColor: 'rgba(26,45,70,0.25)',
     borderColor: BORDER,
-  },
-  continentShapeWrap: {
-    position: 'absolute',
-    right: -8,
-    top: -4,
-    opacity: 0.13,
   },
   continentPct: {
     fontSize: 26,

@@ -19,13 +19,15 @@ const BORDER = '#1a2d46';
 const TEXT = '#e8e0d0';
 const MUTED = '#4a5a6a';
 
-const { height: SCREEN_H } = Dimensions.get('window');
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
-// Layout constants
-const CARD_H = 215;
+// Layout constants — responsive
+const CARD_H = Math.min(260, Math.max(185, Math.round(SCREEN_H * 0.25)));
 const CAPTION_H = 66;
 const ITEM_MB = 40;
 const ITEM_H = CARD_H + CAPTION_H + ITEM_MB;
+// Extra right padding on wide screens so cards don't stretch wall-to-wall on tablets
+const LIST_PR = Math.max(20, 20 + Math.round(Math.max(0, SCREEN_W - 420) * 0.4));
 const AXIS_X = 36;      // left edge of the golden line (2px wide, center at 37)
 const CARD_START = 68;  // paddingLeft of the list → where cards begin
 const DOT_R = 7;        // radius of axis dot
@@ -253,6 +255,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: MUTED,
     letterSpacing: 0.3,
+    textAlign: 'center',
   },
 
   listContainer: {
@@ -273,7 +276,7 @@ const styles = StyleSheet.create({
 
   list: {
     paddingLeft: CARD_START,
-    paddingRight: 20,
+    paddingRight: LIST_PR,
     paddingTop: LIST_PT,
     paddingBottom: 120,
   },
