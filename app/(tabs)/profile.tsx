@@ -4,7 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
-import { Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 export default function Profile() {
   const router = useRouter();
@@ -24,19 +24,41 @@ const paisRef        = useRef<TextInput>(null);
 
 const soloLetras = (t: string) => t.replace(/[^a-zA-ZÀ-ɏ ]/g, '');
  const pickImage = async () => {
+  const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (!perm.granted) return;
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],
     allowsEditing: true,
     aspect: [1, 1],
     quality: 1,
   });
-
   if (!result.canceled) {
     const uri = result.assets?.[0]?.uri;
-    if (uri) {
-      setImage(uri);
-    }
+    if (uri) setImage(uri);
   }
+};
+
+const takePhoto = async () => {
+  const { status } = await ImagePicker.requestCameraPermissionsAsync();
+  if (status !== 'granted') return;
+  const result = await ImagePicker.launchCameraAsync({
+    mediaTypes: ['images'],
+    allowsEditing: true,
+    aspect: [1, 1],
+    quality: 1,
+  });
+  if (!result.canceled) {
+    const uri = result.assets?.[0]?.uri;
+    if (uri) setImage(uri);
+  }
+};
+
+const selectPhoto = () => {
+  Alert.alert('Seleccionar imagen', 'Elegí una opción', [
+    { text: 'Tomar foto', onPress: takePhoto },
+    { text: 'Elegir de galería', onPress: pickImage },
+    { text: 'Cancelar', style: 'cancel' },
+  ]);
 };
   return (
    
@@ -72,7 +94,7 @@ const soloLetras = (t: string) => t.replace(/[^a-zA-ZÀ-ɏ ]/g, '');
     <TouchableOpacity
   style={styles.photoCircle}
   activeOpacity={0.8}
-  onPress={pickImage}
+  onPress={selectPhoto}
 >
       {image ? (
   <Image source={{ uri: image }} style={styles.avatarImage} />

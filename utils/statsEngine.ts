@@ -279,6 +279,14 @@ function getRango(xp: number) {
   return { current, next, progreso };
 }
 
+export function getXpRestantes(xpTotal: number): number | null {
+  let next: (typeof RANKS)[0] | null = null;
+  for (let i = 0; i < RANKS.length; i++) {
+    if (xpTotal >= RANKS[i].xpMin) next = RANKS[i + 1] ?? null;
+  }
+  return next ? next.xpMin - xpTotal : null;
+}
+
 export function formatKm(km: number): string {
   const n = Math.round(km);
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;

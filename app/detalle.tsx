@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -133,6 +134,16 @@ export default function DetalleViaje() {
   async function handleSetPortada(uri: string) {
     if (!trip || trip.portada === uri) return;
     await persistTrip({ ...trip, portada: uri });
+  }
+
+  async function handleShareTips() {
+    if (!trip || !tipsViaje.trim()) return;
+    const raw = await AsyncStorage.getItem('userData');
+    const userData = raw ? JSON.parse(raw) : {};
+    const nombre = (userData.nombre || '').trim();
+    const texto = `${nombre} de MyWorldXP te recomienda que si visitás ${trip.ciudad}, ${trip.pais} tengas en cuenta:\n\n${tipsViaje.trim()}`;
+    await Clipboard.setStringAsync(texto);
+    Alert.alert('¡Copiado!', 'Texto copiado. Ahora podés pegarlo donde quieras.');
   }
 
   // ─── Loading state ────────────────────────────────────────────────────────────
@@ -387,18 +398,25 @@ export default function DetalleViaje() {
       </View>
     </>
   ) : (
-  <TouchableOpacity
-    activeOpacity={0.8}
-    onPress={() => setEditingTips(true)}
-  >
-    {tipsViaje ? (
-      <Text style={styles.notaText}>{tipsViaje}</Text>
-    ) : (
-      <Text style={[styles.notaEmpty, { color: '#6fa8dc' }]}>
-        Cargar datos útiles de este destino, bares, restaurantes, lugares imperdibles...
-      </Text>
+  <>
+    <TouchableOpacity
+      activeOpacity={0.8}
+      onPress={() => setEditingTips(true)}
+    >
+      {tipsViaje ? (
+        <Text style={styles.notaText}>{tipsViaje}</Text>
+      ) : (
+        <Text style={[styles.notaEmpty, { color: '#6fa8dc' }]}>
+          Cargar datos útiles de este destino, bares, restaurantes, lugares imperdibles...
+        </Text>
+      )}
+    </TouchableOpacity>
+    {!!tipsViaje && (
+      <TouchableOpacity style={styles.shareBtn} onPress={handleShareTips} activeOpacity={0.8}>
+        <Text style={styles.shareBtnText}>↑ Compartir tips</Text>
+      </TouchableOpacity>
     )}
-  </TouchableOpacity>
+  </>
 )}
   
 </View>
@@ -587,4 +605,15 @@ const styles = StyleSheet.create({
   saveText: { color: BG, fontSize: 14, fontWeight: '700' },
 
   bottomSpacer: { height: 48 },
+
+  shareBtn: {
+    marginTop: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: GOLD,
+    backgroundColor: 'rgba(212,175,55,0.08)',
+  },
+  shareBtnText: { color: GOLD, fontSize: 13, fontWeight: '600', letterSpacing: 1 },
 });

@@ -2,8 +2,9 @@ import NavBar from '../components/NavBar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { AchievementPopup } from '../components/AchievementPopup';
+import { LevelUpPopup } from '../components/LevelUpPopup';
 import { Achievement, checkAndSaveAchievements } from '../utils/achievementsEngine';
-import { calcularStats, Trip as StatsTrip } from '../utils/statsEngine';
+import { calcularStats, getXpRestantes, Trip as StatsTrip } from '../utils/statsEngine';
 import { useLocalSearchParams } from 'expo-router';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import React, { useEffect, useRef, useState } from 'react';
@@ -169,6 +170,9 @@ export default function CargarViaje() {
   );
   const [geoNombre, setGeoNombre] = useState('');
   const [pendingAchievements, setPendingAchievements] = useState<Achievement[]>([]);
+  const [pendingLevelUp, setPendingLevelUp] = useState<{
+    prevRango: string; newRango: string; xpRestantes: number | null; userName: string;
+  } | null>(null);
   const chainIdRef = useRef<string | null>(null);
   const scrollRef = useRef<any>(null);
 
@@ -346,13 +350,23 @@ export default function CargarViaje() {
     await AsyncStorage.setItem('trips', JSON.stringify(all.filter((t) => t.id !== id)));
   }
 
-  async function _checkAchievements() {
+  async function _checkAchievements(prevRango: string) {
     try {
       const raw = await AsyncStorage.getItem('trips');
       const allTrips = raw ? JSON.parse(raw) : [];
       const stats = calcularStats(allTrips as StatsTrip[]);
       const newOnes = await checkAndSaveAchievements(allTrips as StatsTrip[], stats);
       if (newOnes.length > 0) setPendingAchievements(newOnes);
+      if (stats.rangoActual !== prevRango) {
+        const rawUser = await AsyncStorage.getItem('userData');
+        const userData = rawUser ? JSON.parse(rawUser) : {};
+        setPendingLevelUp({
+          prevRango,
+          newRango: stats.rangoActual,
+          xpRestantes: getXpRestantes(stats.xpTotal),
+          userName: userData.nombre ?? '',
+        });
+      }
     } catch {
       // silencioso — los logros no deben bloquear el flujo principal
     }
@@ -362,13 +376,15 @@ export default function CargarViaje() {
     if (!validate()) return;
     Keyboard.dismiss();
     try {
+      const rawBefore = await AsyncStorage.getItem('trips');
+      const prevStats = calcularStats((rawBefore ? JSON.parse(rawBefore) : []) as StatsTrip[]);
       const trip = buildTrip(null);
       await saveTrip(trip);
       if (pWishlistId) await deleteWishlistTrip(pWishlistId);
       chainIdRef.current = null;
       resetForm();
       Alert.alert('¡Guardado!', `Tu ${tipo === 'real' ? 'viaje' : 'destino'} fue guardado correctamente.`);
-      _checkAchievements();
+      _checkAchievements(prevStats.rangoActual);
     } catch {
       Alert.alert('Error', 'No se pudo guardar. Intentá de nuevo.');
     }
@@ -378,6 +394,8 @@ export default function CargarViaje() {
     if (!validate()) return;
     Keyboard.dismiss();
     try {
+      const rawBefore = await AsyncStorage.getItem('trips');
+      const prevStats = calcularStats((rawBefore ? JSON.parse(rawBefore) : []) as StatsTrip[]);
       if (!chainIdRef.current) {
         chainIdRef.current = genId();
       }
@@ -386,7 +404,7 @@ export default function CargarViaje() {
       if (pWishlistId) await deleteWishlistTrip(pWishlistId);
       resetForm();
       Alert.alert('Destino guardado', 'Cargá el siguiente destino del mismo viaje.');
-      _checkAchievements();
+      _checkAchievements(prevStats.rangoActual);
     } catch {
       Alert.alert('Error', 'No se pudo guardar. Intentá de nuevo.');
     }
@@ -653,6 +671,15 @@ export default function CargarViaje() {
         <AchievementPopup
           achievements={pendingAchievements}
           onDone={() => setPendingAchievements([])}
+        />
+      )}
+      {pendingLevelUp && (
+        <LevelUpPopup
+          prevRango={pendingLevelUp.prevRango}
+          newRango={pendingLevelUp.newRango}
+          xpRestantes={pendingLevelUp.xpRestantes}
+          userName={pendingLevelUp.userName}
+          onDone={() => setPendingLevelUp(null)}
         />
       )}
     </View>

@@ -2,10 +2,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  Image, StyleSheet,
+  Image,
+  StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from 'react-native';
 import Svg, {
   Circle,
@@ -145,7 +146,7 @@ interface UserData {
   nacionalidad?: string;
 }
 
-export default function PassportOpen() {
+export default function PassportOpen({ onClose }: { onClose?: () => void } = {}) {
   const router = useRouter();
   const [userData, setUserData] = useState<UserData | null>(null);
   const [stats, setStats] = useState<StatsResult | null>(null);
@@ -350,7 +351,7 @@ const icon = '◉ ';
             <Text style={styles.mrzLine}>MWX263524&lt;ARG9901014M3012315&lt;&lt;&lt;&lt;</Text>
           </View>
 
-          <TouchableOpacity onPress={() => router.push('/passportcover')}>
+          <TouchableOpacity onPress={onClose ?? (() => router.push('/passportcover'))}>
             <Text style={styles.closeHint}>Tocar para cerrar</Text>
           </TouchableOpacity>
         </View>

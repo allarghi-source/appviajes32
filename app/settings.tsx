@@ -62,7 +62,14 @@ export default function Settings() {
     setTimeout(() => setSaved(false), 2500);
   };
 
-  const pickPhoto = async () => {
+  const savePhoto = async (uri: string) => {
+    setFoto(uri);
+    const current = await AsyncStorage.getItem('userData');
+    const existing: UserData = current ? JSON.parse(current) : {};
+    await AsyncStorage.setItem('userData', JSON.stringify({ ...existing, foto: uri }));
+  };
+
+  const openGallery = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
       Alert.alert('Permiso requerido', 'Necesitás permitir el acceso a la galería.');
@@ -75,12 +82,33 @@ export default function Settings() {
       quality: 0.8,
     });
     if (!result.canceled && result.assets[0]) {
-      const uri = result.assets[0].uri;
-      setFoto(uri);
-      const current = await AsyncStorage.getItem('userData');
-      const existing: UserData = current ? JSON.parse(current) : {};
-      await AsyncStorage.setItem('userData', JSON.stringify({ ...existing, foto: uri }));
+      await savePhoto(result.assets[0].uri);
     }
+  };
+
+  const openCamera = async () => {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('Permiso requerido', 'Necesitás permitir el acceso a la cámara.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [3, 4],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]) {
+      await savePhoto(result.assets[0].uri);
+    }
+  };
+
+  const pickPhoto = () => {
+    Alert.alert('Foto de perfil', 'Elegí una opción', [
+      { text: 'Tomar foto', onPress: openCamera },
+      { text: 'Elegir de galería', onPress: openGallery },
+      { text: 'Cancelar', style: 'cancel' },
+    ]);
   };
 
   const saveBackup = async () => {
@@ -174,7 +202,7 @@ export default function Settings() {
             </View>
             <View style={styles.photoInfo}>
               <Text style={styles.photoLabel}>Foto de perfil</Text>
-              <Text style={styles.photoHint}>Tocar para elegir desde la galería</Text>
+              <Text style={styles.photoHint}>Tocar para tomar foto o elegir de galería</Text>
             </View>
             <Text style={styles.photoChevron}>›</Text>
           </TouchableOpacity>

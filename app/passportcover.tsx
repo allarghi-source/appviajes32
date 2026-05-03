@@ -1,7 +1,10 @@
+import PassportOpen from './passportinside';
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useRef } from 'react';
 import {
+  Animated,
   Dimensions,
+  Easing,
   Image,
   StyleSheet,
   Text,
@@ -15,7 +18,6 @@ import Svg, {
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// Corner ornament SVG (top-left)
 const CornerOrnamentTopLeft = () => (
   <Svg width={20} height={20} viewBox="0 0 20 20">
     <Path d="M2,2 L8,2 L2,8 Z" fill="none" stroke="#d4af37" strokeWidth={1} />
@@ -25,7 +27,6 @@ const CornerOrnamentTopLeft = () => (
   </Svg>
 );
 
-// Corner ornament SVG (top-right, mirrored)
 const CornerOrnamentTopRight = () => (
   <Svg width={20} height={20} viewBox="0 0 20 20" style={{ transform: [{ scaleX: -1 }] }}>
     <Path d="M2,2 L8,2 L2,8 Z" fill="none" stroke="#d4af37" strokeWidth={1} />
@@ -35,7 +36,6 @@ const CornerOrnamentTopRight = () => (
   </Svg>
 );
 
-// Bottom corner ornaments
 const CornerOrnamentBottomLeft = () => (
   <Svg width={16} height={16} viewBox="0 0 16 16" style={{ opacity: 0.5 }}>
     <Path d="M2,14 L2,8 L8,14 Z" fill="none" stroke="#d4af37" strokeWidth={0.8} />
@@ -50,7 +50,6 @@ const CornerOrnamentBottomRight = () => (
   </Svg>
 );
 
-// Horizontal line with gradient effect (simulated with views)
 const TopLine = () => (
   <View style={styles.topLineContainer}>
     <View style={styles.topLineGradientLeft} />
@@ -69,89 +68,98 @@ const DividerLine = () => (
 
 export default function PassportCover() {
   const router = useRouter();
+  const coverAnim = useRef(new Animated.Value(0)).current;
+
+  const coverTranslateX = coverAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -(SCREEN_WIDTH + 20)],
+  });
+
+  const openPassport = () => {
+    Animated.timing(coverAnim, {
+      toValue: 1,
+      duration: 500,
+      easing: Easing.inOut(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const closePassport = () => {
+    Animated.timing(coverAnim, {
+      toValue: 0,
+      duration: 500,
+      easing: Easing.inOut(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  };
+
   return (
     <View style={styles.screenContainer}>
-      {/* Passport card */}
-      <TouchableOpacity
-  onPress={() => router.push('/settings')}
-  style={{
-    position: 'absolute',
-    top: 60,
-    right: 25,
-    zIndex: 10,
-    padding: 6,
-  }}
->
-  <Text
-    style={{
-      color: 'rgba(212,175,55,0.6)',
-      fontSize: 16,
-      fontFamily: 'Georgia',
-    }}
-  >
-    ⚙
-  </Text>
-</TouchableOpacity>
-      <TouchableOpacity
-  style={styles.passport}
-  activeOpacity={0.9}
-  onPress={() => router.push('/passportinside')}
->
-        {/* Leather texture overlay (subtle diagonal lines via multiple thin views) */}
-        <View style={styles.leatherTexture} pointerEvents="none" />
+      {/* Inside content — siempre renderizado como fondo */}
+      <PassportOpen onClose={closePassport} />
 
-        {/* Spine / Lomo */}
-        <View style={styles.spine} />
+      {/* Cover — overlay absoluto animado encima */}
+      <Animated.View
+        style={[
+          StyleSheet.absoluteFill,
+          styles.coverContainer,
+          {
+            transform: [{ translateX: coverTranslateX }],
+          },
+        ]}
+      >
+        <TouchableOpacity
+          onPress={() => router.push('/settings')}
+          style={styles.settingsBtn}
+        >
+          <Text style={styles.settingsIcon}>⚙</Text>
+        </TouchableOpacity>
 
-        {/* Inner content */}
-        <View style={styles.passportInner}>
-
-          {/* TOP BLOCK */}
-          <View style={styles.blockTop}>
-            {/* Ornament row */}
-            <View style={styles.ornamentTop}>
-              <View style={{ opacity: 0.7 }}>
-                <CornerOrnamentTopLeft />
+        <TouchableOpacity
+          style={styles.passport}
+          activeOpacity={0.9}
+          onPress={openPassport}
+        >
+          <View style={styles.leatherTexture} pointerEvents="none" />
+          <View style={styles.spine} />
+          <View style={styles.passportInner}>
+            <View style={styles.blockTop}>
+              <View style={styles.ornamentTop}>
+                <View style={{ opacity: 0.7 }}>
+                  <CornerOrnamentTopLeft />
+                </View>
+                <TopLine />
+                <View style={{ opacity: 0.7 }}>
+                  <CornerOrnamentTopRight />
+                </View>
               </View>
-              <TopLine />
-              <View style={{ opacity: 0.7 }}>
-                <CornerOrnamentTopRight />
+              <View style={styles.brandLine}>
+                <Text style={styles.brandMy}>MY </Text>
+                <Text style={styles.brandWorld}>WORLD</Text>
+                <Text style={styles.brandXp}>XP</Text>
               </View>
             </View>
-
-            {/* Brand line */}
-            <View style={styles.brandLine}>
-              <Text style={styles.brandMy}>MY </Text>
-              <Text style={styles.brandWorld}>WORLD</Text>
-              <Text style={styles.brandXp}>XP</Text>
+            <View style={styles.blockLogo}>
+              <Image
+                source={require('../assets/images/myworld-logo.png')}
+                style={styles.logoImg}
+                resizeMode="contain"
+              />
+            </View>
+            <View style={styles.blockBottom}>
+              <DividerLine />
+              <Text style={styles.passportTitle}>PASSPORT</Text>
+              <Text style={styles.passportSubtitle}>
+                PASSEPORT · PASAPORTE · REISEPASS · PASSAPORTO
+              </Text>
+              <View style={styles.ornamentBottom}>
+                <CornerOrnamentBottomLeft />
+                <CornerOrnamentBottomRight />
+              </View>
             </View>
           </View>
-
-          {/* CENTER BLOCK - Logo */}
-          <View style={styles.blockLogo}>
-            <Image
-              source={require('../assets/images/myworld-logo.png')}
-              style={styles.logoImg}
-              resizeMode="contain"
-            />
-          </View>
-
-          {/* BOTTOM BLOCK */}
-          <View style={styles.blockBottom}>
-            <DividerLine />
-            <Text style={styles.passportTitle}>PASSPORT</Text>
-            <Text style={styles.passportSubtitle}>
-              PASSEPORT · PASAPORTE · REISEPASS · PASSAPORTO
-            </Text>
-            <View style={styles.ornamentBottom}>
-              <CornerOrnamentBottomLeft />
-              <CornerOrnamentBottomRight />
-            </View>
-          </View>
-
-        </View>
-
-    </TouchableOpacity>
+        </TouchableOpacity>
+      </Animated.View>
     </View>
   );
 }
@@ -160,30 +168,44 @@ const styles = StyleSheet.create({
   screenContainer: {
     flex: 1,
     backgroundColor: '#01050d',
+  },
+
+  coverContainer: {
+    backgroundColor: '#01050d',
     justifyContent: 'center',
     alignItems: 'center',
   },
 
-  // Passport card: 320x450
+  settingsBtn: {
+    position: 'absolute',
+    top: 60,
+    right: 25,
+    zIndex: 10,
+    padding: 6,
+  },
+
+  settingsIcon: {
+    color: 'rgba(212,175,55,0.6)',
+    fontSize: 16,
+    fontFamily: 'Georgia',
+  },
+
   passport: {
     width: SCREEN_WIDTH * 0.9,
-height: SCREEN_HEIGHT * 0.75,
+    height: SCREEN_HEIGHT * 0.75,
     backgroundColor: '#0a1628',
     borderRadius: 12,
     overflow: 'hidden',
     position: 'relative',
-    // Box shadow approximation
     shadowColor: '#000',
     shadowOffset: { width: 8, height: 20 },
     shadowOpacity: 0.8,
     shadowRadius: 30,
     elevation: 20,
-    // Inset border via borderWidth
     borderWidth: 2,
     borderColor: 'rgba(212,175,55,0.15)',
   },
 
-  // Leather texture overlay (subtle)
   leatherTexture: {
     position: 'absolute',
     top: 0,
@@ -195,7 +217,6 @@ height: SCREEN_HEIGHT * 0.75,
     backgroundColor: 'rgba(255,255,255,0.008)',
   },
 
-  // Spine / Lomo: 18px wide, left side
   spine: {
     position: 'absolute',
     left: 0,
@@ -204,12 +225,10 @@ height: SCREEN_HEIGHT * 0.75,
     width: 18,
     zIndex: 2,
     backgroundColor: '#0a1628',
-    // Gradient approximation: dark left to slightly lighter
     borderRightWidth: 1,
     borderRightColor: 'rgba(212,175,55,0.2)',
   },
 
-  // Inner layout: paddingLeft 32, paddingRight 28, flex column centered
   passportInner: {
     position: 'absolute',
     top: 0,
@@ -223,7 +242,6 @@ height: SCREEN_HEIGHT * 0.75,
     zIndex: 3,
   },
 
-  // TOP BLOCK
   blockTop: {
     paddingTop: 22,
     width: '100%',
@@ -239,7 +257,6 @@ height: SCREEN_HEIGHT * 0.75,
     alignItems: 'center',
   },
 
-  // Top line: flex:1, height 1, gradient transparent -> gold -> transparent
   topLineContainer: {
     flex: 1,
     height: 1,
@@ -250,7 +267,6 @@ height: SCREEN_HEIGHT * 0.75,
     flex: 1,
     height: 1,
     backgroundColor: 'transparent',
-    // Simulate gradient with opacity layers
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(212,175,55,0.1)',
   },
@@ -267,7 +283,6 @@ height: SCREEN_HEIGHT * 0.75,
     borderBottomColor: 'rgba(212,175,55,0.1)',
   },
 
-  // Brand line
   brandLine: {
     flexDirection: 'row',
     alignItems: 'baseline',
@@ -297,7 +312,6 @@ height: SCREEN_HEIGHT * 0.75,
     fontFamily: 'Georgia',
   },
 
-  // LOGO BLOCK: flex 1, centered
   blockLogo: {
     flex: 1,
     justifyContent: 'center',
@@ -307,14 +321,12 @@ height: SCREEN_HEIGHT * 0.75,
   logoImg: {
     width: 320,
     height: 320,
-    // drop-shadow approximation
     shadowColor: 'rgba(212,175,55,0.55)',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.55,
     shadowRadius: 18,
   },
 
-  // BOTTOM BLOCK
   blockBottom: {
     width: '100%',
     paddingBottom: 18,
