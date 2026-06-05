@@ -1,4 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { resetAchievements } from '../utils/achievementsEngine';
+import { playSound } from '../utils/soundEngine';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -162,7 +164,9 @@ export default function Settings() {
           text: 'Borrar todo',
           style: 'destructive',
           onPress: async () => {
-            await AsyncStorage.multiRemove(['userData', 'trips']);
+            playSound('borrar_todo');
+            await AsyncStorage.multiRemove(['userData', 'trips', 'learned_cities']);
+            await resetAchievements();
             router.replace('/onboarding');
           },
         },

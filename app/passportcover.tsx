@@ -1,11 +1,12 @@
 import PassportOpen from './passportinside';
 import { useRouter } from 'expo-router';
-import React, { useRef } from 'react';
+import { playSound, preloadSounds } from '../utils/soundEngine';
+import { Image } from 'expo-image';
+import React, { useRef, useEffect } from 'react';
 import {
   Animated,
   Dimensions,
   Easing,
-  Image,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -73,6 +74,8 @@ export default function PassportCover() {
   const router = useRouter();
   const coverAnim = useRef(new Animated.Value(0)).current;
 
+  useEffect(() => { preloadSounds(); }, []);
+
   const coverTranslateX = coverAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [0, -(SCREEN_WIDTH + 20)],
@@ -121,7 +124,7 @@ export default function PassportCover() {
         <TouchableOpacity
           style={styles.passport}
           activeOpacity={0.9}
-          onPress={openPassport}
+          onPress={() => { playSound('abrir_hoja'); openPassport(); }}
         >
           <View style={styles.leatherTexture} pointerEvents="none" />
           <View style={styles.spine} />
@@ -146,7 +149,8 @@ export default function PassportCover() {
               <Image
                 source={require('../assets/images/myworld-logo.png')}
                 style={styles.logoImg}
-                resizeMode="contain"
+                contentFit="contain"
+                transition={0}
               />
             </View>
             <View style={styles.blockBottom}>

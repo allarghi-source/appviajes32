@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import { playSound } from '../utils/soundEngine';
 import { Image, ImageBackground, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 export default function Onboarding() {
   const router = useRouter();
@@ -61,7 +62,7 @@ export default function Onboarding() {
   <TouchableOpacity
     style={styles.button}
     activeOpacity={0.85}
-    onPress={() => router.push('/profile')}
+    onPress={() => { playSound('piloto'); router.push('/profile'); }}
   >
     <Text style={styles.buttonText}>
       CREAR MI PASAPORTE →

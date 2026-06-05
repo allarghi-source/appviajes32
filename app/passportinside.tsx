@@ -181,6 +181,10 @@ export default function PassportOpen({ onClose }: { onClose?: () => void } = {})
   const _nextThreshold = RANK_THRESHOLDS.find((t) => t > _xpNow) ?? null;
   const xpLabel = `+${_nextThreshold !== null ? Math.max(0, _nextThreshold - _xpNow) : 0} XP`;
   const hasKm = stats && stats.kmTotales > 0;
+  const _mrzSurname = (userData?.apellido ?? '').toUpperCase().replace(/[^A-Z]/g, '') || 'VIAJERO';
+  const _mrzName    = (userData?.nombre   ?? '').toUpperCase().replace(/[^A-Z]/g, '') || 'MWX';
+  const _mrzRaw     = `P<MWX${_mrzSurname}<<${_mrzName}`;
+  const mrzLine1    = (_mrzRaw + '<'.repeat(33)).slice(0, 33);
 
 const formatOneDecimal = (value: number) => {
   const rounded = Math.round(value * 10) / 10;
@@ -358,7 +362,7 @@ const icon = '◉ ';
 
           {/* MRZ */}
           <View style={styles.mrz}>
-            <Text style={styles.mrzLine}>P&lt;MWXLARGHI&lt;&lt;ANGEL&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;</Text>
+            <Text style={styles.mrzLine}>{mrzLine1}</Text>
             <Text style={styles.mrzLine}>MWX263524&lt;ARG9901014M3012315&lt;&lt;&lt;&lt;</Text>
           </View>
 

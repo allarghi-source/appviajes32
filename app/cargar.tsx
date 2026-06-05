@@ -5,6 +5,7 @@ import { AchievementPopup } from '../components/AchievementPopup';
 import { LevelUpPopup } from '../components/LevelUpPopup';
 import { Achievement, checkAndSaveAchievements } from '../utils/achievementsEngine';
 import { calcularStats, getXpRestantes, Trip as StatsTrip } from '../utils/statsEngine';
+import { playSound } from '../utils/soundEngine';
 import { useLocalSearchParams } from 'expo-router';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import React, { useEffect, useRef, useState } from 'react';
@@ -14,6 +15,7 @@ import {
   Dimensions,
   Image,
   Keyboard,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
@@ -32,6 +34,7 @@ const MUTED = '#6b7a8d';
 const { width: SCREEN_W } = Dimensions.get('window');
 // On tablets (>540px) the padding grows so the content stays ~540px wide and centered
 const SIDE_PAD = Math.max(24, Math.round((SCREEN_W - 540) / 2));
+const PICKER_THUMB_SIZE = Math.floor((SCREEN_W - 6) / 3);
 
 type TripType = 'real' | 'wishlist';
 
@@ -48,6 +51,23 @@ interface TripData {
   xp: number;
   distancia: number;
   chainId: string | null;
+}
+
+interface DestinoState {
+  id: string;
+  ciudad: string;
+  pais: string;
+  coords: { lat: number; lng: number } | null;
+  geoStatus: 'idle' | 'buscando' | 'encontrada' | 'no_encontrada' | 'error';
+  geoNombre: string;
+  dia: string;
+  mes: string;
+  anio: string;
+  nota: string;
+  fotos: string[];
+  ciudadSugs: string[];
+  paisSugs: string[];
+  openDropdown: 'dia' | 'mes' | 'anio' | null;
 }
 
 function genId(): string {
@@ -81,6 +101,241 @@ const YEARS: DropItem[] = Array.from({ length: 2035 - 1980 + 1 }, (_, i) => ({
   label: String(2035 - i),
   value: String(2035 - i),
 }));
+
+// ─── CITY AUTOCOMPLETE DATA ───────────────────────────────────────────────────
+
+interface CityEntry { name: string; country: string; }
+
+const CIUDADES: CityEntry[] = [
+  { name: 'Abu Dhabi',           country: 'Emiratos Árabes Unidos' },
+  { name: 'Abiyán',              country: 'Costa de Marfil' },
+  { name: 'Accra',               country: 'Ghana' },
+  { name: 'Addis Abeba',         country: 'Etiopía' },
+  { name: 'Adelaide',            country: 'Australia' },
+  { name: 'Alejandría',          country: 'Egipto' },
+  { name: 'Almaty',              country: 'Kazajistán' },
+  { name: 'Ámsterdam',           country: 'Países Bajos' },
+  { name: 'Amsterdam',           country: 'Países Bajos' },
+  { name: 'Ankara',              country: 'Turquía' },
+  { name: 'Asunción',            country: 'Paraguay' },
+  { name: 'Atenas',              country: 'Grecia' },
+  { name: 'Athens',              country: 'Grecia' },
+  { name: 'Auckland',            country: 'Nueva Zelanda' },
+  { name: 'Bagdad',              country: 'Irak' },
+  { name: 'Baghdad',             country: 'Irak' },
+  { name: 'Baku',                country: 'Azerbaiyán' },
+  { name: 'Bangkok',             country: 'Tailandia' },
+  { name: 'Barcelona',           country: 'España' },
+  { name: 'Barranquilla',        country: 'Colombia' },
+  { name: 'Beirut',              country: 'Líbano' },
+  { name: 'Belgrado',            country: 'Serbia' },
+  { name: 'Belgrade',            country: 'Serbia' },
+  { name: 'Berlín',              country: 'Alemania' },
+  { name: 'Berlin',              country: 'Alemania' },
+  { name: 'Berna',               country: 'Suiza' },
+  { name: 'Bogotá',              country: 'Colombia' },
+  { name: 'Bratislava',          country: 'Eslovaquia' },
+  { name: 'Brisbane',            country: 'Australia' },
+  { name: 'Bruselas',            country: 'Bélgica' },
+  { name: 'Brussels',            country: 'Bélgica' },
+  { name: 'Bucarest',            country: 'Rumania' },
+  { name: 'Bucharest',           country: 'Rumania' },
+  { name: 'Budapest',            country: 'Hungría' },
+  { name: 'Buenos Aires',        country: 'Argentina' },
+  { name: 'El Cairo',            country: 'Egipto' },
+  { name: 'Cairo',               country: 'Egipto' },
+  { name: 'Calcuta',             country: 'India' },
+  { name: 'Calgary',             country: 'Canadá' },
+  { name: 'Cancún',              country: 'México' },
+  { name: 'Cape Town',           country: 'Sudáfrica' },
+  { name: 'Caracas',             country: 'Venezuela' },
+  { name: 'Cartagena',           country: 'Colombia' },
+  { name: 'Casablanca',          country: 'Marruecos' },
+  { name: 'Chennai',             country: 'India' },
+  { name: 'Chicago',             country: 'Estados Unidos' },
+  { name: 'Ciudad de Guatemala', country: 'Guatemala' },
+  { name: 'Ciudad de México',    country: 'México' },
+  { name: 'Ciudad del Cabo',     country: 'Sudáfrica' },
+  { name: 'Colombo',             country: 'Sri Lanka' },
+  { name: 'Copenhague',          country: 'Dinamarca' },
+  { name: 'Copenhagen',          country: 'Dinamarca' },
+  { name: 'Córdoba',             country: 'Argentina' },
+  { name: 'Córdoba',             country: 'España' },
+  { name: 'Dakar',               country: 'Senegal' },
+  { name: 'Damasco',             country: 'Siria' },
+  { name: 'Damascus',            country: 'Siria' },
+  { name: 'Delhi',               country: 'India' },
+  { name: 'Denver',              country: 'Estados Unidos' },
+  { name: 'Doha',                country: 'Catar' },
+  { name: 'Dubái',               country: 'Emiratos Árabes Unidos' },
+  { name: 'Dubai',               country: 'Emiratos Árabes Unidos' },
+  { name: 'Dublín',              country: 'Irlanda' },
+  { name: 'Dublin',              country: 'Irlanda' },
+  { name: 'Durban',              country: 'Sudáfrica' },
+  { name: 'Düsseldorf',          country: 'Alemania' },
+  { name: 'Edmonton',            country: 'Canadá' },
+  { name: 'Estambul',            country: 'Turquía' },
+  { name: 'Istanbul',            country: 'Turquía' },
+  { name: 'Filadelfia',          country: 'Estados Unidos' },
+  { name: 'Philadelphia',        country: 'Estados Unidos' },
+  { name: 'Florencia',           country: 'Italia' },
+  { name: 'Florence',            country: 'Italia' },
+  { name: 'Frankfurt',           country: 'Alemania' },
+  { name: 'Ginebra',             country: 'Suiza' },
+  { name: 'Geneva',              country: 'Suiza' },
+  { name: 'Glasgow',             country: 'Reino Unido' },
+  { name: 'Guadalajara',         country: 'México' },
+  { name: 'Guadalajara',         country: 'España' },
+  { name: 'Guayaquil',           country: 'Ecuador' },
+  { name: 'La Habana',           country: 'Cuba' },
+  { name: 'Havana',              country: 'Cuba' },
+  { name: 'Hamburgo',            country: 'Alemania' },
+  { name: 'Hamburg',             country: 'Alemania' },
+  { name: 'Hanói',               country: 'Vietnam' },
+  { name: 'Hanoi',               country: 'Vietnam' },
+  { name: 'Helsinki',            country: 'Finlandia' },
+  { name: 'Hong Kong',           country: 'China' },
+  { name: 'Houston',             country: 'Estados Unidos' },
+  { name: 'Hyderabad',           country: 'India' },
+  { name: 'Islamabad',           country: 'Pakistán' },
+  { name: 'Jacarta',             country: 'Indonesia' },
+  { name: 'Jakarta',             country: 'Indonesia' },
+  { name: 'Johannesburgo',       country: 'Sudáfrica' },
+  { name: 'Johannesburg',        country: 'Sudáfrica' },
+  { name: 'Kabul',               country: 'Afganistán' },
+  { name: 'Karachi',             country: 'Pakistán' },
+  { name: 'Katmandú',            country: 'Nepal' },
+  { name: 'Kathmandu',           country: 'Nepal' },
+  { name: 'Kiev',                country: 'Ucrania' },
+  { name: 'Kinshasa',            country: 'Congo' },
+  { name: 'Kuala Lumpur',        country: 'Malasia' },
+  { name: 'Lagos',               country: 'Nigeria' },
+  { name: 'La Paz',              country: 'Bolivia' },
+  { name: 'Lima',                country: 'Perú' },
+  { name: 'Lisboa',              country: 'Portugal' },
+  { name: 'Lisbon',              country: 'Portugal' },
+  { name: 'Ljubljana',           country: 'Eslovenia' },
+  { name: 'Londres',             country: 'Reino Unido' },
+  { name: 'London',              country: 'Reino Unido' },
+  { name: 'Los Ángeles',         country: 'Estados Unidos' },
+  { name: 'Los Angeles',         country: 'Estados Unidos' },
+  { name: 'Luanda',              country: 'Angola' },
+  { name: 'Luxemburgo',          country: 'Luxemburgo' },
+  { name: 'Luxembourg',          country: 'Luxemburgo' },
+  { name: 'Madrid',              country: 'España' },
+  { name: 'Managua',             country: 'Nicaragua' },
+  { name: 'Manila',              country: 'Filipinas' },
+  { name: 'Marrakech',           country: 'Marruecos' },
+  { name: 'Medellín',            country: 'Colombia' },
+  { name: 'Melbourne',           country: 'Australia' },
+  { name: 'Mexico City',         country: 'México' },
+  { name: 'Miami',               country: 'Estados Unidos' },
+  { name: 'Milán',               country: 'Italia' },
+  { name: 'Milan',               country: 'Italia' },
+  { name: 'Minsk',               country: 'Bielorrusia' },
+  { name: 'Montevideo',          country: 'Uruguay' },
+  { name: 'Montreal',            country: 'Canadá' },
+  { name: 'Moscú',               country: 'Rusia' },
+  { name: 'Moscow',              country: 'Rusia' },
+  { name: 'Mumbai',              country: 'India' },
+  { name: 'Múnich',              country: 'Alemania' },
+  { name: 'Munich',              country: 'Alemania' },
+  { name: 'Nairobi',             country: 'Kenia' },
+  { name: 'Nápoles',             country: 'Italia' },
+  { name: 'Naples',              country: 'Italia' },
+  { name: 'Nashville',           country: 'Estados Unidos' },
+  { name: 'Nueva Delhi',         country: 'India' },
+  { name: 'New Delhi',           country: 'India' },
+  { name: 'Nueva Orleans',       country: 'Estados Unidos' },
+  { name: 'New Orleans',         country: 'Estados Unidos' },
+  { name: 'Nueva York',          country: 'Estados Unidos' },
+  { name: 'New York',            country: 'Estados Unidos' },
+  { name: 'Osaka',               country: 'Japón' },
+  { name: 'Oslo',                country: 'Noruega' },
+  { name: 'Ottawa',              country: 'Canadá' },
+  { name: 'Panamá',              country: 'Panamá' },
+  { name: 'París',               country: 'Francia' },
+  { name: 'Paris',               country: 'Francia' },
+  { name: 'Pekín',               country: 'China' },
+  { name: 'Beijing',             country: 'China' },
+  { name: 'Perth',               country: 'Australia' },
+  { name: 'Porto Alegre',        country: 'Brasil' },
+  { name: 'Praga',               country: 'República Checa' },
+  { name: 'Prague',              country: 'República Checa' },
+  { name: 'Quito',               country: 'Ecuador' },
+  { name: 'Riga',                country: 'Letonia' },
+  { name: 'Río de Janeiro',      country: 'Brasil' },
+  { name: 'Rio de Janeiro',      country: 'Brasil' },
+  { name: 'Roma',                country: 'Italia' },
+  { name: 'Rome',                country: 'Italia' },
+  { name: 'Rosario',             country: 'Argentina' },
+  { name: 'Rotterdam',           country: 'Países Bajos' },
+  { name: 'Saint Petersburg',    country: 'Rusia' },
+  { name: 'San Francisco',       country: 'Estados Unidos' },
+  { name: 'San José',            country: 'Costa Rica' },
+  { name: 'San Juan',            country: 'Puerto Rico' },
+  { name: 'San Petersburgo',     country: 'Rusia' },
+  { name: 'San Salvador',        country: 'El Salvador' },
+  { name: 'Santiago',            country: 'Chile' },
+  { name: 'Santiago de Chile',   country: 'Chile' },
+  { name: 'Santo Domingo',       country: 'República Dominicana' },
+  { name: 'São Paulo',           country: 'Brasil' },
+  { name: 'Seattle',             country: 'Estados Unidos' },
+  { name: 'Seúl',                country: 'Corea del Sur' },
+  { name: 'Seoul',               country: 'Corea del Sur' },
+  { name: 'Shanghái',            country: 'China' },
+  { name: 'Shanghai',            country: 'China' },
+  { name: 'Singapur',            country: 'Singapur' },
+  { name: 'Singapore',           country: 'Singapur' },
+  { name: 'Sofía',               country: 'Bulgaria' },
+  { name: 'Sofia',               country: 'Bulgaria' },
+  { name: 'Sídney',              country: 'Australia' },
+  { name: 'Sydney',              country: 'Australia' },
+  { name: 'Taipéi',              country: 'Taiwán' },
+  { name: 'Taipei',              country: 'Taiwán' },
+  { name: 'Tallin',              country: 'Estonia' },
+  { name: 'Tallinn',             country: 'Estonia' },
+  { name: 'Tbilisi',             country: 'Georgia' },
+  { name: 'Tegucigalpa',         country: 'Honduras' },
+  { name: 'Teherán',             country: 'Irán' },
+  { name: 'Tehran',              country: 'Irán' },
+  { name: 'Tel Aviv',            country: 'Israel' },
+  { name: 'Tokio',               country: 'Japón' },
+  { name: 'Tokyo',               country: 'Japón' },
+  { name: 'Toronto',             country: 'Canadá' },
+  { name: 'Túnez',               country: 'Túnez' },
+  { name: 'Tunis',               country: 'Túnez' },
+  { name: 'Valencia',            country: 'España' },
+  { name: 'Valencia',            country: 'Venezuela' },
+  { name: 'Vancouver',           country: 'Canadá' },
+  { name: 'Varsovia',            country: 'Polonia' },
+  { name: 'Warsaw',              country: 'Polonia' },
+  { name: 'Venecia',             country: 'Italia' },
+  { name: 'Venice',              country: 'Italia' },
+  { name: 'Viena',               country: 'Austria' },
+  { name: 'Vienna',              country: 'Austria' },
+  { name: 'Vilna',               country: 'Lituania' },
+  { name: 'Vilnius',             country: 'Lituania' },
+  { name: 'Washington D.C.',     country: 'Estados Unidos' },
+  { name: 'Yereván',             country: 'Armenia' },
+  { name: 'Yerevan',             country: 'Armenia' },
+  { name: 'Zagreb',              country: 'Croacia' },
+  { name: 'Zúrich',              country: 'Suiza' },
+  { name: 'Zurich',              country: 'Suiza' },
+];
+
+function normalizarTexto(s: string): string {
+  return s.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
+function getPaisesPorCiudad(cityName: string, extra: CityEntry[] = []): string[] {
+  const norm = normalizarTexto(cityName);
+  return [...new Set(
+    [...CIUDADES, ...extra]
+      .filter(c => normalizarTexto(c.name) === norm)
+      .map(c => c.country)
+  )];
+}
 
 // ─── DROPDOWN LIST COMPONENT ──────────────────────────────────────────────────
 
@@ -133,6 +388,463 @@ const DropdownList = ({
   );
 };
 
+// ─── FOTO PICKER MODAL ────────────────────────────────────────────────────────
+
+function FotoPickerModal({
+  visible,
+  fotosDisponibles,
+  fotosActuales,
+  maxSeleccion,
+  onConfirm,
+  onClose,
+}: {
+  visible: boolean;
+  fotosDisponibles: string[];
+  fotosActuales: string[];
+  maxSeleccion: number;
+  onConfirm: (uris: string[]) => void;
+  onClose: () => void;
+}) {
+  const [selected, setSelected] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (visible) {
+      setSelected(fotosActuales.filter(u => fotosDisponibles.includes(u)));
+    }
+  }, [visible]);
+
+  function toggleFoto(uri: string) {
+    setSelected(prev => {
+      if (prev.includes(uri)) return prev.filter(u => u !== uri);
+      if (prev.length >= maxSeleccion) return prev;
+      return [...prev, uri];
+    });
+  }
+
+  return (
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+      <View style={styles.pickerModal}>
+        <View style={styles.pickerHeader}>
+          <TouchableOpacity onPress={onClose} style={styles.pickerHeaderBtn}>
+            <Text style={styles.pickerCancelText}>Cancelar</Text>
+          </TouchableOpacity>
+          <Text style={styles.pickerTitle}>Fotos del viaje</Text>
+          <TouchableOpacity onPress={() => onConfirm(selected)} style={styles.pickerHeaderBtn}>
+            <Text style={[styles.pickerConfirmText, selected.length === 0 && { opacity: 0.45 }]}>
+              Listo ({selected.length})
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {fotosDisponibles.length === 0 ? (
+          <View style={styles.pickerEmpty}>
+            <Text style={styles.pickerEmptyText}>
+              Todavía no preseleccionaste fotos para este viaje.{'\n'}
+              Usá "Seleccionar fotos del viaje" para agregar.
+            </Text>
+          </View>
+        ) : (
+          <>
+            <Text style={styles.pickerHint}>
+              Seleccioná hasta {maxSeleccion} foto{maxSeleccion !== 1 ? 's' : ''} para este destino
+            </Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={styles.pickerGrid}>
+                {fotosDisponibles.map((uri) => {
+                  const isSel = selected.includes(uri);
+                  const atLimit = !isSel && selected.length >= maxSeleccion;
+                  return (
+                    <TouchableOpacity
+                      key={uri}
+                      onPress={() => { if (!atLimit) toggleFoto(uri); }}
+                      activeOpacity={atLimit ? 1 : 0.85}
+                      style={[
+                        styles.pickerThumbWrap,
+                        { width: PICKER_THUMB_SIZE, height: PICKER_THUMB_SIZE },
+                        isSel && styles.pickerThumbWrapSelected,
+                      ]}
+                    >
+                      <Image
+                        source={{ uri }}
+                        style={[styles.pickerThumb, atLimit && { opacity: 0.35 }]}
+                      />
+                      {isSel && (
+                        <View style={styles.pickerCheckBadge}>
+                          <Text style={styles.pickerCheckText}>✓</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+          </>
+        )}
+      </View>
+    </Modal>
+  );
+}
+
+// ─── DESTINO HELPERS ─────────────────────────────────────────────────────────
+
+function toRoman(n: number): string {
+  const r = ['I','II','III','IV','V','VI','VII','VIII','IX','X'];
+  return r[n - 1] ?? String(n);
+}
+
+function createDestino(): DestinoState {
+  const today = new Date();
+  return {
+    id: genId(),
+    ciudad: '', pais: '',
+    coords: null,
+    geoStatus: 'idle', geoNombre: '',
+    dia: String(today.getDate()),
+    mes: String(today.getMonth() + 1),
+    anio: String(today.getFullYear()),
+    nota: '', fotos: [],
+    ciudadSugs: [], paisSugs: [],
+    openDropdown: null,
+  };
+}
+
+// ─── DESTINO BLOCK COMPONENT ──────────────────────────────────────────────────
+
+function DestinoBlock({
+  destino, index, tipo, learnedCities, onChange, onLearnCity, scrollRef, fotosViaje,
+}: {
+  destino: DestinoState;
+  index: number;
+  tipo: TripType;
+  learnedCities: CityEntry[];
+  onChange: (patch: Partial<DestinoState>) => void;
+  onLearnCity: (nombre: string, pais: string) => void;
+  scrollRef: React.RefObject<any>;
+  fotosViaje?: string[];
+}) {
+  const dateSectionY = useRef(0);
+  const [pickerVisible, setPickerVisible] = useState(false);
+
+  function handleCiudadChange(t: string) {
+    const patch: Partial<DestinoState> = { ciudad: t };
+    if (destino.geoStatus === 'encontrada') {
+      patch.coords = null; patch.geoStatus = 'idle'; patch.geoNombre = '';
+    }
+    if (t.trim().length > 0) {
+      const lower = t.trim().toLowerCase();
+      const seen = new Set<string>();
+      const matches: string[] = [];
+      for (const c of [...CIUDADES, ...learnedCities]) {
+        if (c.name.toLowerCase().includes(lower) && !seen.has(c.name)) {
+          seen.add(c.name); matches.push(c.name);
+          if (matches.length === 8) break;
+        }
+      }
+      patch.ciudadSugs = matches;
+    } else {
+      patch.ciudadSugs = []; patch.pais = ''; patch.paisSugs = [];
+    }
+    onChange(patch);
+  }
+
+  function selectCiudad(name: string) {
+    const patch: Partial<DestinoState> = { ciudad: name, ciudadSugs: [] };
+    if (destino.geoStatus === 'encontrada') {
+      patch.coords = null; patch.geoStatus = 'idle'; patch.geoNombre = '';
+    }
+    const paises = getPaisesPorCiudad(name, learnedCities);
+    if (paises.length === 1) { patch.pais = paises[0]; patch.paisSugs = []; }
+    else if (paises.length > 1) { patch.pais = ''; patch.paisSugs = paises; }
+    onChange(patch);
+  }
+
+  function handlePaisChange(t: string) {
+    const patch: Partial<DestinoState> = { pais: t, paisSugs: [] };
+    if (destino.geoStatus === 'encontrada') {
+      patch.coords = null; patch.geoStatus = 'idle'; patch.geoNombre = '';
+    }
+    onChange(patch);
+  }
+
+  async function buscarUbicacion() {
+    if (!destino.ciudad.trim() || !destino.pais.trim()) {
+      Alert.alert('Faltan datos', 'Ingresá ciudad y país antes de buscar la ubicación.');
+      return;
+    }
+    onChange({ geoStatus: 'buscando', coords: null, geoNombre: '' });
+    try {
+      const q = encodeURIComponent(`${destino.ciudad.trim()}, ${destino.pais.trim()}`);
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1`,
+        { headers: { 'User-Agent': 'MyWorldXP/1.0', 'Accept-Language': 'es' } }
+      );
+      const data = await res.json();
+      if (data.length > 0) {
+        onChange({
+          coords: { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) },
+          geoNombre: data[0].display_name,
+          geoStatus: 'encontrada',
+        });
+        onLearnCity(destino.ciudad.trim(), destino.pais.trim());
+      } else {
+        onChange({ geoStatus: 'no_encontrada' });
+      }
+    } catch {
+      onChange({ geoStatus: 'error' });
+    }
+  }
+
+  function toggleDrop(key: 'dia' | 'mes' | 'anio') {
+    Keyboard.dismiss();
+    const patch: Partial<DestinoState> = {};
+    if (destino.openDropdown !== key && !destino.dia && !destino.mes && !destino.anio) {
+      const today = new Date();
+      patch.dia = String(today.getDate());
+      patch.mes = String(today.getMonth() + 1);
+      patch.anio = String(today.getFullYear());
+    }
+    const opening = destino.openDropdown !== key;
+    patch.openDropdown = opening ? key : null;
+    onChange(patch);
+    if (opening) {
+      setTimeout(() => {
+        scrollRef.current?.scrollToPosition?.(0, dateSectionY.current - 20, true);
+      }, 80);
+    }
+  }
+
+  async function handleCargarFotosBlock() {
+    if (destino.fotos.length >= 4) {
+      Alert.alert('Máximo 4 fotos', 'Ya cargaste el máximo de fotos permitidas.');
+      return;
+    }
+    if (fotosViaje !== undefined) {
+      setPickerVisible(true);
+      return;
+    }
+    Alert.alert('Cargar fotos', '', [
+      { text: 'Elegir de galería', onPress: pickImagesBlock },
+      { text: 'Tomar foto', onPress: takePhotoBlock },
+      { text: 'Cancelar', style: 'cancel' },
+    ]);
+  }
+
+  async function pickImagesBlock() {
+    if (destino.fotos.length >= 4) return;
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') { Alert.alert('Permiso necesario', 'Necesitamos acceso a tu galería.'); return; }
+    const remaining = 4 - destino.fotos.length;
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8, allowsMultipleSelection: true, selectionLimit: remaining,
+    });
+    if (!result.canceled && result.assets.length > 0) {
+      onChange({ fotos: [...destino.fotos, ...result.assets.map((a) => a.uri)].slice(0, 4) });
+    }
+  }
+
+  async function takePhotoBlock() {
+    if (destino.fotos.length >= 4) return;
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') { Alert.alert('Permiso necesario', 'Necesitamos acceso a tu cámara.'); return; }
+    const result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
+    if (!result.canceled && result.assets[0]) {
+      onChange({ fotos: [...destino.fotos, result.assets[0].uri] });
+    }
+  }
+
+  const diaLabel = destino.dia ? destino.dia.padStart(2, '0') : '';
+  const mesLabel = destino.mes ? (MONTHS.find((m) => m.value === destino.mes)?.label ?? '') : '';
+  const anioLabel = destino.anio || '';
+
+  return (
+    <>
+    <View style={styles.destinoBlock}>
+      <Text style={styles.destinoBlockTitle}>Destino {toRoman(index + 1)}</Text>
+
+      {/* Destino */}
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>Destino</Text>
+        <View style={styles.sugContainer}>
+          <TextInput
+            style={[styles.input, { marginBottom: destino.ciudadSugs.length > 0 ? 0 : 10 }]}
+            placeholder="Ciudad"
+            placeholderTextColor={MUTED}
+            value={destino.ciudad}
+            onChangeText={handleCiudadChange}
+            onBlur={() => setTimeout(() => onChange({ ciudadSugs: [] }), 150)}
+            returnKeyType="next"
+          />
+          {destino.ciudadSugs.length > 0 && (
+            <View style={styles.sugList}>
+              <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                {destino.ciudadSugs.map((item) => (
+                  <TouchableOpacity key={item} style={styles.sugItem} onPress={() => selectCiudad(item)} activeOpacity={0.7}>
+                    <Text style={styles.sugText}>{item}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+        </View>
+        <View style={styles.sugContainer}>
+          <TextInput
+            style={[styles.input, { marginBottom: destino.paisSugs.length > 0 ? 0 : 10 }]}
+            placeholder="País"
+            placeholderTextColor={MUTED}
+            value={destino.pais}
+            onChangeText={handlePaisChange}
+            onBlur={() => setTimeout(() => onChange({ paisSugs: [] }), 150)}
+            returnKeyType="done"
+          />
+          {destino.paisSugs.length > 0 && (
+            <View style={styles.sugList}>
+              <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                {destino.paisSugs.map((item) => (
+                  <TouchableOpacity key={item} style={styles.sugItem} onPress={() => onChange({ pais: item, paisSugs: [] })} activeOpacity={0.7}>
+                    <Text style={styles.sugText}>{item}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+        </View>
+        <TouchableOpacity
+          style={[
+            styles.outlineBtn,
+            destino.geoStatus === 'buscando' && styles.outlineBtnDisabled,
+            destino.geoStatus === 'encontrada' && styles.outlineBtnSuccess,
+          ]}
+          onPress={buscarUbicacion}
+          activeOpacity={0.8}
+          disabled={destino.geoStatus === 'buscando'}
+        >
+          <Text style={[
+            styles.outlineBtnText,
+            destino.geoStatus === 'encontrada' && styles.outlineBtnTextSuccess,
+            (destino.geoStatus === 'no_encontrada' || destino.geoStatus === 'error') && styles.outlineBtnTextError,
+          ]}>
+            {destino.geoStatus === 'buscando' ? 'Buscando...'
+              : destino.geoStatus === 'encontrada' ? '✓  Ubicación encontrada'
+              : destino.geoStatus === 'no_encontrada' ? 'No encontrada — intentá de nuevo'
+              : destino.geoStatus === 'error' ? 'Error al buscar — intentá de nuevo'
+              : 'Buscar ubicación'}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.outlineBtn} activeOpacity={0.8}>
+          <Text style={styles.outlineBtnText}>Elegir país de la lista</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Fotos */}
+      {tipo === 'real' && (
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Fotos ({destino.fotos.length}/4)</Text>
+          {destino.fotos.length < 4 && (
+            <TouchableOpacity style={styles.photoCard} onPress={handleCargarFotosBlock} activeOpacity={0.8}>
+              <Text style={styles.photoCardIcon}>✦</Text>
+              <Text style={styles.photoCardText}>Agregar fotos</Text>
+              <Text style={styles.photoCardHint}>{fotosViaje !== undefined ? 'Del viaje' : 'Galería · Cámara'}</Text>
+            </TouchableOpacity>
+          )}
+          {destino.fotos.length > 0 && (
+            <View style={styles.photosRow}>
+              {destino.fotos.map((uri, i) => (
+                <View key={i} style={styles.photoWrapper}>
+                  <Image source={{ uri }} style={styles.photoThumb} />
+                  {i === 0 && (
+                    <View style={styles.photoCoverBadge}>
+                      <Text style={styles.photoCoverText}>Portada</Text>
+                    </View>
+                  )}
+                  <TouchableOpacity
+                    style={styles.photoRemoveBtn}
+                    onPress={() => onChange({ fotos: destino.fotos.filter((_, fi) => fi !== i) })}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Text style={styles.photoRemoveText}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
+          {destino.fotos.length === 0 && (
+            <Text style={styles.photoHint}>La primera foto será la portada del viaje.</Text>
+          )}
+        </View>
+      )}
+
+      {/* Fecha */}
+      {tipo === 'real' && (
+        <View style={styles.section} onLayout={(e) => { dateSectionY.current = e.nativeEvent.layout.y; }}>
+          <Text style={styles.sectionLabel}>Fecha de inicio</Text>
+          <View style={styles.dropRow}>
+            <TouchableOpacity
+              style={[styles.dropBtn, destino.openDropdown === 'dia' && styles.dropBtnOpen, { flex: 1 }]}
+              onPress={() => toggleDrop('dia')}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.dropBtnText, !diaLabel && styles.dropBtnPlaceholder]}>{diaLabel || 'DD'}</Text>
+              <Text style={styles.dropChevron}>{destino.openDropdown === 'dia' ? '▴' : '▾'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.dropBtn, destino.openDropdown === 'mes' && styles.dropBtnOpen, { flex: 2 }]}
+              onPress={() => toggleDrop('mes')}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.dropBtnText, !mesLabel && styles.dropBtnPlaceholder]}>{mesLabel || 'Mes'}</Text>
+              <Text style={styles.dropChevron}>{destino.openDropdown === 'mes' ? '▴' : '▾'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.dropBtn, destino.openDropdown === 'anio' && styles.dropBtnOpen, { flex: 1.5 }]}
+              onPress={() => toggleDrop('anio')}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.dropBtnText, !anioLabel && styles.dropBtnPlaceholder]}>{anioLabel || 'AAAA'}</Text>
+              <Text style={styles.dropChevron}>{destino.openDropdown === 'anio' ? '▴' : '▾'}</Text>
+            </TouchableOpacity>
+          </View>
+          {destino.openDropdown === 'dia' && (
+            <DropdownList items={DAYS} selected={destino.dia} onSelect={(v) => { onChange({ dia: v, openDropdown: null }); playSound('tic'); }} />
+          )}
+          {destino.openDropdown === 'mes' && (
+            <DropdownList items={MONTHS} selected={destino.mes} onSelect={(v) => { onChange({ mes: v, openDropdown: null }); playSound('tic'); }} />
+          )}
+          {destino.openDropdown === 'anio' && (
+            <DropdownList items={YEARS} selected={destino.anio} onSelect={(v) => { onChange({ anio: v, openDropdown: null }); playSound('tic'); }} />
+          )}
+        </View>
+      )}
+
+      {/* Nota */}
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>Nota <Text style={styles.optional}>(opcional)</Text></Text>
+        <TextInput
+          style={[styles.input, styles.textArea]}
+          placeholder="Contá algo de este destino..."
+          placeholderTextColor={MUTED}
+          value={destino.nota}
+          onChangeText={(t) => onChange({ nota: t })}
+          multiline
+          numberOfLines={4}
+          textAlignVertical="top"
+        />
+      </View>
+    </View>
+    {fotosViaje !== undefined && (
+      <FotoPickerModal
+        visible={pickerVisible}
+        fotosDisponibles={fotosViaje}
+        fotosActuales={destino.fotos}
+        maxSeleccion={Math.max(0, 4 - destino.fotos.length)}
+        onConfirm={(uris) => { onChange({ fotos: uris }); setPickerVisible(false); }}
+        onClose={() => setPickerVisible(false)}
+      />
+    )}
+    </>
+  );
+}
+
 // ─── TOGGLE CONSTANTS ─────────────────────────────────────────────────────────
 
 const TRACK_W = 64;
@@ -161,9 +873,10 @@ export default function CargarViaje() {
   const [tipo, setTipo] = useState<TripType>('real');
   const [ciudad, setCiudad] = useState(pCiudad);
   const [pais, setPais] = useState(pPais);
-  const [dia, setDia] = useState('');
-  const [mes, setMes] = useState('');
-  const [anio, setAnio] = useState('');
+  const _today = new Date();
+  const [dia, setDia] = useState(String(_today.getDate()));
+  const [mes, setMes] = useState(String(_today.getMonth() + 1));
+  const [anio, setAnio] = useState(String(_today.getFullYear()));
   const [openDropdown, setOpenDropdown] = useState<'dia' | 'mes' | 'anio' | null>(null);
   const [nota, setNota] = useState('');
   const [fotos, setFotos] = useState<string[]>([]);
@@ -174,12 +887,25 @@ export default function CargarViaje() {
     hasParamCoords ? 'encontrada' : 'idle'
   );
   const [geoNombre, setGeoNombre] = useState('');
+  const [ciudadSugs, setCiudadSugs] = useState<string[]>([]);
+  const [paisSugs, setPaisSugs] = useState<string[]>([]);
+  const [learnedCities, setLearnedCities] = useState<CityEntry[]>([]);
+  const [cantCiudades, setCantCiudades] = useState<'una' | 'mas'>('una');
+  const [destinos, setDestinos] = useState<DestinoState[]>(() => [createDestino(), createDestino()]);
+  const [fotosViaje, setFotosViaje] = useState<string[]>([]);
   const [pendingAchievements, setPendingAchievements] = useState<Achievement[]>([]);
   const [pendingLevelUp, setPendingLevelUp] = useState<{
     prevRango: string; newRango: string; xpRestantes: number | null; userName: string;
   } | null>(null);
   const chainIdRef = useRef<string | null>(null);
   const scrollRef = useRef<any>(null);
+  const dateSectionY = useRef(0);
+
+  useEffect(() => {
+    AsyncStorage.getItem('learned_cities').then(raw => {
+      if (raw) setLearnedCities(JSON.parse(raw));
+    }).catch(() => {});
+  }, []);
 
   const toggleAnim = useRef(new Animated.Value(0)).current;
 
@@ -203,9 +929,157 @@ export default function CargarViaje() {
     outputRange: [2, THUMB_TRAVEL],
   });
 
+  const cantCiudadesAnim = useRef(new Animated.Value(0)).current;
+
+  function handleToggleCantCiudades(val: 'una' | 'mas') {
+    setCantCiudades(val);
+    Animated.spring(cantCiudadesAnim, {
+      toValue: val === 'una' ? 0 : 1,
+      useNativeDriver: false,
+      friction: 7,
+      tension: 130,
+    }).start();
+  }
+
+  const thumbLeftCant = cantCiudadesAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [2, THUMB_TRAVEL],
+  });
+
+  function updateDestino(idx: number, patch: Partial<DestinoState>) {
+    setDestinos(prev => prev.map((d, i) => i === idx ? { ...d, ...patch } : d));
+  }
+
+  function agregarCiudad() {
+    setDestinos(prev => [...prev, createDestino()]);
+  }
+
+  async function seleccionarFotosDelViaje() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permiso necesario', 'Necesitamos acceso a tu galería.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
+      allowsMultipleSelection: true,
+      selectionLimit: 50,
+    });
+    if (!result.canceled && result.assets.length > 0) {
+      setFotosViaje(result.assets.map(a => a.uri));
+    }
+  }
+
+  async function handleFinalizarViaje() {
+    for (let i = 0; i < destinos.length; i++) {
+      const d = destinos[i];
+      if (!d.ciudad.trim()) {
+        Alert.alert('Falta información', `Destino ${toRoman(i + 1)}: la ciudad es obligatoria.`);
+        return;
+      }
+      if (!d.pais.trim()) {
+        Alert.alert('Falta información', `Destino ${toRoman(i + 1)}: el país es obligatorio.`);
+        return;
+      }
+      if (!d.coords) {
+        Alert.alert('Ubicación requerida', `Destino ${toRoman(i + 1)}: buscá y confirmá la ubicación.`);
+        return;
+      }
+      if (tipo === 'real' && (!d.dia.trim() || !d.mes.trim() || !d.anio.trim())) {
+        Alert.alert('Falta información', `Destino ${toRoman(i + 1)}: la fecha es obligatoria.`);
+        return;
+      }
+    }
+    Keyboard.dismiss();
+    try {
+      const rawBefore = await AsyncStorage.getItem('trips');
+      const prevStats = calcularStats((rawBefore ? JSON.parse(rawBefore) : []) as StatsTrip[]);
+      const chainId = genId();
+      for (const d of destinos) {
+        const trip: TripData = {
+          id: genId(),
+          tipo,
+          ciudad: d.ciudad.trim(),
+          pais: d.pais.trim(),
+          coords: d.coords,
+          fechaInicio: tipo === 'real' ? buildFechaInicio(d.dia, d.mes, d.anio) : null,
+          fotos: tipo === 'real' ? d.fotos : [],
+          portada: tipo === 'real' && d.fotos.length > 0 ? d.fotos[0] : null,
+          nota: d.nota.trim(),
+          xp: 0,
+          distancia: 0,
+          chainId,
+        };
+        await saveTrip(trip);
+      }
+      if (pWishlistId) await deleteWishlistTrip(pWishlistId);
+      setDestinos([createDestino(), createDestino()]);
+      setFotosViaje([]);
+      setTimeout(() => {
+        scrollRef.current?.scrollToPosition?.(0, 0, false);
+        scrollRef.current?.scrollTo?.({ x: 0, y: 0, animated: false });
+      }, 50);
+      playSound('cargar');
+      Alert.alert('¡Guardado!', `Tu viaje con ${destinos.length} ciudades fue guardado correctamente.`);
+      _checkAchievements(prevStats.rangoActual);
+    } catch {
+      Alert.alert('Error', 'No se pudo guardar. Intentá de nuevo.');
+    }
+  }
+
+  function handleCiudadChange(t: string) {
+    setCiudad(t);
+    if (geoStatus === 'encontrada') resetGeo();
+    if (t.trim().length > 0) {
+      const lower = t.trim().toLowerCase();
+      const seen = new Set<string>();
+      const matches: string[] = [];
+      for (const c of [...CIUDADES, ...learnedCities]) {
+        if (c.name.toLowerCase().includes(lower) && !seen.has(c.name)) {
+          seen.add(c.name);
+          matches.push(c.name);
+          if (matches.length === 8) break;
+        }
+      }
+      setCiudadSugs(matches);
+    } else {
+      setCiudadSugs([]);
+      setPais('');
+      setPaisSugs([]);
+    }
+  }
+
+  function selectCiudad(name: string) {
+    setCiudad(name);
+    setCiudadSugs([]);
+    if (geoStatus === 'encontrada') resetGeo();
+    const paises = getPaisesPorCiudad(name, learnedCities);
+    if (paises.length === 1) {
+      setPais(paises[0]);
+      setPaisSugs([]);
+    } else if (paises.length > 1) {
+      setPais('');
+      setPaisSugs(paises);
+    }
+  }
+
+  function handlePaisChange(t: string) {
+    setPais(t);
+    setPaisSugs([]);
+    if (geoStatus === 'encontrada') resetGeo();
+  }
+
+  function selectPais(country: string) {
+    setPais(country);
+    setPaisSugs([]);
+  }
+
   function resetForm() {
     setCiudad('');
+    setCiudadSugs([]);
     setPais('');
+    setPaisSugs([]);
     setDia('');
     setMes('');
     setAnio('');
@@ -219,6 +1093,23 @@ export default function CargarViaje() {
       scrollRef.current?.scrollToPosition?.(0, 0, false);
       scrollRef.current?.scrollTo?.({ x: 0, y: 0, animated: false });
     }, 50);
+  }
+
+  async function guardarCiudadAprendida(nombre: string, paisNombre: string) {
+    const normNombre = normalizarTexto(nombre);
+    const normPais = normalizarTexto(paisNombre);
+    const yaExiste = [...CIUDADES, ...learnedCities].some(
+      c => normalizarTexto(c.name) === normNombre && normalizarTexto(c.country) === normPais
+    );
+    if (yaExiste) return;
+    const nueva: CityEntry = { name: nombre.trim(), country: paisNombre.trim() };
+    const nuevaLista = [...learnedCities, nueva];
+    setLearnedCities(nuevaLista);
+    try {
+      await AsyncStorage.setItem('learned_cities', JSON.stringify(nuevaLista));
+    } catch {
+      // best-effort — no bloquea el flujo principal
+    }
   }
 
   function resetGeo() {
@@ -246,6 +1137,7 @@ export default function CargarViaje() {
         setCoords({ lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) });
         setGeoNombre(data[0].display_name);
         setGeoStatus('encontrada');
+        guardarCiudadAprendida(ciudad.trim(), pais.trim());
       } else {
         setGeoStatus('no_encontrada');
       }
@@ -361,8 +1253,9 @@ export default function CargarViaje() {
       const allTrips = raw ? JSON.parse(raw) : [];
       const stats = calcularStats(allTrips as StatsTrip[]);
       const newOnes = await checkAndSaveAchievements(allTrips as StatsTrip[], stats);
-      if (newOnes.length > 0) setPendingAchievements(newOnes);
+      if (newOnes.length > 0) { setPendingAchievements(newOnes); playSound('anuncio_2'); }
       if (stats.rangoActual !== prevRango) {
+        playSound('subir_nivel');
         const rawUser = await AsyncStorage.getItem('userData');
         const userData = rawUser ? JSON.parse(rawUser) : {};
         setPendingLevelUp({
@@ -388,27 +1281,8 @@ export default function CargarViaje() {
       if (pWishlistId) await deleteWishlistTrip(pWishlistId);
       chainIdRef.current = null;
       resetForm();
+      playSound('cargar');
       Alert.alert('¡Guardado!', `Tu ${tipo === 'real' ? 'viaje' : 'destino'} fue guardado correctamente.`);
-      _checkAchievements(prevStats.rangoActual);
-    } catch {
-      Alert.alert('Error', 'No se pudo guardar. Intentá de nuevo.');
-    }
-  }
-
-  async function handleGuardarYAgregarDestino() {
-    if (!validate()) return;
-    Keyboard.dismiss();
-    try {
-      const rawBefore = await AsyncStorage.getItem('trips');
-      const prevStats = calcularStats((rawBefore ? JSON.parse(rawBefore) : []) as StatsTrip[]);
-      if (!chainIdRef.current) {
-        chainIdRef.current = genId();
-      }
-      const trip = buildTrip(chainIdRef.current);
-      await saveTrip(trip);
-      if (pWishlistId) await deleteWishlistTrip(pWishlistId);
-      resetForm();
-      Alert.alert('Destino guardado', 'Cargá el siguiente destino del mismo viaje.');
       _checkAchievements(prevStats.rangoActual);
     } catch {
       Alert.alert('Error', 'No se pudo guardar. Intentá de nuevo.');
@@ -422,7 +1296,20 @@ export default function CargarViaje() {
   const anioLabel = anio || '';
 
   function toggleDrop(key: 'dia' | 'mes' | 'anio') {
+    Keyboard.dismiss();
+    if (openDropdown !== key && !dia && !mes && !anio) {
+      const today = new Date();
+      setDia(String(today.getDate()));
+      setMes(String(today.getMonth() + 1));
+      setAnio(String(today.getFullYear()));
+    }
+    const isOpening = openDropdown !== key;
     setOpenDropdown((prev) => (prev === key ? null : key));
+    if (isOpening) {
+      setTimeout(() => {
+        scrollRef.current?.scrollToPosition?.(0, dateSectionY.current - 20, true);
+      }, 80);
+    }
   }
 
   return (
@@ -470,204 +1357,281 @@ export default function CargarViaje() {
           </TouchableOpacity>
         </View>
 
-        {/* Fotos — solo para real */}
-        {tipo === 'real' && (
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Fotos ({fotos.length}/4)</Text>
-
-            {fotos.length < 4 && (
-              <TouchableOpacity style={styles.photoCard} onPress={handleCargarFotos} activeOpacity={0.8}>
-                <Text style={styles.photoCardIcon}>✦</Text>
-                <Text style={styles.photoCardText}>Cargar fotos</Text>
-                <Text style={styles.photoCardHint}>Galería · Cámara</Text>
-              </TouchableOpacity>
-            )}
-
-            {fotos.length > 0 && (
-              <View style={styles.photosRow}>
-                {fotos.map((uri, i) => (
-                  <View key={i} style={styles.photoWrapper}>
-                    <Image source={{ uri }} style={styles.photoThumb} />
-                    {i === 0 && (
-                      <View style={styles.photoCoverBadge}>
-                        <Text style={styles.photoCoverText}>Portada</Text>
-                      </View>
-                    )}
-                    <TouchableOpacity
-                      style={styles.photoRemoveBtn}
-                      onPress={() => removePhoto(i)}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
-                      <Text style={styles.photoRemoveText}>✕</Text>
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-            )}
-
-            {fotos.length === 0 && (
-              <Text style={styles.photoHint}>La primera foto será la portada del viaje.</Text>
-            )}
-          </View>
-        )}
-
-        {/* Ubicación */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Destino</Text>
-
-          <TextInput
-            style={styles.input}
-            placeholder="Ciudad"
-            placeholderTextColor={MUTED}
-            value={ciudad}
-            onChangeText={(t) => { setCiudad(t); if (geoStatus === 'encontrada') resetGeo(); }}
-            returnKeyType="next"
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="País"
-            placeholderTextColor={MUTED}
-            value={pais}
-            onChangeText={(t) => { setPais(t); if (geoStatus === 'encontrada') resetGeo(); }}
-            returnKeyType="done"
-          />
-
+        {/* Selector cantidad de ciudades */}
+        <View style={styles.toggleRow}>
           <TouchableOpacity
-            style={[
-              styles.outlineBtn,
-              geoStatus === 'buscando' && styles.outlineBtnDisabled,
-              geoStatus === 'encontrada' && styles.outlineBtnSuccess,
-            ]}
-            onPress={buscarUbicacion}
-            activeOpacity={0.8}
-            disabled={geoStatus === 'buscando'}
+            style={styles.toggleLabelWrap}
+            onPress={() => handleToggleCantCiudades('una')}
+            activeOpacity={0.7}
           >
-            <Text style={[
-              styles.outlineBtnText,
-              geoStatus === 'encontrada' && styles.outlineBtnTextSuccess,
-              (geoStatus === 'no_encontrada' || geoStatus === 'error') && styles.outlineBtnTextError,
-            ]}>
-              {geoStatus === 'buscando' ? 'Buscando...'
-                : geoStatus === 'encontrada' ? '✓  Ubicación encontrada'
-                : geoStatus === 'no_encontrada' ? 'No encontrada — intentá de nuevo'
-                : geoStatus === 'error' ? 'Error al buscar — intentá de nuevo'
-                : 'Buscar ubicación'}
+            <Text style={[styles.toggleLabel, cantCiudades === 'una' && styles.toggleLabelActive]}>
+              Visité una ciudad
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.outlineBtn} activeOpacity={0.8}>
-            <Text style={styles.outlineBtnText}>Elegir país de la lista</Text>
+          <TouchableOpacity
+            onPress={() => handleToggleCantCiudades(cantCiudades === 'una' ? 'mas' : 'una')}
+            activeOpacity={0.85}
+          >
+            <View style={styles.toggleTrack}>
+              <Animated.View style={[styles.toggleThumb, { left: thumbLeftCant }]} />
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.toggleLabelWrap}
+            onPress={() => handleToggleCantCiudades('mas')}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.toggleLabel, cantCiudades === 'mas' && styles.toggleLabelActive]}>
+              Visité más de una ciudad
+            </Text>
           </TouchableOpacity>
         </View>
 
-        {/* Fecha — solo para real, dropdowns */}
-        {tipo === 'real' && (
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Fecha de inicio</Text>
-
-            <View style={styles.dropRow}>
-              {/* DÍA */}
+        {/* ── MODO: UNA CIUDAD ─────────────────────────────────────────── */}
+        {cantCiudades === 'una' && (
+          <>
+            {/* Ubicación */}
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Destino</Text>
+              <View style={styles.sugContainer}>
+                <TextInput
+                  style={[styles.input, { marginBottom: ciudadSugs.length > 0 ? 0 : 10 }]}
+                  placeholder="Ciudad"
+                  placeholderTextColor={MUTED}
+                  value={ciudad}
+                  onChangeText={handleCiudadChange}
+                  onBlur={() => setTimeout(() => setCiudadSugs([]), 150)}
+                  returnKeyType="next"
+                />
+                {ciudadSugs.length > 0 && (
+                  <View style={styles.sugList}>
+                    <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                      {ciudadSugs.map((item) => (
+                        <TouchableOpacity key={item} style={styles.sugItem} onPress={() => selectCiudad(item)} activeOpacity={0.7}>
+                          <Text style={styles.sugText}>{item}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
+              <View style={styles.sugContainer}>
+                <TextInput
+                  style={[styles.input, { marginBottom: paisSugs.length > 0 ? 0 : 10 }]}
+                  placeholder="País"
+                  placeholderTextColor={MUTED}
+                  value={pais}
+                  onChangeText={handlePaisChange}
+                  onBlur={() => setTimeout(() => setPaisSugs([]), 150)}
+                  returnKeyType="done"
+                />
+                {paisSugs.length > 0 && (
+                  <View style={styles.sugList}>
+                    <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                      {paisSugs.map((item) => (
+                        <TouchableOpacity key={item} style={styles.sugItem} onPress={() => selectPais(item)} activeOpacity={0.7}>
+                          <Text style={styles.sugText}>{item}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
               <TouchableOpacity
-                style={[styles.dropBtn, openDropdown === 'dia' && styles.dropBtnOpen, { flex: 1 }]}
-                onPress={() => toggleDrop('dia')}
+                style={[
+                  styles.outlineBtn,
+                  geoStatus === 'buscando' && styles.outlineBtnDisabled,
+                  geoStatus === 'encontrada' && styles.outlineBtnSuccess,
+                ]}
+                onPress={buscarUbicacion}
                 activeOpacity={0.8}
+                disabled={geoStatus === 'buscando'}
               >
-                <Text style={[styles.dropBtnText, !diaLabel && styles.dropBtnPlaceholder]}>
-                  {diaLabel || 'DD'}
+                <Text style={[
+                  styles.outlineBtnText,
+                  geoStatus === 'encontrada' && styles.outlineBtnTextSuccess,
+                  (geoStatus === 'no_encontrada' || geoStatus === 'error') && styles.outlineBtnTextError,
+                ]}>
+                  {geoStatus === 'buscando' ? 'Buscando...'
+                    : geoStatus === 'encontrada' ? '✓  Ubicación encontrada'
+                    : geoStatus === 'no_encontrada' ? 'No encontrada — intentá de nuevo'
+                    : geoStatus === 'error' ? 'Error al buscar — intentá de nuevo'
+                    : 'Buscar ubicación'}
                 </Text>
-                <Text style={styles.dropChevron}>{openDropdown === 'dia' ? '▴' : '▾'}</Text>
               </TouchableOpacity>
-
-              {/* MES */}
-              <TouchableOpacity
-                style={[styles.dropBtn, openDropdown === 'mes' && styles.dropBtnOpen, { flex: 2 }]}
-                onPress={() => toggleDrop('mes')}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.dropBtnText, !mesLabel && styles.dropBtnPlaceholder]}>
-                  {mesLabel || 'Mes'}
-                </Text>
-                <Text style={styles.dropChevron}>{openDropdown === 'mes' ? '▴' : '▾'}</Text>
-              </TouchableOpacity>
-
-              {/* AÑO */}
-              <TouchableOpacity
-                style={[styles.dropBtn, openDropdown === 'anio' && styles.dropBtnOpen, { flex: 1.5 }]}
-                onPress={() => toggleDrop('anio')}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.dropBtnText, !anioLabel && styles.dropBtnPlaceholder]}>
-                  {anioLabel || 'AAAA'}
-                </Text>
-                <Text style={styles.dropChevron}>{openDropdown === 'anio' ? '▴' : '▾'}</Text>
+              <TouchableOpacity style={styles.outlineBtn} activeOpacity={0.8}>
+                <Text style={styles.outlineBtnText}>Elegir país de la lista</Text>
               </TouchableOpacity>
             </View>
 
-            {openDropdown === 'dia' && (
-              <DropdownList
-                items={DAYS}
-                selected={dia}
-                onSelect={(v) => { setDia(v); setOpenDropdown(null); }}
-              />
+            {/* Fotos — solo para real */}
+            {tipo === 'real' && (
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>Fotos ({fotos.length}/4)</Text>
+                {fotos.length < 4 && (
+                  <TouchableOpacity style={styles.photoCard} onPress={handleCargarFotos} activeOpacity={0.8}>
+                    <Text style={styles.photoCardIcon}>✦</Text>
+                    <Text style={styles.photoCardText}>Cargar fotos</Text>
+                    <Text style={styles.photoCardHint}>Galería · Cámara</Text>
+                  </TouchableOpacity>
+                )}
+                {fotos.length > 0 && (
+                  <View style={styles.photosRow}>
+                    {fotos.map((uri, i) => (
+                      <View key={i} style={styles.photoWrapper}>
+                        <Image source={{ uri }} style={styles.photoThumb} />
+                        {i === 0 && (
+                          <View style={styles.photoCoverBadge}>
+                            <Text style={styles.photoCoverText}>Portada</Text>
+                          </View>
+                        )}
+                        <TouchableOpacity
+                          style={styles.photoRemoveBtn}
+                          onPress={() => removePhoto(i)}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <Text style={styles.photoRemoveText}>✕</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+                )}
+                {fotos.length === 0 && (
+                  <Text style={styles.photoHint}>La primera foto será la portada del viaje.</Text>
+                )}
+              </View>
             )}
-            {openDropdown === 'mes' && (
-              <DropdownList
-                items={MONTHS}
-                selected={mes}
-                onSelect={(v) => { setMes(v); setOpenDropdown(null); }}
-              />
+
+            {/* Fecha — solo para real */}
+            {tipo === 'real' && (
+              <View style={styles.section} onLayout={(e) => { dateSectionY.current = e.nativeEvent.layout.y; }}>
+                <Text style={styles.sectionLabel}>Fecha de inicio</Text>
+                <View style={styles.dropRow}>
+                  <TouchableOpacity
+                    style={[styles.dropBtn, openDropdown === 'dia' && styles.dropBtnOpen, { flex: 1 }]}
+                    onPress={() => toggleDrop('dia')}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.dropBtnText, !diaLabel && styles.dropBtnPlaceholder]}>{diaLabel || 'DD'}</Text>
+                    <Text style={styles.dropChevron}>{openDropdown === 'dia' ? '▴' : '▾'}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.dropBtn, openDropdown === 'mes' && styles.dropBtnOpen, { flex: 2 }]}
+                    onPress={() => toggleDrop('mes')}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.dropBtnText, !mesLabel && styles.dropBtnPlaceholder]}>{mesLabel || 'Mes'}</Text>
+                    <Text style={styles.dropChevron}>{openDropdown === 'mes' ? '▴' : '▾'}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.dropBtn, openDropdown === 'anio' && styles.dropBtnOpen, { flex: 1.5 }]}
+                    onPress={() => toggleDrop('anio')}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.dropBtnText, !anioLabel && styles.dropBtnPlaceholder]}>{anioLabel || 'AAAA'}</Text>
+                    <Text style={styles.dropChevron}>{openDropdown === 'anio' ? '▴' : '▾'}</Text>
+                  </TouchableOpacity>
+                </View>
+                {openDropdown === 'dia' && (
+                  <DropdownList items={DAYS} selected={dia} onSelect={(v) => { setDia(v); setOpenDropdown(null); playSound('tic'); }} />
+                )}
+                {openDropdown === 'mes' && (
+                  <DropdownList items={MONTHS} selected={mes} onSelect={(v) => { setMes(v); setOpenDropdown(null); playSound('tic'); }} />
+                )}
+                {openDropdown === 'anio' && (
+                  <DropdownList items={YEARS} selected={anio} onSelect={(v) => { setAnio(v); setOpenDropdown(null); playSound('tic'); }} />
+                )}
+              </View>
             )}
-            {openDropdown === 'anio' && (
-              <DropdownList
-                items={YEARS}
-                selected={anio}
-                onSelect={(v) => { setAnio(v); setOpenDropdown(null); }}
+
+            {/* Nota */}
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Nota <Text style={styles.optional}>(opcional)</Text></Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                placeholder="Contá algo de este viaje..."
+                placeholderTextColor={MUTED}
+                value={nota}
+                onChangeText={setNota}
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
               />
-            )}
-          </View>
+            </View>
+
+            {/* Botones — una ciudad */}
+            <View style={styles.buttonsSection}>
+              <TouchableOpacity
+                style={[styles.primaryBtn, !locationConfirmed && styles.primaryBtnDisabled]}
+                onPress={handleGuardar}
+                activeOpacity={locationConfirmed ? 0.85 : 1}
+                disabled={!locationConfirmed}
+              >
+                <Text style={styles.primaryBtnText}>
+                  {tipo === 'real' ? 'Guardar viaje' : 'Guardar destino'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </>
         )}
 
-        {/* Nota */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Nota <Text style={styles.optional}>(opcional)</Text></Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            placeholder="Contá algo de este viaje..."
-            placeholderTextColor={MUTED}
-            value={nota}
-            onChangeText={setNota}
-            multiline
-            numberOfLines={4}
-            textAlignVertical="top"
-          />
-        </View>
-
-        {/* Botones */}
-        <View style={styles.buttonsSection}>
-          <TouchableOpacity
-            style={[styles.primaryBtn, !locationConfirmed && styles.primaryBtnDisabled]}
-            onPress={handleGuardar}
-            activeOpacity={locationConfirmed ? 0.85 : 1}
-            disabled={!locationConfirmed}
-          >
-            <Text style={styles.primaryBtnText}>
-              {tipo === 'real' ? 'Guardar viaje' : 'Guardar destino'}
-            </Text>
-          </TouchableOpacity>
-
-          {tipo === 'real' && (
-            <TouchableOpacity
-              style={[styles.secondaryBtn, !locationConfirmed && styles.secondaryBtnDisabled]}
-              onPress={handleGuardarYAgregarDestino}
-              activeOpacity={locationConfirmed ? 0.85 : 1}
-              disabled={!locationConfirmed}
-            >
-              <Text style={[styles.secondaryBtnText, !locationConfirmed && styles.secondaryBtnTextDisabled]}>
-                Guardar y agregar destino
+        {/* ── MODO: MÁS DE UNA CIUDAD ──────────────────────────────────── */}
+        {cantCiudades === 'mas' && (
+          <>
+            {/* Preselección de fotos del viaje */}
+            <View style={styles.preseleccionBlock}>
+              <Text style={styles.preseleccionTitle}>Preseleccionar fotos de todo el viaje</Text>
+              <Text style={styles.preseleccionSubtitle}>
+                Seleccioná todas las fotos que podrían formar parte de este viaje. Más adelante podrás asignarlas a cada ciudad.
               </Text>
-            </TouchableOpacity>
-          )}
-        </View>
+              <TouchableOpacity style={styles.preseleccionBtn} onPress={seleccionarFotosDelViaje} activeOpacity={0.8}>
+                <Text style={styles.preseleccionBtnText}>
+                  {fotosViaje.length > 0
+                    ? `${fotosViaje.length} foto${fotosViaje.length !== 1 ? 's' : ''} · Cambiar selección`
+                    : 'Seleccionar fotos'}
+                </Text>
+              </TouchableOpacity>
+              {fotosViaje.length > 0 && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.preseleccionThumbsRow}>
+                  {fotosViaje.slice(0, 10).map((uri, i) => (
+                    <Image key={i} source={{ uri }} style={styles.preseleccionThumb} />
+                  ))}
+                  {fotosViaje.length > 10 && (
+                    <View style={styles.preseleccionMoreBadge}>
+                      <Text style={styles.preseleccionMoreText}>+{fotosViaje.length - 10}</Text>
+                    </View>
+                  )}
+                </ScrollView>
+              )}
+            </View>
+
+            {destinos.map((d, i) => (
+              <DestinoBlock
+                key={d.id}
+                destino={d}
+                index={i}
+                tipo={tipo}
+                learnedCities={learnedCities}
+                onChange={(patch) => updateDestino(i, patch)}
+                onLearnCity={guardarCiudadAprendida}
+                scrollRef={scrollRef}
+                fotosViaje={fotosViaje}
+              />
+            ))}
+
+            {/* Botones — más de una ciudad */}
+            <View style={styles.buttonsSection}>
+              <TouchableOpacity style={styles.agregarCiudadBtn} onPress={agregarCiudad} activeOpacity={0.8}>
+                <Text style={styles.agregarCiudadBtnText}>+ Agregar ciudad</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.primaryBtn} onPress={handleFinalizarViaje} activeOpacity={0.85}>
+                <Text style={styles.primaryBtnText}>Finalizar viaje</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
 
         <View style={styles.bottomSpacer} />
       </KeyboardAwareScrollView>
@@ -1000,6 +1964,219 @@ const styles = StyleSheet.create({
   },
   secondaryBtnTextDisabled: {
     color: MUTED,
+  },
+
+  sugContainer: {
+    width: '100%',
+  },
+  sugList: {
+    backgroundColor: SURFACE,
+    borderWidth: 1,
+    borderColor: GOLD,
+    borderTopWidth: 0,
+    borderBottomLeftRadius: 10,
+    borderBottomRightRadius: 10,
+    maxHeight: 240,
+    marginBottom: 10,
+    overflow: 'hidden',
+  },
+  sugItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(30,48,80,0.5)',
+  },
+  sugText: {
+    color: TEXT,
+    fontSize: 15,
+  },
+
+  // ── Preselección de fotos del viaje ─────────────────────────────────────────
+  preseleccionBlock: {
+    borderWidth: 1,
+    borderColor: 'rgba(212,175,55,0.35)',
+    borderStyle: 'dashed',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 24,
+    backgroundColor: 'rgba(212,175,55,0.04)',
+  },
+  preseleccionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: GOLD,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    marginBottom: 6,
+  },
+  preseleccionSubtitle: {
+    fontSize: 12,
+    color: MUTED,
+    lineHeight: 17,
+    marginBottom: 14,
+    textAlign: 'center',
+  },
+  preseleccionBtn: {
+    backgroundColor: 'rgba(212,175,55,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(212,175,55,0.4)',
+    borderRadius: 10,
+    paddingVertical: 13,
+    alignItems: 'center',
+  },
+  preseleccionBtnText: {
+    color: GOLD,
+    fontSize: 14,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+  },
+  preseleccionThumbsRow: {
+    marginTop: 12,
+  },
+  preseleccionThumb: {
+    width: 52,
+    height: 52,
+    borderRadius: 6,
+    marginRight: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(212,175,55,0.3)',
+  },
+  preseleccionMoreBadge: {
+    width: 52,
+    height: 52,
+    borderRadius: 6,
+    backgroundColor: 'rgba(212,175,55,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(212,175,55,0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  preseleccionMoreText: {
+    color: GOLD,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
+  // ── Foto Picker Modal ────────────────────────────────────────────────────────
+  pickerModal: {
+    flex: 1,
+    backgroundColor: BG,
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 56,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: BORDER,
+  },
+  pickerHeaderBtn: {
+    minWidth: 80,
+  },
+  pickerCancelText: {
+    color: MUTED,
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  pickerTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: TEXT,
+    letterSpacing: 0.3,
+  },
+  pickerConfirmText: {
+    color: GOLD,
+    fontSize: 15,
+    fontWeight: '700',
+    textAlign: 'right',
+  },
+  pickerHint: {
+    fontSize: 12,
+    color: MUTED,
+    textAlign: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  pickerGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 2,
+    padding: 1,
+  },
+  pickerThumbWrap: {
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  pickerThumbWrapSelected: {
+    borderWidth: 3,
+    borderColor: GOLD,
+  },
+  pickerThumb: {
+    width: '100%',
+    height: '100%',
+  },
+  pickerCheckBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: GOLD,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pickerCheckText: {
+    color: BG,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  pickerEmpty: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  pickerEmptyText: {
+    color: MUTED,
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 21,
+  },
+
+  // ── Multi-city ──────────────────────────────────────────────────────────────
+  destinoBlock: {
+    borderWidth: 1,
+    borderColor: 'rgba(212,175,55,0.25)',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 24,
+    backgroundColor: 'rgba(13,26,46,0.6)',
+  },
+  destinoBlockTitle: {
+    fontFamily: 'Georgia',
+    fontSize: 14,
+    fontWeight: '700',
+    color: GOLD,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    marginBottom: 16,
+  },
+  agregarCiudadBtn: {
+    borderWidth: 1.5,
+    borderColor: GOLD,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  agregarCiudadBtnText: {
+    color: GOLD,
+    fontSize: 15,
+    fontWeight: '600',
+    letterSpacing: 0.3,
   },
 
   bottomSpacer: { height: 88 },

@@ -1,7 +1,7 @@
-import * as Sharing from 'expo-sharing';
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
+import * as Sharing from 'expo-sharing';
 import type { Achievement } from '../utils/achievementsEngine';
 
 const GOLD = '#d4af37';
@@ -15,7 +15,7 @@ export function AchievementPopup({ achievements, onDone }: Props) {
   const [index, setIndex] = useState(0);
   const opacity = useRef(new Animated.Value(0)).current;
   const scale   = useRef(new Animated.Value(0.88)).current;
-  const cardRef = useRef<any>(null);
+  const cardRef = useRef<View>(null);
 
   useEffect(() => {
     opacity.setValue(0);
@@ -42,15 +42,10 @@ export function AchievementPopup({ achievements, onDone }: Props) {
 
   async function handleShare() {
     try {
-      const uri = await captureRef(cardRef, { format: 'png', quality: 1 });
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, {
-          mimeType: 'image/png',
-          dialogTitle: 'Compartir logro',
-        });
-      }
+      const uri = await captureRef(cardRef, { format: 'png', quality: 0.95 });
+      await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: 'Compartir logro' });
     } catch (e) {
-      console.warn('Error al compartir:', e);
+      console.warn('Error al compartir logro:', e);
     }
   }
 
@@ -165,7 +160,7 @@ const styles = StyleSheet.create({
     margin: 20,
     backgroundColor: '#0d1a2e',
     borderRadius: 22,
-    borderWidth: 1.5,
+    borderWidth: 3,
     borderColor: GOLD,
     paddingVertical: 32,
     paddingHorizontal: 26,
@@ -173,9 +168,9 @@ const styles = StyleSheet.create({
     gap: 6,
     shadowColor: GOLD,
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.28,
-    shadowRadius: 18,
-    elevation: 14,
+    shadowOpacity: 0.42,
+    shadowRadius: 22,
+    elevation: 20,
     zIndex: 1000,
   },
   topRow: {

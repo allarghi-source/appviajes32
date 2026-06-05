@@ -1,5 +1,7 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { captureRef } from 'react-native-view-shot';
+import * as Sharing from 'expo-sharing';
 
 const GOLD = '#d4af37';
 
@@ -14,6 +16,7 @@ interface Props {
 export function LevelUpPopup({ prevRango, newRango, xpRestantes, userName, onDone }: Props) {
   const opacity = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(0.88)).current;
+  const cardRef = useRef<View>(null);
 
   useEffect(() => {
     opacity.setValue(0);
@@ -33,10 +36,10 @@ export function LevelUpPopup({ prevRango, newRango, xpRestantes, userName, onDon
 
   async function handleShare() {
     try {
-      const name = userName.trim() || 'Un viajero';
-      await Share.share({ message: `${name} subió de nivel en MyWorldXP: ahora es ${newRango}` });
+      const uri = await captureRef(cardRef, { format: 'png', quality: 0.95 });
+      await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: 'Compartir nivel' });
     } catch (e) {
-      console.warn('Error al compartir:', e);
+      console.warn('Error al compartir nivel:', e);
     }
   }
 
@@ -49,7 +52,7 @@ export function LevelUpPopup({ prevRango, newRango, xpRestantes, userName, onDon
           <Text style={styles.closeBtnText}>✕</Text>
         </TouchableOpacity>
 
-        <Animated.View style={[styles.card, { opacity, transform: [{ scale }] }]}>
+        <Animated.View ref={cardRef} style={[styles.card, { opacity, transform: [{ scale }] }]}>
           <View style={styles.topRow}>
             <Text style={styles.unlockedLabel}>SUBISTE DE NIVEL</Text>
           </View>

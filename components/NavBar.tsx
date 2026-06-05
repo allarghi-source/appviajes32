@@ -67,11 +67,11 @@ function StatsIcon({ active }: { active: boolean }) {
 }
 
 const ITEMS = [
-  { route: '/passportinside', label: 'Pasaporte', Icon: PassportIcon },
-  { route: '/timeline',       label: 'Timeline',  Icon: TimelineIcon },
-  { route: '/mapa',           label: 'Mapa',      Icon: MapIcon },
-  { route: '/cargar',         label: 'Cargar',    Icon: AddIcon },
-  { route: '/estadisticas',   label: 'Stats',     Icon: StatsIcon },
+  { route: '/passportinside', label: 'Home',     Icon: PassportIcon },
+  { route: '/cargar',         label: 'Cargar',   Icon: AddIcon      },
+  { route: '/timeline',       label: 'Timeline', Icon: TimelineIcon },
+  { route: '/estadisticas',   label: 'Stats',    Icon: StatsIcon    },
+  { route: '/mapa',           label: 'Mapa',     Icon: MapIcon      },
 ] as const;
 
 export default function NavBar() {

@@ -241,3 +241,7 @@ export async function loadBadgeCount(): Promise<number> {
 export async function clearBadgeCount(): Promise<void> {
   await AsyncStorage.setItem(KEY_BADGE, '0');
 }
+
+export async function resetAchievements(): Promise<void> {
+  await AsyncStorage.multiRemove([KEY_UNLOCKED, KEY_BADGE]);
+}

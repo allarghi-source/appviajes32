@@ -5,6 +5,7 @@ import { Animated, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View }
 import MapView, { Marker, Region } from 'react-native-maps';
 import Svg, { Circle, Path } from 'react-native-svg';
 import NavBar from '../components/NavBar';
+import { playSound, preloadSounds } from '../utils/soundEngine';
 
 const GOLD = '#d4af37';
 const GREEN = '#1a3a6e';
@@ -86,6 +87,7 @@ export default function Mapa() {
 
   useEffect(() => {
     Animated.timing(opacity, { toValue: 1, duration: 700, useNativeDriver: true }).start();
+    preloadSounds();
   }, []);
 
   // Group trips by rounded coordinate so overlapping pins merge
@@ -125,7 +127,7 @@ export default function Mapa() {
               key={group.key}
               coordinate={{ latitude: group.lat, longitude: group.lng }}
               tracksViewChanges={false}
-              onPress={() => setSelectedGroup(group.trips)}
+              onPress={() => { playSound('ding'); setSelectedGroup(group.trips); }}
             >
               {group.hasReal ? <PinReal /> : <PinWishlist />}
             </Marker>

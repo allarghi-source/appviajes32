@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import NavBar from '../components/NavBar';
+import { playSound } from '../utils/soundEngine';
 
 const BG = '#01050d';
 const GOLD = '#d4af37';
@@ -31,9 +32,9 @@ const LIST_PR = Math.max(20, 20 + Math.round(Math.max(0, SCREEN_W - 420) * 0.4))
 const AXIS_X = 36;      // left edge of the golden line (2px wide, center at 37)
 const CARD_START = 68;  // paddingLeft of the list → where cards begin
 const DOT_R = 7;        // radius of axis dot
+const BADGE_R = 16;     // radius of the chain sequence badge
 const HEADER_H = 130;   // approximate header height
 const LIST_PT = 24;
-
 // Precomputed connector geometry (relative to card-left = CARD_START)
 const AXIS_CENTER_X = AXIS_X + 1;                    // 37 (screen)
 const DOT_LEFT = AXIS_CENTER_X - DOT_R - CARD_START; // -34 (rel. to card)
@@ -70,6 +71,16 @@ function formatDate(s: string | null): string {
   return d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
+function toRoman(n: number): string {
+  const vals = [1000,900,500,400,100,90,50,40,10,9,5,4,1];
+  const syms = ['M','CM','D','CD','C','XC','L','XL','X','IX','V','IV','I'];
+  let result = '';
+  for (let i = 0; i < vals.length; i++) {
+    while (n >= vals[i]) { result += syms[i]; n -= vals[i]; }
+  }
+  return result;
+}
+
 // ─── CARD ─────────────────────────────────────────────────────────────────────
 
 function TripCard({
@@ -77,13 +88,13 @@ function TripCard({
   index,
   scrollY,
   onPress,
-  isChainStart,
+  chainIndex,
 }: {
   trip: Trip;
   index: number;
   scrollY: Animated.Value;
   onPress: () => void;
-  isChainStart: boolean;
+  chainIndex: number;
 }) {
   // Scroll Y value at which this card is centered on screen
   const itemCenterInContent = LIST_PT + index * ITEM_H + CARD_H / 2;
@@ -106,11 +117,14 @@ function TripCard({
   return (
     <Animated.View style={[styles.itemWrap, { opacity, transform: [{ scale }] }]}>
 
-      {/* Chain connector: vertical line from bottom of this card to top of next chained card */}
-      {isChainStart && <View style={styles.chainLineDown} />}
-
-      {/* Axis dot – sits on top of the golden line */}
-      <View style={styles.axisDot} />
+      {/* Axis dot for normal trips; Roman numeral badge for chained trips */}
+      {chainIndex > 0 ? (
+        <View style={[styles.chainBadge, { top: CARD_H / 2 - BADGE_R }]}>
+          <Text style={styles.chainBadgeText}>{toRoman(chainIndex)}</Text>
+        </View>
+      ) : (
+        <View style={styles.axisDot} />
+      )}
 
       {/* Short horizontal bar from dot to card edge */}
       <View style={styles.axisBar} />
@@ -150,6 +164,55 @@ export default function Timeline() {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
   const scrollY = useRef(new Animated.Value(0)).current;
+  const activeIndexRef = useRef(0);
+  const tickQueueRef = useRef(0);
+  const lastSoundTimeRef = useRef(0);
+  const tickDrainRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (trips.length === 0) return;
+    activeIndexRef.current = 0;
+    tickQueueRef.current = 0;
+    lastSoundTimeRef.current = 0;
+
+    const MIN_TIC_MS = 85;
+
+    function drainTicks() {
+      if (tickQueueRef.current <= 0) { tickDrainRef.current = null; return; }
+      playSound('tic');
+      lastSoundTimeRef.current = Date.now();
+      tickQueueRef.current--;
+      tickDrainRef.current = tickQueueRef.current > 0 ? setTimeout(drainTicks, MIN_TIC_MS) : null;
+    }
+
+    function enqueueTics(count: number) {
+      tickQueueRef.current += count;
+      if (tickDrainRef.current !== null) return;
+      const elapsed = Date.now() - lastSoundTimeRef.current;
+      const delay = elapsed >= MIN_TIC_MS ? 0 : MIN_TIC_MS - elapsed;
+      tickDrainRef.current = setTimeout(drainTicks, delay);
+    }
+
+    const id = scrollY.addListener(({ value }) => {
+      let bestIndex = 0;
+      let bestDist = Infinity;
+      for (let i = 0; i < trips.length; i++) {
+        const optimalScroll = HEADER_H + LIST_PT + i * ITEM_H + CARD_H / 2 - SCREEN_H / 2;
+        const dist = Math.abs(value - optimalScroll);
+        if (dist < bestDist) { bestDist = dist; bestIndex = i; }
+      }
+      if (bestIndex !== activeIndexRef.current) {
+        const delta = Math.abs(bestIndex - activeIndexRef.current);
+        activeIndexRef.current = bestIndex;
+        enqueueTics(delta);
+      }
+    });
+
+    return () => {
+      scrollY.removeListener(id);
+      if (tickDrainRef.current !== null) { clearTimeout(tickDrainRef.current); tickDrainRef.current = null; }
+    };
+  }, [trips]);
 
   useEffect(() => {
     async function load() {
@@ -207,15 +270,22 @@ export default function Timeline() {
               { useNativeDriver: false }
             )}
             renderItem={({ item, index }) => {
-              const prev = index > 0 ? trips[index - 1] : null;
-              const isChainStart = !!(prev?.chainId);
+              let chainIndex = 0;
+              const prevHasChain = index > 0 && !!trips[index - 1].chainId;
+              if (item.chainId || prevHasChain) {
+                // Walk back to find the first trip in this chain sequence.
+                // A trip belongs to the same chain while the trip before it has chainId.
+                let start = index;
+                while (start > 0 && !!trips[start - 1].chainId) start--;
+                chainIndex = index - start + 1;
+              }
               return (
                 <TripCard
                   trip={item}
                   index={index}
                   scrollY={scrollY}
                   onPress={() => router.push(`/detalle?id=${item.id}`)}
-                  isChainStart={isChainStart}
+                  chainIndex={chainIndex}
                 />
               );
             }}
@@ -301,6 +371,29 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
 
+  // Chain sequence badge — replaces axisDot for trips that belong to a chain
+  chainBadge: {
+    position: 'absolute',
+    left: AXIS_CENTER_X - CARD_START - BADGE_R,  // centered on axis line
+    // top is set inline per card: CARD_H / 2 - BADGE_R
+    width: BADGE_R * 2,
+    height: BADGE_R * 2,
+    borderRadius: BADGE_R,
+    backgroundColor: BG,
+    borderWidth: 2,
+    borderColor: GOLD,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 3,
+  },
+  chainBadgeText: {
+    fontFamily: 'Georgia',
+    fontSize: 10,
+    fontWeight: '700',
+    color: GOLD,
+    letterSpacing: 1,
+  },
+
   // Short horizontal bar connecting dot to card left edge
   axisBar: {
     position: 'absolute',
@@ -310,19 +403,6 @@ const styles = StyleSheet.create({
     height: 2,
     backgroundColor: GOLD,
     opacity: 0.4,
-  },
-
-  // Vertical line in the margin gap: drawn on the second card, going upward
-  // bottom of line (top: -ITEM_MB + height: ITEM_MB = 0) = top of this card's photo
-  chainLineDown: {
-    position: 'absolute',
-    left: '50%',
-    transform: [{ translateX: -1 }],
-    top: -ITEM_MB,
-    width: 2,
-    height: ITEM_MB,
-    backgroundColor: GOLD,
-    opacity: 0.85,
   },
 
   // ── Card: image fills the full rectangle ──

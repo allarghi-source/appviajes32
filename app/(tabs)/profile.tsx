@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 export default function Profile() {
@@ -15,6 +15,8 @@ const [nacionalidad, setNacionalidad] = useState('');
 const scrollRef = useRef(null);
 const [ciudad, setCiudad] = useState('');
 const [pais, setPais] = useState('');
+const [ciudadError, setCiudadError] = useState('');
+const [paisError, setPaisError] = useState('');
 
 const nombreRef      = useRef<TextInput>(null);
 const apellidoRef    = useRef<TextInput>(null);
@@ -22,7 +24,43 @@ const nacionalidadRef = useRef<TextInput>(null);
 const ciudadRef      = useRef<TextInput>(null);
 const paisRef        = useRef<TextInput>(null);
 
+useEffect(() => {
+  AsyncStorage.getItem('userData').then((raw) => {
+    if (!raw) return;
+    try {
+      const data = JSON.parse(raw);
+      if (data.nombre)       setNombre(data.nombre);
+      if (data.apellido)     setApellido(data.apellido);
+      if (data.nacionalidad) setNacionalidad(data.nacionalidad);
+      if (data.ciudad)       setCiudad(data.ciudad);
+      if (data.pais)         setPais(data.pais);
+      if (data.foto)         setImage(data.foto);
+    } catch {}
+  });
+}, []);
+
 const soloLetras = (t: string) => t.replace(/[^a-zA-ZÀ-ɏ ]/g, '');
+
+async function validarUbicacion(c: string, p: string, campo: 'ciudad' | 'pais') {
+  if (!c.trim() || !p.trim()) return;
+  try {
+    const q = encodeURIComponent(`${c.trim()}, ${p.trim()}`);
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1`,
+      { headers: { 'User-Agent': 'MyWorldXP/1.0', 'Accept-Language': 'es' } }
+    );
+    const data = await res.json();
+    if (data.length > 0) {
+      setCiudadError('');
+      setPaisError('');
+    } else {
+      if (campo === 'ciudad') setCiudadError('Ciudad no encontrada');
+      else setPaisError('País no encontrado');
+    }
+  } catch {
+    // Error de red — no bloquear al usuario
+  }
+}
  const pickImage = async () => {
   const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (!perm.granted) return;
@@ -166,34 +204,48 @@ const selectPhoto = () => {
     />
   </View>
 
-  <View style={styles.input}>
-    <Feather name="map-pin" size={18} color="#d4af37" />
-    <View style={styles.divider} />
-    <TextInput
-      ref={ciudadRef}
-      placeholder="Ciudad"
-      placeholderTextColor="rgba(255,255,255,0.5)"
-      style={styles.inputText}
-      value={ciudad}
-      onChangeText={setCiudad}
-      returnKeyType="next"
-      submitBehavior="submit"
-      onSubmitEditing={() => paisRef.current?.focus()}
-    />
+  <View>
+    <View style={styles.input}>
+      <Feather name="map-pin" size={18} color="#d4af37" />
+      <View style={styles.divider} />
+      <TextInput
+        ref={ciudadRef}
+        placeholder="Ciudad donde resides"
+        placeholderTextColor="rgba(255,255,255,0.5)"
+        style={styles.inputText}
+        value={ciudad}
+        onChangeText={(t) => { setCiudad(t); if (ciudadError) setCiudadError(''); }}
+        onBlur={() => {
+          if (!ciudad.trim() && pais.trim()) { setCiudadError('Ciudad no encontrada'); return; }
+          if (ciudad.trim()) validarUbicacion(ciudad, pais, 'ciudad');
+        }}
+        returnKeyType="next"
+        submitBehavior="submit"
+        onSubmitEditing={() => paisRef.current?.focus()}
+      />
+    </View>
+    {ciudadError ? <Text style={styles.errorText}>{ciudadError}</Text> : null}
   </View>
 
-  <View style={styles.input}>
-    <Feather name="map" size={18} color="#d4af37" />
-    <View style={styles.divider} />
-    <TextInput
-      ref={paisRef}
-      placeholder="País"
-      placeholderTextColor="rgba(255,255,255,0.5)"
-      style={styles.inputText}
-      value={pais}
-      onChangeText={(t) => setPais(soloLetras(t))}
-      returnKeyType="done"
-    />
+  <View>
+    <View style={styles.input}>
+      <Feather name="map" size={18} color="#d4af37" />
+      <View style={styles.divider} />
+      <TextInput
+        ref={paisRef}
+        placeholder="País donde resides"
+        placeholderTextColor="rgba(255,255,255,0.5)"
+        style={styles.inputText}
+        value={pais}
+        onChangeText={(t) => { setPais(soloLetras(t)); if (paisError) setPaisError(''); }}
+        onBlur={() => {
+          if (!pais.trim() && ciudad.trim()) { setPaisError('País no encontrado'); return; }
+          if (pais.trim()) validarUbicacion(ciudad, pais, 'pais');
+        }}
+        returnKeyType="done"
+      />
+    </View>
+    {paisError ? <Text style={styles.errorText}>{paisError}</Text> : null}
   </View>
 
 
@@ -201,19 +253,20 @@ const selectPhoto = () => {
   <TouchableOpacity
   style={styles.button}
   onPress={async () => {
-  const userData = {
-    nombre,
-    apellido,
-    nacionalidad,
-    ciudad,
-    pais,
-    foto: image,// string URi
-  };
-
-  await AsyncStorage.setItem('userData', JSON.stringify(userData));
-
-  router.push('/passportcover');
-}}
+    if (ciudad.trim() && !pais.trim()) { setPaisError('País no encontrado'); return; }
+    if (!ciudad.trim() && pais.trim()) { setCiudadError('Ciudad no encontrada'); return; }
+    if (ciudadError || paisError) return;
+    const userData = {
+      nombre,
+      apellido,
+      nacionalidad,
+      ciudad,
+      pais,
+      foto: image,
+    };
+    await AsyncStorage.setItem('userData', JSON.stringify(userData));
+    router.push('/passportcover');
+  }}
 >
     <Text style={styles.buttonText}>CONTINUAR →</Text>
   </TouchableOpacity>
@@ -395,5 +448,11 @@ buttonText: {
   fontSize: 14,
   fontWeight: '700',
   letterSpacing: 1,
+},
+errorText: {
+  color: '#e07070',
+  fontSize: 12,
+  marginTop: 4,
+  marginLeft: 16,
 },
 });
