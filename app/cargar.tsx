@@ -70,6 +70,10 @@ interface DestinoState {
   openDropdown: 'dia' | 'mes' | 'anio' | null;
 }
 
+type NotifItem =
+  | { kind: 'levelup'; prevRango: string; newRango: string; xpRestantes: number | null; userName: string }
+  | { kind: 'achievement'; achievement: Achievement };
+
 function genId(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
@@ -88,18 +92,19 @@ const DAYS: DropItem[] = Array.from({ length: 31 }, (_, i) => ({
 }));
 
 const MONTHS: DropItem[] = [
-  { label: 'Enero',      value: '1'  }, { label: 'Febrero',   value: '2'  },
-  { label: 'Marzo',      value: '3'  }, { label: 'Abril',     value: '4'  },
-  { label: 'Mayo',       value: '5'  }, { label: 'Junio',     value: '6'  },
-  { label: 'Julio',      value: '7'  }, { label: 'Agosto',    value: '8'  },
-  { label: 'Septiembre', value: '9'  }, { label: 'Octubre',   value: '10' },
-  { label: 'Noviembre',  value: '11' }, { label: 'Diciembre', value: '12' },
+  { label: 'ENE', value: '1'  }, { label: 'FEB', value: '2'  },
+  { label: 'MAR', value: '3'  }, { label: 'ABR', value: '4'  },
+  { label: 'MAY', value: '5'  }, { label: 'JUN', value: '6'  },
+  { label: 'JUL', value: '7'  }, { label: 'AGO', value: '8'  },
+  { label: 'SEP', value: '9'  }, { label: 'OCT', value: '10' },
+  { label: 'NOV', value: '11' }, { label: 'DIC', value: '12' },
 ];
 
-// Newest first so recent years are at the top
-const YEARS: DropItem[] = Array.from({ length: 2035 - 1980 + 1 }, (_, i) => ({
-  label: String(2035 - i),
-  value: String(2035 - i),
+// Newest first so recent years are at the top; capped at current year
+const _CURRENT_YEAR = new Date().getFullYear();
+const YEARS: DropItem[] = Array.from({ length: _CURRENT_YEAR - 1980 + 1 }, (_, i) => ({
+  label: String(_CURRENT_YEAR - i),
+  value: String(_CURRENT_YEAR - i),
 }));
 
 // ─── CITY AUTOCOMPLETE DATA ───────────────────────────────────────────────────
@@ -523,6 +528,7 @@ function DestinoBlock({
   fotosViaje?: string[];
 }) {
   const dateSectionY = useRef(0);
+  const blockY = useRef(0);
   const [pickerVisible, setPickerVisible] = useState(false);
 
   function handleCiudadChange(t: string) {
@@ -608,7 +614,7 @@ function DestinoBlock({
     onChange(patch);
     if (opening) {
       setTimeout(() => {
-        scrollRef.current?.scrollToPosition?.(0, dateSectionY.current - 20, true);
+        scrollRef.current?.scrollToPosition?.(0, blockY.current + dateSectionY.current - 20, true);
       }, 80);
     }
   }
@@ -640,6 +646,7 @@ function DestinoBlock({
     });
     if (!result.canceled && result.assets.length > 0) {
       onChange({ fotos: [...destino.fotos, ...result.assets.map((a) => a.uri)].slice(0, 4) });
+      setTimeout(() => { scrollRef.current?.scrollToPosition?.(0, blockY.current - 20, true); }, 80);
     }
   }
 
@@ -650,6 +657,7 @@ function DestinoBlock({
     const result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
     if (!result.canceled && result.assets[0]) {
       onChange({ fotos: [...destino.fotos, result.assets[0].uri] });
+      setTimeout(() => { scrollRef.current?.scrollToPosition?.(0, blockY.current - 20, true); }, 80);
     }
   }
 
@@ -659,7 +667,7 @@ function DestinoBlock({
 
   return (
     <>
-    <View style={styles.destinoBlock}>
+    <View style={styles.destinoBlock} onLayout={(e) => { blockY.current = e.nativeEvent.layout.y; }}>
       <Text style={styles.destinoBlockTitle}>Destino {toRoman(index + 1)}</Text>
 
       {/* Destino */}
@@ -837,8 +845,8 @@ function DestinoBlock({
         fotosDisponibles={fotosViaje}
         fotosActuales={destino.fotos}
         maxSeleccion={Math.max(0, 4 - destino.fotos.length)}
-        onConfirm={(uris) => { onChange({ fotos: uris }); setPickerVisible(false); }}
-        onClose={() => setPickerVisible(false)}
+        onConfirm={(uris) => { onChange({ fotos: uris }); setPickerVisible(false); setTimeout(() => { scrollRef.current?.scrollToPosition?.(0, blockY.current - 20, true); }, 80); }}
+        onClose={() => { setPickerVisible(false); setTimeout(() => { scrollRef.current?.scrollToPosition?.(0, blockY.current - 20, true); }, 80); }}
       />
     )}
     </>
@@ -893,10 +901,8 @@ export default function CargarViaje() {
   const [cantCiudades, setCantCiudades] = useState<'una' | 'mas'>('una');
   const [destinos, setDestinos] = useState<DestinoState[]>(() => [createDestino(), createDestino()]);
   const [fotosViaje, setFotosViaje] = useState<string[]>([]);
-  const [pendingAchievements, setPendingAchievements] = useState<Achievement[]>([]);
-  const [pendingLevelUp, setPendingLevelUp] = useState<{
-    prevRango: string; newRango: string; xpRestantes: number | null; userName: string;
-  } | null>(null);
+  const [notifQueue, setNotifQueue] = useState<NotifItem[]>([]);
+  const notifHeadRef = useRef<NotifItem | null>(null);
   const chainIdRef = useRef<string | null>(null);
   const scrollRef = useRef<any>(null);
   const dateSectionY = useRef(0);
@@ -906,6 +912,14 @@ export default function CargarViaje() {
       if (raw) setLearnedCities(JSON.parse(raw));
     }).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    const head = notifQueue[0] ?? null;
+    if (head === notifHeadRef.current) return;
+    notifHeadRef.current = head;
+    if (!head) return;
+    playSound(head.kind === 'levelup' ? 'subir_nivel' : 'anuncio_2');
+  }, [notifQueue]);
 
   const toggleAnim = useRef(new Animated.Value(0)).current;
 
@@ -951,7 +965,18 @@ export default function CargarViaje() {
   }
 
   function agregarCiudad() {
-    setDestinos(prev => [...prev, createDestino()]);
+    setDestinos(prev => {
+      const last = prev[prev.length - 1];
+      const next = createDestino();
+      if (last?.dia && last?.mes && last?.anio) {
+        const d = new Date(Number(last.anio), Number(last.mes) - 1, Number(last.dia));
+        d.setDate(d.getDate() + 1);
+        next.dia = String(d.getDate());
+        next.mes = String(d.getMonth() + 1);
+        next.anio = String(d.getFullYear());
+      }
+      return [...prev, next];
+    });
   }
 
   async function seleccionarFotosDelViaje() {
@@ -1253,21 +1278,29 @@ export default function CargarViaje() {
       const allTrips = raw ? JSON.parse(raw) : [];
       const stats = calcularStats(allTrips as StatsTrip[]);
       const newOnes = await checkAndSaveAchievements(allTrips as StatsTrip[], stats);
-      if (newOnes.length > 0) { setPendingAchievements(newOnes); playSound('anuncio_2'); }
+      const items: NotifItem[] = [];
       if (stats.rangoActual !== prevRango) {
-        playSound('subir_nivel');
         const rawUser = await AsyncStorage.getItem('userData');
         const userData = rawUser ? JSON.parse(rawUser) : {};
-        setPendingLevelUp({
+        items.push({
+          kind: 'levelup',
           prevRango,
           newRango: stats.rangoActual,
           xpRestantes: getXpRestantes(stats.xpTotal),
           userName: userData.nombre ?? '',
         });
       }
+      for (const a of newOnes) {
+        items.push({ kind: 'achievement', achievement: a });
+      }
+      if (items.length > 0) setNotifQueue(prev => [...prev, ...items]);
     } catch {
       // silencioso — los logros no deben bloquear el flujo principal
     }
+  }
+
+  function popNotif() {
+    setNotifQueue(prev => prev.slice(1));
   }
 
   async function handleGuardar() {
@@ -1636,19 +1669,19 @@ export default function CargarViaje() {
         <View style={styles.bottomSpacer} />
       </KeyboardAwareScrollView>
       <NavBar />
-      {pendingAchievements.length > 0 && (
-        <AchievementPopup
-          achievements={pendingAchievements}
-          onDone={() => setPendingAchievements([])}
+      {notifQueue.length > 0 && notifQueue[0].kind === 'levelup' && (
+        <LevelUpPopup
+          prevRango={notifQueue[0].prevRango}
+          newRango={notifQueue[0].newRango}
+          xpRestantes={notifQueue[0].xpRestantes}
+          userName={notifQueue[0].userName}
+          onDone={popNotif}
         />
       )}
-      {pendingLevelUp && (
-        <LevelUpPopup
-          prevRango={pendingLevelUp.prevRango}
-          newRango={pendingLevelUp.newRango}
-          xpRestantes={pendingLevelUp.xpRestantes}
-          userName={pendingLevelUp.userName}
-          onDone={() => setPendingLevelUp(null)}
+      {notifQueue.length > 0 && notifQueue[0].kind === 'achievement' && (
+        <AchievementPopup
+          achievements={[notifQueue[0].achievement]}
+          onDone={popNotif}
         />
       )}
     </View>

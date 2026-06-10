@@ -271,12 +271,9 @@ export default function Timeline() {
             )}
             renderItem={({ item, index }) => {
               let chainIndex = 0;
-              const prevHasChain = index > 0 && !!trips[index - 1].chainId;
-              if (item.chainId || prevHasChain) {
-                // Walk back to find the first trip in this chain sequence.
-                // A trip belongs to the same chain while the trip before it has chainId.
+              if (item.chainId) {
                 let start = index;
-                while (start > 0 && !!trips[start - 1].chainId) start--;
+                while (start > 0 && trips[start - 1].chainId === item.chainId) start--;
                 chainIndex = index - start + 1;
               }
               return (

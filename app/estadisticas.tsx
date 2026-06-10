@@ -8,6 +8,7 @@ import {
   Trip,
   calcularStats,
   getContinent,
+  getXpRestantes,
 } from '../utils/statsEngine';
 
 const BG = '#01050d';
@@ -54,6 +55,7 @@ const CONTINENT_TOTAL_COUNTRIES: Record<string, number> = {
 function XpSection({ stats }: { stats: StatsResult }) {
   const tierColor = TIER_COLOR[stats.rangoTier];
   const xpProgress = Math.max(1, Math.round(stats.progresoRango * 100));
+  const xpRestantes = getXpRestantes(stats.xpTotal);
 
   return (
     <View style={styles.card}>
@@ -86,6 +88,9 @@ function XpSection({ stats }: { stats: StatsResult }) {
           </Text>
         )}
       </View>
+      {stats.siguienteRango && xpRestantes !== null && (
+        <Text style={styles.xpRestantesHint}>Faltan {xpRestantes} XP para {stats.siguienteRango}</Text>
+      )}
     </View>
   );
 }
@@ -443,6 +448,13 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: MUTED,
     letterSpacing: 0.5,
+  },
+  xpRestantesHint: {
+    fontSize: 11,
+    color: MUTED,
+    textAlign: 'center',
+    marginTop: 8,
+    letterSpacing: 0.3,
   },
 
   // Continentes – barra general

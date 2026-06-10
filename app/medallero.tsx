@@ -49,7 +49,7 @@ export default function Medallero() {
         showsVerticalScrollIndicator={false}
       >
         {/* Back */}
-        <TouchableOpacity onPress={() => router.back()} style={styles.backRow}>
+        <TouchableOpacity onPress={() => router.replace('/passportinside')} style={styles.backRow}>
           <Text style={styles.backText}>← Volver</Text>
         </TouchableOpacity>
 
