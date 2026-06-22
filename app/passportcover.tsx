@@ -117,8 +117,15 @@ export default function PassportCover() {
         <TouchableOpacity
           onPress={() => router.push('/settings')}
           style={styles.settingsBtn}
+          activeOpacity={0.7}
         >
-          <Text style={styles.settingsIcon}>⚙</Text>
+          <View style={styles.settingsStampOuter}>
+            <View style={styles.settingsStampInner}>
+              <View style={styles.stampDecoLine} />
+              <Text style={styles.settingsStampText} numberOfLines={1}>CONFIG</Text>
+              <View style={styles.stampDecoLine} />
+            </View>
+          </View>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -185,16 +192,48 @@ const styles = StyleSheet.create({
 
   settingsBtn: {
     position: 'absolute',
-    top: 60,
-    right: 25,
+    top: 54,
+    right: 22,
     zIndex: 10,
-    padding: 6,
+    padding: 4,
   },
 
-  settingsIcon: {
-    color: 'rgba(212,175,55,0.6)',
-    fontSize: 16,
+  settingsStampOuter: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 2,
+    borderColor: 'rgba(212,175,55,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: [{ rotate: '-10deg' }],
+  },
+
+  settingsStampInner: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor: 'rgba(212,175,55,0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 3,
+  },
+
+  stampDecoLine: {
+    width: 28,
+    height: 0.6,
+    backgroundColor: 'rgba(212,175,55,0.45)',
+  },
+
+  settingsStampText: {
     fontFamily: 'Georgia',
+    fontSize: 7.5,
+    fontWeight: '700',
+    color: 'rgba(212,175,55,0.65)',
+    letterSpacing: 1.0,
+    textTransform: 'uppercase',
+    textAlign: 'center',
   },
 
   passport: {

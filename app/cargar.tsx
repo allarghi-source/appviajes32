@@ -1,5 +1,6 @@
 import NavBar from '../components/NavBar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import { AchievementPopup } from '../components/AchievementPopup';
 import { LevelUpPopup } from '../components/LevelUpPopup';
@@ -65,6 +66,7 @@ interface DestinoState {
   anio: string;
   nota: string;
   fotos: string[];
+  portada: string | null;
   ciudadSugs: string[];
   paisSugs: string[];
   openDropdown: 'dia' | 'mes' | 'anio' | null;
@@ -80,6 +82,73 @@ function genId(): string {
 
 function buildFechaInicio(dia: string, mes: string, anio: string): string {
   return `${dia.padStart(2, '0')}/${mes.padStart(2, '0')}/${anio}`;
+}
+
+// ─── FOTO PERSISTENCE ─────────────────────────────────────────────────────────
+
+const FOTOS_DIR = FileSystem.documentDirectory
+  ? `${FileSystem.documentDirectory}fotos/`
+  : null;
+
+async function copiarAalmacenamientoPersistente(uris: string[]): Promise<string[]> {
+  console.log('[Fotos] Iniciando copia —', uris.length, 'foto(s)');
+
+  if (uris.length === 0) return [];
+
+  if (!FOTOS_DIR || !FileSystem.documentDirectory) {
+    const err = new Error('FileSystem.documentDirectory no disponible');
+    console.error('[Fotos] ERROR:', err.message);
+    throw err;
+  }
+
+  // Crear el directorio sólo si todavía no existe
+  try {
+    const dirInfo = await FileSystem.getInfoAsync(FOTOS_DIR);
+    console.log('[Fotos] Directorio fotos/', dirInfo.exists ? 'ya existe' : 'no existe — creando');
+    if (!dirInfo.exists) {
+      await FileSystem.makeDirectoryAsync(FOTOS_DIR, { intermediates: true });
+      console.log('[Fotos] Directorio creado OK');
+    }
+  } catch (dirErr) {
+    console.error('[Fotos] ERROR al crear directorio:', FOTOS_DIR, dirErr);
+    throw dirErr;
+  }
+
+  const resultados: string[] = [];
+  for (let i = 0; i < uris.length; i++) {
+    const uri = uris[i];
+    console.log(`[Fotos] Foto ${i + 1}/${uris.length}:`, uri ? uri.slice(0, 100) : '⚠ URI VACÍA');
+
+    if (!uri) {
+      console.warn(`[Fotos] Foto ${i + 1}: URI nula/vacía, saltando`);
+      continue;
+    }
+
+    // Ya está en documentDirectory → no necesita copiarse
+    if (uri.startsWith(FileSystem.documentDirectory)) {
+      console.log(`[Fotos] Foto ${i + 1}: ya persistida, usando directa`);
+      resultados.push(uri);
+      continue;
+    }
+
+    const cleanUri = uri.split('?')[0];
+    const rawExt = cleanUri.split('.').pop()?.toLowerCase() ?? 'jpg';
+    const safeExt = ['jpg', 'jpeg', 'png', 'heic', 'webp'].includes(rawExt) ? rawExt : 'jpg';
+    const dest = `${FOTOS_DIR}${genId()}.${safeExt}`;
+
+    try {
+      console.log(`[Fotos] Foto ${i + 1}: copyAsync →`, dest.slice(-50));
+      await FileSystem.copyAsync({ from: uri, to: dest });
+      console.log(`[Fotos] Foto ${i + 1}: copiada OK`);
+      resultados.push(dest);
+    } catch (copyErr) {
+      console.error(`[Fotos] Foto ${i + 1}: ERROR en copyAsync — uri: ${uri.slice(0, 100)}`, copyErr);
+      throw copyErr;
+    }
+  }
+
+  console.log('[Fotos] Copia completa —', resultados.length, 'foto(s) persistida(s)');
+  return resultados;
 }
 
 // ─── DATE DROPDOWN DATA ───────────────────────────────────────────────────────
@@ -507,7 +576,7 @@ function createDestino(): DestinoState {
     dia: String(today.getDate()),
     mes: String(today.getMonth() + 1),
     anio: String(today.getFullYear()),
-    nota: '', fotos: [],
+    nota: '', fotos: [], portada: null,
     ciudadSugs: [], paisSugs: [],
     openDropdown: null,
   };
@@ -757,23 +826,45 @@ function DestinoBlock({
           )}
           {destino.fotos.length > 0 && (
             <View style={styles.photosRow}>
-              {destino.fotos.map((uri, i) => (
-                <View key={i} style={styles.photoWrapper}>
-                  <Image source={{ uri }} style={styles.photoThumb} />
-                  {i === 0 && (
-                    <View style={styles.photoCoverBadge}>
-                      <Text style={styles.photoCoverText}>Portada</Text>
-                    </View>
-                  )}
+              {destino.fotos.map((uri, i) => {
+                const isPortada = destino.portada ? uri === destino.portada : i === 0;
+                return (
                   <TouchableOpacity
-                    style={styles.photoRemoveBtn}
-                    onPress={() => onChange({ fotos: destino.fotos.filter((_, fi) => fi !== i) })}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    key={i}
+                    activeOpacity={0.9}
+                    onLongPress={() => {
+                      Alert.alert(
+                        '¿Portada?',
+                        '¿Deseás asignar esta foto como portada?',
+                        [
+                          { text: 'Cancelar', style: 'cancel' },
+                          { text: 'Asignar', onPress: () => onChange({ portada: uri }) },
+                        ]
+                      );
+                    }}
+                    style={styles.photoWrapper}
                   >
-                    <Text style={styles.photoRemoveText}>✕</Text>
+                    <Image source={{ uri }} style={styles.photoThumb} />
+                    {isPortada && (
+                      <View style={styles.photoCoverBadge}>
+                        <Text style={styles.photoCoverText}>Portada</Text>
+                      </View>
+                    )}
+                    <TouchableOpacity
+                      style={styles.photoRemoveBtn}
+                      onPress={() => {
+                        onChange({
+                          fotos: destino.fotos.filter((_, fi) => fi !== i),
+                          ...(destino.portada === uri ? { portada: null } : {}),
+                        });
+                      }}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Text style={styles.photoRemoveText}>✕</Text>
+                    </TouchableOpacity>
                   </TouchableOpacity>
-                </View>
-              ))}
+                );
+              })}
             </View>
           )}
           {destino.fotos.length === 0 && (
@@ -836,7 +927,9 @@ function DestinoBlock({
           multiline
           numberOfLines={4}
           textAlignVertical="top"
+          maxLength={1000}
         />
+        <Text style={styles.notaCounter}>{destino.nota.length}/1000</Text>
       </View>
     </View>
     {fotosViaje !== undefined && (
@@ -845,7 +938,12 @@ function DestinoBlock({
         fotosDisponibles={fotosViaje}
         fotosActuales={destino.fotos}
         maxSeleccion={Math.max(0, 4 - destino.fotos.length)}
-        onConfirm={(uris) => { onChange({ fotos: uris }); setPickerVisible(false); setTimeout(() => { scrollRef.current?.scrollToPosition?.(0, blockY.current - 20, true); }, 80); }}
+        onConfirm={(uris) => {
+          const newPortada = destino.portada && uris.includes(destino.portada) ? destino.portada : null;
+          onChange({ fotos: uris, portada: newPortada });
+          setPickerVisible(false);
+          setTimeout(() => { scrollRef.current?.scrollToPosition?.(0, blockY.current - 20, true); }, 80);
+        }}
         onClose={() => { setPickerVisible(false); setTimeout(() => { scrollRef.current?.scrollToPosition?.(0, blockY.current - 20, true); }, 80); }}
       />
     )}
@@ -888,6 +986,7 @@ export default function CargarViaje() {
   const [openDropdown, setOpenDropdown] = useState<'dia' | 'mes' | 'anio' | null>(null);
   const [nota, setNota] = useState('');
   const [fotos, setFotos] = useState<string[]>([]);
+  const [portadaUri, setPortadaUri] = useState<string | null>(null);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
     hasParamCoords ? { lat: parseFloat(pLat), lng: parseFloat(pLng) } : null
   );
@@ -969,11 +1068,9 @@ export default function CargarViaje() {
       const last = prev[prev.length - 1];
       const next = createDestino();
       if (last?.dia && last?.mes && last?.anio) {
-        const d = new Date(Number(last.anio), Number(last.mes) - 1, Number(last.dia));
-        d.setDate(d.getDate() + 1);
-        next.dia = String(d.getDate());
-        next.mes = String(d.getMonth() + 1);
-        next.anio = String(d.getFullYear());
+        next.dia = last.dia;
+        next.mes = last.mes;
+        next.anio = last.anio;
       }
       return [...prev, next];
     });
@@ -1018,10 +1115,19 @@ export default function CargarViaje() {
     }
     Keyboard.dismiss();
     try {
+      console.log('[FinalizarViaje] Step 1: leyendo trips existentes');
       const rawBefore = await AsyncStorage.getItem('trips');
       const prevStats = calcularStats((rawBefore ? JSON.parse(rawBefore) : []) as StatsTrip[]);
       const chainId = genId();
-      for (const d of destinos) {
+      for (let di = 0; di < destinos.length; di++) {
+        const d = destinos[di];
+        console.log(`[FinalizarViaje] Step 2: copiando fotos del destino ${di + 1}/${destinos.length}`);
+        const finalFotos = tipo === 'real' ? await copiarAalmacenamientoPersistente(d.fotos) : [];
+        console.log(`[FinalizarViaje] Step 3: armando trip del destino ${di + 1}`);
+        const portadaIdxMulti = d.portada ? d.fotos.indexOf(d.portada) : -1;
+        const portadaMulti = finalFotos.length > 0
+          ? (portadaIdxMulti >= 0 && portadaIdxMulti < finalFotos.length ? finalFotos[portadaIdxMulti] : finalFotos[0])
+          : null;
         const trip: TripData = {
           id: genId(),
           tipo,
@@ -1029,18 +1135,24 @@ export default function CargarViaje() {
           pais: d.pais.trim(),
           coords: d.coords,
           fechaInicio: tipo === 'real' ? buildFechaInicio(d.dia, d.mes, d.anio) : null,
-          fotos: tipo === 'real' ? d.fotos : [],
-          portada: tipo === 'real' && d.fotos.length > 0 ? d.fotos[0] : null,
+          fotos: finalFotos,
+          portada: portadaMulti,
           nota: d.nota.trim(),
           xp: 0,
           distancia: 0,
           chainId,
         };
+        console.log(`[FinalizarViaje] Step 4: guardando en AsyncStorage destino ${di + 1}`);
         await saveTrip(trip);
+        console.log(`[FinalizarViaje] Destino ${di + 1} guardado OK`);
       }
       if (pWishlistId) await deleteWishlistTrip(pWishlistId);
       setDestinos([createDestino(), createDestino()]);
       setFotosViaje([]);
+      setCantCiudades('una');
+      setTipo('real');
+      Animated.spring(cantCiudadesAnim, { toValue: 0, useNativeDriver: false, friction: 7, tension: 130 }).start();
+      Animated.spring(toggleAnim, { toValue: 0, useNativeDriver: false, friction: 7, tension: 130 }).start();
       setTimeout(() => {
         scrollRef.current?.scrollToPosition?.(0, 0, false);
         scrollRef.current?.scrollTo?.({ x: 0, y: 0, animated: false });
@@ -1048,7 +1160,8 @@ export default function CargarViaje() {
       playSound('cargar');
       Alert.alert('¡Guardado!', `Tu viaje con ${destinos.length} ciudades fue guardado correctamente.`);
       _checkAchievements(prevStats.rangoActual);
-    } catch {
+    } catch (err) {
+      console.error('[FinalizarViaje] ERROR COMPLETO al guardar:', err);
       Alert.alert('Error', 'No se pudo guardar. Intentá de nuevo.');
     }
   }
@@ -1111,6 +1224,7 @@ export default function CargarViaje() {
     setOpenDropdown(null);
     setNota('');
     setFotos([]);
+    setPortadaUri(null);
     setCoords(null);
     setGeoStatus('idle');
     setGeoNombre('');
@@ -1216,7 +1330,9 @@ export default function CargarViaje() {
   }
 
   function removePhoto(index: number) {
+    const removedUri = fotos[index];
     setFotos((prev) => prev.filter((_, i) => i !== index));
+    if (portadaUri === removedUri) setPortadaUri(null);
   }
 
   function validate(): boolean {
@@ -1241,8 +1357,18 @@ export default function CargarViaje() {
     return true;
   }
 
-  function buildTrip(chainId: string | null): TripData {
+  function buildTrip(chainId: string | null, persistedFotos?: string[]): TripData {
     const esReal = tipo === 'real';
+    const finalFotos = persistedFotos ?? (esReal ? fotos : []);
+    let portada: string | null = null;
+    if (finalFotos.length > 0) {
+      if (portadaUri) {
+        const idx = fotos.indexOf(portadaUri);
+        portada = (idx >= 0 && idx < finalFotos.length) ? finalFotos[idx] : finalFotos[0];
+      } else {
+        portada = finalFotos[0];
+      }
+    }
     return {
       id: genId(),
       tipo,
@@ -1250,8 +1376,8 @@ export default function CargarViaje() {
       pais: pais.trim(),
       coords,
       fechaInicio: esReal ? buildFechaInicio(dia, mes, anio) : null,
-      fotos: esReal ? fotos : [],
-      portada: esReal && fotos.length > 0 ? fotos[0] : null,
+      fotos: finalFotos,
+      portada,
       nota: nota.trim(),
       xp: 0,
       distancia: 0,
@@ -1307,17 +1433,24 @@ export default function CargarViaje() {
     if (!validate()) return;
     Keyboard.dismiss();
     try {
+      console.log('[Guardar] Step 1: leyendo trips existentes');
       const rawBefore = await AsyncStorage.getItem('trips');
       const prevStats = calcularStats((rawBefore ? JSON.parse(rawBefore) : []) as StatsTrip[]);
-      const trip = buildTrip(null);
+      console.log('[Guardar] Step 2: copiando fotos (', fotos.length, ')');
+      const persistedFotos = tipo === 'real' ? await copiarAalmacenamientoPersistente(fotos) : [];
+      console.log('[Guardar] Step 3: armando objeto trip');
+      const trip = buildTrip(null, persistedFotos);
+      console.log('[Guardar] Step 4: guardando en AsyncStorage');
       await saveTrip(trip);
+      console.log('[Guardar] Step 5: OK — trip guardado');
       if (pWishlistId) await deleteWishlistTrip(pWishlistId);
       chainIdRef.current = null;
       resetForm();
       playSound('cargar');
       Alert.alert('¡Guardado!', `Tu ${tipo === 'real' ? 'viaje' : 'destino'} fue guardado correctamente.`);
       _checkAchievements(prevStats.rangoActual);
-    } catch {
+    } catch (err) {
+      console.error('[Guardar] ERROR COMPLETO al guardar:', err);
       Alert.alert('Error', 'No se pudo guardar. Intentá de nuevo.');
     }
   }
@@ -1512,23 +1645,40 @@ export default function CargarViaje() {
                 )}
                 {fotos.length > 0 && (
                   <View style={styles.photosRow}>
-                    {fotos.map((uri, i) => (
-                      <View key={i} style={styles.photoWrapper}>
-                        <Image source={{ uri }} style={styles.photoThumb} />
-                        {i === 0 && (
-                          <View style={styles.photoCoverBadge}>
-                            <Text style={styles.photoCoverText}>Portada</Text>
-                          </View>
-                        )}
+                    {fotos.map((uri, i) => {
+                      const isPortada = portadaUri ? uri === portadaUri : i === 0;
+                      return (
                         <TouchableOpacity
-                          style={styles.photoRemoveBtn}
-                          onPress={() => removePhoto(i)}
-                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          key={i}
+                          activeOpacity={0.9}
+                          onLongPress={() => {
+                            Alert.alert(
+                              '¿Portada?',
+                              '¿Deseás asignar esta foto como portada?',
+                              [
+                                { text: 'Cancelar', style: 'cancel' },
+                                { text: 'Asignar', onPress: () => setPortadaUri(uri) },
+                              ]
+                            );
+                          }}
+                          style={styles.photoWrapper}
                         >
-                          <Text style={styles.photoRemoveText}>✕</Text>
+                          <Image source={{ uri }} style={styles.photoThumb} />
+                          {isPortada && (
+                            <View style={styles.photoCoverBadge}>
+                              <Text style={styles.photoCoverText}>Portada</Text>
+                            </View>
+                          )}
+                          <TouchableOpacity
+                            style={styles.photoRemoveBtn}
+                            onPress={() => removePhoto(i)}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          >
+                            <Text style={styles.photoRemoveText}>✕</Text>
+                          </TouchableOpacity>
                         </TouchableOpacity>
-                      </View>
-                    ))}
+                      );
+                    })}
                   </View>
                 )}
                 {fotos.length === 0 && (
@@ -1591,7 +1741,9 @@ export default function CargarViaje() {
                 multiline
                 numberOfLines={4}
                 textAlignVertical="top"
+                maxLength={1000}
               />
+              <Text style={styles.notaCounter}>{nota.length}/1000</Text>
             </View>
 
             {/* Botones — una ciudad */}
@@ -1748,7 +1900,7 @@ const styles = StyleSheet.create({
   },
   toggleThumb: {
     position: 'absolute',
-    top: 2,
+    top: 1,
     width: THUMB_D,
     height: THUMB_D,
     borderRadius: THUMB_D / 2,
@@ -1772,6 +1924,12 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     textTransform: 'none',
     letterSpacing: 0,
+  },
+  notaCounter: {
+    fontSize: 11,
+    color: MUTED,
+    textAlign: 'right',
+    marginTop: -6,
   },
 
   input: {

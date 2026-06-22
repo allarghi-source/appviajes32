@@ -171,8 +171,8 @@ function TopPaisesSection({ stats }: { stats: StatsResult }) {
   if (stats.paisesMasVisitados.length === 0) {
     return (
       <View style={styles.card}>
-        <Text style={styles.cardLabel}>TOP PAÍSES</Text>
-        <Text style={styles.emptyText}>Todavía no hay viajes cargados</Text>
+        <Text style={styles.cardLabel}>TOP PAÍSES MÁS VISITADOS</Text>
+        <Text style={styles.emptyText}>—</Text>
       </View>
     );
   }
@@ -214,7 +214,14 @@ function TopCiudadesSection({
 }: {
   topCiudades: Array<{ ciudad: string; visitas: number }>;
 }) {
-  if (topCiudades.length === 0) return null;
+  if (topCiudades.length === 0) {
+    return (
+      <View style={styles.card}>
+        <Text style={styles.cardLabel}>TOP CIUDADES MÁS VISITADAS</Text>
+        <Text style={styles.emptyText}>—</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.card}>
@@ -304,15 +311,7 @@ export default function Estadisticas() {
         <View style={styles.center}>
           <Text style={styles.mutedText}>Cargando...</Text>
         </View>
-      ) : !stats || stats.paisesVisitados === 0 ? (
-        <View style={styles.center}>
-          <Text style={styles.emptyIcon}>◎</Text>
-          <Text style={styles.emptyTitle}>Sin estadísticas aún</Text>
-          <Text style={styles.emptyHint}>
-            Cargá tus viajes reales para ver tus stats aquí
-          </Text>
-        </View>
-      ) : (
+      ) : stats ? (
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
@@ -327,7 +326,7 @@ export default function Estadisticas() {
           <TopCiudadesSection topCiudades={topCiudades} />
           <View style={styles.bottomSpacer} />
         </ScrollView>
-      )}
+      ) : null}
 
       <NavBar />
     </View>
@@ -583,26 +582,6 @@ const styles = StyleSheet.create({
     color: MUTED,
   },
 
-  // Empty state
-  emptyIcon: {
-    fontSize: 40,
-    marginBottom: 14,
-    opacity: 0.2,
-    color: TEXT,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: TEXT,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  emptyHint: {
-    fontSize: 13,
-    color: MUTED,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
   emptyText: {
     fontSize: 14,
     color: MUTED,

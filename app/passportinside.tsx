@@ -1,21 +1,24 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
+  Animated,
   Dimensions,
   Image,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
+  Vibration,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import Svg, {
   Circle,
   Path,
   Rect
 } from 'react-native-svg';
-import NavBar from '../components/NavBar';
+import NavBar, { NAV_HEIGHT } from '../components/NavBar';
 import { loadBadgeCount } from '../utils/achievementsEngine';
 import {
   StatsResult,
@@ -154,6 +157,34 @@ interface UserData {
 
 export default function PassportOpen({ onClose }: { onClose?: () => void } = {}) {
   const router = useRouter();
+  const { height: wH } = useWindowDimensions();
+  const photoScaleAnim = useRef(new Animated.Value(1)).current;
+
+  function handlePhotoPressIn() {
+    Animated.timing(photoScaleAnim, {
+      toValue: 0.93,
+      duration: 1600,
+      useNativeDriver: true,
+    }).start();
+  }
+
+  function handlePhotoPressOut() {
+    photoScaleAnim.stopAnimation();
+    Animated.spring(photoScaleAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      tension: 200,
+      friction: 10,
+    }).start();
+  }
+
+  function handlePhotoLongPress() {
+    handlePhotoPressOut();
+    Vibration.vibrate(40);
+    router.push('/settings');
+  }
+  // Available height: full window minus NavBar, passport marginTop (40) and scroll paddingBottom (20)
+  const passportMinH = Math.max(0, wH - NAV_HEIGHT - 60);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [stats, setStats] = useState<StatsResult | null>(null);
   const [wishlistCount, setWishlistCount] = useState(0);
@@ -239,7 +270,7 @@ const icon = '◉ ';
         contentContainerStyle={{ paddingBottom: 20 }}
         showsVerticalScrollIndicator={false}
       >
-      <View style={styles.passportWrap}>
+      <View style={[styles.passportWrap, { minHeight: passportMinH }]}>
 
         {/* ── PAGE 1: STATS ── */}
         <View style={styles.passportPage}>
@@ -302,22 +333,31 @@ const icon = '◉ ';
 
           {/* ID section */}
           <View style={styles.idSection}>
-            {/* Photo box */}
-            <View style={styles.photoBox}>
-              <View style={[styles.photoCorner, { top: 4, left: 4, borderTopWidth: 2, borderLeftWidth: 2 }]} />
-              <View style={[styles.photoCorner, { top: 4, right: 4, borderTopWidth: 2, borderRightWidth: 2 }]} />
-              <View style={[styles.photoCorner, { bottom: 4, left: 4, borderBottomWidth: 2, borderLeftWidth: 2 }]} />
-              <View style={[styles.photoCorner, { bottom: 4, right: 4, borderBottomWidth: 2, borderRightWidth: 2 }]} />
-              {userData?.foto ? (
-                <Image
-                  source={{ uri: userData.foto }}
-                  style={{ width: '100%', height: '100%' }}
-                  resizeMode="cover"
-                />
-              ) : (
-                <UserSilhouette />
-              )}
-            </View>
+            {/* Photo box — long press opens settings */}
+            <TouchableOpacity
+              onPressIn={handlePhotoPressIn}
+              onPressOut={handlePhotoPressOut}
+              onLongPress={handlePhotoLongPress}
+              delayLongPress={1500}
+              activeOpacity={1}
+              style={styles.photoBox}
+            >
+              <Animated.View style={{ width: '100%', height: '100%', transform: [{ scale: photoScaleAnim }] }}>
+                <View style={[styles.photoCorner, { top: 4, left: 4, borderTopWidth: 2, borderLeftWidth: 2 }]} />
+                <View style={[styles.photoCorner, { top: 4, right: 4, borderTopWidth: 2, borderRightWidth: 2 }]} />
+                <View style={[styles.photoCorner, { bottom: 4, left: 4, borderBottomWidth: 2, borderLeftWidth: 2 }]} />
+                <View style={[styles.photoCorner, { bottom: 4, right: 4, borderBottomWidth: 2, borderRightWidth: 2 }]} />
+                {userData?.foto ? (
+                  <Image
+                    source={{ uri: userData.foto }}
+                    style={{ width: '100%', height: '100%' }}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <UserSilhouette />
+                )}
+              </Animated.View>
+            </TouchableOpacity>
 
             {/* Data col */}
             <View style={styles.dataCol}>
@@ -446,6 +486,7 @@ const styles = StyleSheet.create({
     elevation: 10,
     borderWidth: 1,
     borderColor: '#c8b48a',
+    backgroundColor: '#f0e8d0',
   },
 
   passportPage: {
