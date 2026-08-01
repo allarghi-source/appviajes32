@@ -1,8 +1,48 @@
 import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { playSound } from '../utils/soundEngine';
-import { Image, ImageBackground, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  applyBackup,
+  BackupPayload,
+  buildRestoreConfirmMessage,
+  formatBackupDate,
+  hasCurrentData,
+  tryReadValidBackup,
+} from '../utils/backupEngine';
+import { Alert, Image, ImageBackground, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 export default function Onboarding() {
   const router = useRouter();
+  const [backup, setBackup] = useState<BackupPayload | null>(null);
+
+  useEffect(() => {
+    tryReadValidBackup().then(setBackup);
+  }, []);
+
+  async function handleRestoreBackup() {
+    if (!backup) return;
+    const existing = await hasCurrentData();
+    const fecha = backup.savedAt ? formatBackupDate(backup.savedAt) : null;
+    Alert.alert(
+      'Restaurar backup',
+      buildRestoreConfirmMessage(existing, fecha),
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: existing ? 'Cargar Backup' : 'Restaurar',
+          style: existing ? 'destructive' : 'default',
+          onPress: async () => {
+            try {
+              await applyBackup(backup);
+              router.replace('/passportcover');
+            } catch {
+              Alert.alert('Error', 'El archivo de backup está dañado o no se puede leer.');
+            }
+          },
+        },
+      ]
+    );
+  }
+
  return (
   <ImageBackground
     source={require('../assets/images/stars.png')}
@@ -68,6 +108,16 @@ export default function Onboarding() {
       CREAR MI PASAPORTE →
     </Text>
   </TouchableOpacity>
+
+  {backup && (
+    <TouchableOpacity
+      style={styles.restoreLink}
+      activeOpacity={0.7}
+      onPress={handleRestoreBackup}
+    >
+      <Text style={styles.restoreLinkText}>RESTAURAR BACKUP</Text>
+    </TouchableOpacity>
+  )}
 </View>
 
 </ImageBackground>
@@ -150,6 +200,16 @@ buttonText: {
   fontSize: 14,
   fontWeight: '700',
   letterSpacing: 1,
+},
+restoreLink: {
+  marginTop: 14,
+  alignItems: 'center',
+},
+restoreLinkText: {
+  fontSize: 11,
+  color: '#9FB3C8',
+  letterSpacing: 1.2,
+  textDecorationLine: 'underline',
 },
 features: {
   marginTop: 60,

@@ -54,13 +54,17 @@ interface TripData {
   chainId: string | null;
 }
 
+interface GeoOpcion { display_name: string; lat: string; lon: string; }
+
 interface DestinoState {
   id: string;
   ciudad: string;
   pais: string;
   coords: { lat: number; lng: number } | null;
-  geoStatus: 'idle' | 'buscando' | 'encontrada' | 'no_encontrada' | 'error';
+  geoStatus: 'idle' | 'buscando' | 'encontrada' | 'no_encontrada' | 'error' | 'multiples';
   geoNombre: string;
+  geoOpciones: GeoOpcion[];
+  geoSoloPais: boolean;
   dia: string;
   mes: string;
   anio: string;
@@ -68,7 +72,6 @@ interface DestinoState {
   fotos: string[];
   portada: string | null;
   ciudadSugs: string[];
-  paisSugs: string[];
   openDropdown: 'dia' | 'mes' | 'anio' | null;
 }
 
@@ -170,11 +173,43 @@ const MONTHS: DropItem[] = [
 ];
 
 // Newest first so recent years are at the top; capped at current year
-const _CURRENT_YEAR = new Date().getFullYear();
+const _CURRENT_YEAR  = new Date().getFullYear();
+const _CURRENT_MONTH = new Date().getMonth() + 1;
+const _CURRENT_DAY   = new Date().getDate();
 const YEARS: DropItem[] = Array.from({ length: _CURRENT_YEAR - 1980 + 1 }, (_, i) => ({
   label: String(_CURRENT_YEAR - i),
   value: String(_CURRENT_YEAR - i),
 }));
+
+function isFutureDate(dia: string, mes: string, anio: string): boolean {
+  const d     = new Date(parseInt(anio), parseInt(mes) - 1, parseInt(dia));
+  const today = new Date(_CURRENT_YEAR, _CURRENT_MONTH - 1, _CURRENT_DAY);
+  return d > today;
+}
+
+// Detecta fechas que no existen en el calendario (ej: 31 de febrero),
+// que JS normalizaría silenciosamente en vez de rechazar.
+function isValidCalendarDate(dia: string, mes: string, anio: string): boolean {
+  const d = parseInt(dia, 10);
+  const m = parseInt(mes, 10);
+  const y = parseInt(anio, 10);
+  if (!d || !m || !y) return false;
+  const date = new Date(y, m - 1, d);
+  return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d;
+}
+
+// ¿Hay más de 30 días entre algún par de destinos consecutivos de un viaje multidestino?
+function hayBrechaExcesiva(destinos: DestinoState[]): boolean {
+  const DIA_MS = 24 * 60 * 60 * 1000;
+  for (let i = 0; i < destinos.length - 1; i++) {
+    const a = destinos[i];
+    const b = destinos[i + 1];
+    const fechaA = new Date(parseInt(a.anio), parseInt(a.mes) - 1, parseInt(a.dia)).getTime();
+    const fechaB = new Date(parseInt(b.anio), parseInt(b.mes) - 1, parseInt(b.dia)).getTime();
+    if (Math.abs(fechaB - fechaA) > 30 * DIA_MS) return true;
+  }
+  return false;
+}
 
 // ─── CITY AUTOCOMPLETE DATA ───────────────────────────────────────────────────
 
@@ -411,6 +446,17 @@ function getPaisesPorCiudad(cityName: string, extra: CityEntry[] = []): string[]
   )];
 }
 
+// ─── GEOCODING (Nominatim) ────────────────────────────────────────────────────
+
+async function geocodeNominatim(query: string, limit: number): Promise<GeoOpcion[]> {
+  const q = encodeURIComponent(query);
+  const res = await fetch(
+    `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=${limit}`,
+    { headers: { 'User-Agent': 'MyWorldXP/1.0', 'Accept-Language': 'es' } }
+  );
+  return res.json();
+}
+
 // ─── DROPDOWN LIST COMPONENT ──────────────────────────────────────────────────
 
 const DropdownList = ({
@@ -467,6 +513,7 @@ const DropdownList = ({
 function FotoPickerModal({
   visible,
   fotosDisponibles,
+  huboFotosPreseleccionadas = true,
   fotosActuales,
   maxSeleccion,
   onConfirm,
@@ -474,6 +521,7 @@ function FotoPickerModal({
 }: {
   visible: boolean;
   fotosDisponibles: string[];
+  huboFotosPreseleccionadas?: boolean;
   fotosActuales: string[];
   maxSeleccion: number;
   onConfirm: (uris: string[]) => void;
@@ -513,8 +561,9 @@ function FotoPickerModal({
         {fotosDisponibles.length === 0 ? (
           <View style={styles.pickerEmpty}>
             <Text style={styles.pickerEmptyText}>
-              Todavía no preseleccionaste fotos para este viaje.{'\n'}
-              Usá "Seleccionar fotos del viaje" para agregar.
+              {huboFotosPreseleccionadas
+                ? 'Todas las fotos preseleccionadas ya están asignadas a otros destinos de este viaje.'
+                : 'Todavía no preseleccionaste fotos para este viaje.\nUsá "Seleccionar fotos del viaje" para agregar.'}
             </Text>
           </View>
         ) : (
@@ -572,12 +621,12 @@ function createDestino(): DestinoState {
     id: genId(),
     ciudad: '', pais: '',
     coords: null,
-    geoStatus: 'idle', geoNombre: '',
+    geoStatus: 'idle', geoNombre: '', geoOpciones: [], geoSoloPais: false,
     dia: String(today.getDate()),
     mes: String(today.getMonth() + 1),
     anio: String(today.getFullYear()),
     nota: '', fotos: [], portada: null,
-    ciudadSugs: [], paisSugs: [],
+    ciudadSugs: [],
     openDropdown: null,
   };
 }
@@ -585,7 +634,7 @@ function createDestino(): DestinoState {
 // ─── DESTINO BLOCK COMPONENT ──────────────────────────────────────────────────
 
 function DestinoBlock({
-  destino, index, tipo, learnedCities, onChange, onLearnCity, scrollRef, fotosViaje,
+  destino, index, tipo, learnedCities, onChange, onLearnCity, scrollRef, fotosViaje, fotosUsadasPorOtros,
 }: {
   destino: DestinoState;
   index: number;
@@ -595,15 +644,20 @@ function DestinoBlock({
   onLearnCity: (nombre: string, pais: string) => void;
   scrollRef: React.RefObject<any>;
   fotosViaje?: string[];
+  fotosUsadasPorOtros?: string[];
 }) {
   const dateSectionY = useRef(0);
   const blockY = useRef(0);
   const [pickerVisible, setPickerVisible] = useState(false);
+  // Fotos del pool del viaje que todavía no fueron asignadas a NINGÚN OTRO destino de la cadena.
+  const fotosDisponiblesPickerBlock = fotosViaje
+    ? fotosViaje.filter((uri) => !(fotosUsadasPorOtros ?? []).includes(uri))
+    : undefined;
 
   function handleCiudadChange(t: string) {
     const patch: Partial<DestinoState> = { ciudad: t };
-    if (destino.geoStatus === 'encontrada') {
-      patch.coords = null; patch.geoStatus = 'idle'; patch.geoNombre = '';
+    if (destino.geoStatus !== 'idle' && destino.geoStatus !== 'buscando') {
+      patch.coords = null; patch.geoStatus = 'idle'; patch.geoNombre = ''; patch.geoOpciones = []; patch.geoSoloPais = false;
     }
     if (t.trim().length > 0) {
       const lower = t.trim().toLowerCase();
@@ -617,51 +671,73 @@ function DestinoBlock({
       }
       patch.ciudadSugs = matches;
     } else {
-      patch.ciudadSugs = []; patch.pais = ''; patch.paisSugs = [];
+      patch.ciudadSugs = [];
     }
     onChange(patch);
   }
 
   function selectCiudad(name: string) {
     const patch: Partial<DestinoState> = { ciudad: name, ciudadSugs: [] };
-    if (destino.geoStatus === 'encontrada') {
-      patch.coords = null; patch.geoStatus = 'idle'; patch.geoNombre = '';
+    if (destino.geoStatus !== 'idle' && destino.geoStatus !== 'buscando') {
+      patch.coords = null; patch.geoStatus = 'idle'; patch.geoNombre = ''; patch.geoOpciones = []; patch.geoSoloPais = false;
     }
     const paises = getPaisesPorCiudad(name, learnedCities);
-    if (paises.length === 1) { patch.pais = paises[0]; patch.paisSugs = []; }
-    else if (paises.length > 1) { patch.pais = ''; patch.paisSugs = paises; }
+    if (paises.length === 1 && !destino.pais.trim()) patch.pais = paises[0];
     onChange(patch);
   }
 
   function handlePaisChange(t: string) {
-    const patch: Partial<DestinoState> = { pais: t, paisSugs: [] };
-    if (destino.geoStatus === 'encontrada') {
-      patch.coords = null; patch.geoStatus = 'idle'; patch.geoNombre = '';
+    const patch: Partial<DestinoState> = { pais: t };
+    if (destino.geoStatus !== 'idle' && destino.geoStatus !== 'buscando') {
+      patch.coords = null; patch.geoStatus = 'idle'; patch.geoNombre = ''; patch.geoOpciones = []; patch.geoSoloPais = false;
     }
     onChange(patch);
   }
 
   async function buscarUbicacion() {
     if (!destino.ciudad.trim() || !destino.pais.trim()) {
-      Alert.alert('Faltan datos', 'Ingresá ciudad y país antes de buscar la ubicación.');
+      Alert.alert('Faltan datos', 'Ingresá ciudad y país antes de validar el destino.');
       return;
     }
-    onChange({ geoStatus: 'buscando', coords: null, geoNombre: '' });
+    onChange({ geoStatus: 'buscando', coords: null, geoNombre: '', geoOpciones: [], geoSoloPais: false });
     try {
-      const q = encodeURIComponent(`${destino.ciudad.trim()}, ${destino.pais.trim()}`);
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1`,
-        { headers: { 'User-Agent': 'MyWorldXP/1.0', 'Accept-Language': 'es' } }
-      );
-      const data = await res.json();
-      if (data.length > 0) {
+      const data = await geocodeNominatim(`${destino.ciudad.trim()}, ${destino.pais.trim()}`, 5);
+      if (data.length === 1) {
         onChange({
           coords: { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) },
           geoNombre: data[0].display_name,
           geoStatus: 'encontrada',
+          geoOpciones: [],
         });
         onLearnCity(destino.ciudad.trim(), destino.pais.trim());
+      } else if (data.length > 1) {
+        onChange({ geoStatus: 'multiples', geoOpciones: data });
       } else {
+        onChange({ geoStatus: 'no_encontrada', geoOpciones: [] });
+      }
+    } catch {
+      onChange({ geoStatus: 'error', geoOpciones: [] });
+    }
+  }
+
+  function elegirOtraCiudad() {
+    onChange({ geoStatus: 'idle', coords: null, geoNombre: '', geoOpciones: [], geoSoloPais: false });
+  }
+
+  async function confirmarSoloPais() {
+    onChange({ geoStatus: 'buscando' });
+    try {
+      const data = await geocodeNominatim(destino.pais.trim(), 1);
+      if (data.length > 0) {
+        onChange({
+          coords: { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) },
+          geoNombre: `${destino.ciudad.trim()}, ${destino.pais.trim()}`,
+          geoStatus: 'encontrada',
+          geoOpciones: [],
+          geoSoloPais: true,
+        });
+      } else {
+        Alert.alert('País no encontrado', 'No pudimos validar el país ingresado. Revisalo e intentá de nuevo.');
         onChange({ geoStatus: 'no_encontrada' });
       }
     } catch {
@@ -766,31 +842,19 @@ function DestinoBlock({
         </View>
         <View style={styles.sugContainer}>
           <TextInput
-            style={[styles.input, { marginBottom: destino.paisSugs.length > 0 ? 0 : 10 }]}
+            style={styles.input}
             placeholder="País"
             placeholderTextColor={MUTED}
             value={destino.pais}
             onChangeText={handlePaisChange}
-            onBlur={() => setTimeout(() => onChange({ paisSugs: [] }), 150)}
             returnKeyType="done"
           />
-          {destino.paisSugs.length > 0 && (
-            <View style={styles.sugList}>
-              <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-                {destino.paisSugs.map((item) => (
-                  <TouchableOpacity key={item} style={styles.sugItem} onPress={() => onChange({ pais: item, paisSugs: [] })} activeOpacity={0.7}>
-                    <Text style={styles.sugText}>{item}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          )}
         </View>
         <TouchableOpacity
           style={[
             styles.outlineBtn,
             destino.geoStatus === 'buscando' && styles.outlineBtnDisabled,
-            destino.geoStatus === 'encontrada' && styles.outlineBtnSuccess,
+            destino.geoStatus === 'encontrada' && styles.outlineBtnValidated,
           ]}
           onPress={buscarUbicacion}
           activeOpacity={0.8}
@@ -798,19 +862,67 @@ function DestinoBlock({
         >
           <Text style={[
             styles.outlineBtnText,
-            destino.geoStatus === 'encontrada' && styles.outlineBtnTextSuccess,
+            destino.geoStatus === 'encontrada' && styles.outlineBtnTextValidated,
             (destino.geoStatus === 'no_encontrada' || destino.geoStatus === 'error') && styles.outlineBtnTextError,
           ]}>
-            {destino.geoStatus === 'buscando' ? 'Buscando...'
-              : destino.geoStatus === 'encontrada' ? '✓  Ubicación encontrada'
+            {destino.geoStatus === 'buscando' ? 'Validando...'
+              : destino.geoStatus === 'encontrada' ? 'OK'
               : destino.geoStatus === 'no_encontrada' ? 'No encontrada — intentá de nuevo'
-              : destino.geoStatus === 'error' ? 'Error al buscar — intentá de nuevo'
-              : 'Buscar ubicación'}
+              : destino.geoStatus === 'error' ? 'Error al validar — intentá de nuevo'
+              : destino.geoStatus === 'multiples' ? 'Varias coincidencias — elegí una'
+              : 'VALIDAR'}
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.outlineBtn} activeOpacity={0.8}>
-          <Text style={styles.outlineBtnText}>Elegir país de la lista</Text>
-        </TouchableOpacity>
+        {destino.geoStatus === 'error' && (
+          <View style={styles.geoNotFound}>
+            <Text style={styles.geoNotFoundText}>
+              Error al conectar. Verificá tu conexión e intentá de nuevo.
+            </Text>
+          </View>
+        )}
+        {destino.geoStatus === 'no_encontrada' && (
+          <View style={styles.geoNotFound}>
+            <Text style={styles.geoNotFoundText}>No encontramos la ciudad ingresada.</Text>
+            <View style={styles.geoNotFoundActions}>
+              <TouchableOpacity style={styles.geoActionBtn} onPress={elegirOtraCiudad} activeOpacity={0.8}>
+                <Text style={styles.geoActionBtnText}>Elegir otra ciudad</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.geoActionBtn, styles.geoActionBtnPrimary]}
+                onPress={confirmarSoloPais}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.geoActionBtnText, styles.geoActionBtnTextPrimary]}>
+                  Confirmar solo con el país
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+        {destino.geoStatus === 'multiples' && destino.geoOpciones.length > 0 && (
+          <View style={styles.sugList}>
+            <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+              {destino.geoOpciones.map((opt, i) => (
+                <TouchableOpacity
+                  key={i}
+                  style={styles.sugItem}
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    onChange({
+                      coords: { lat: parseFloat(opt.lat), lng: parseFloat(opt.lon) },
+                      geoNombre: opt.display_name,
+                      geoStatus: 'encontrada',
+                      geoOpciones: [],
+                    });
+                    onLearnCity(destino.ciudad.trim(), destino.pais.trim());
+                  }}
+                >
+                  <Text style={styles.sugText}>{opt.display_name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
       </View>
 
       {/* Fotos */}
@@ -904,13 +1016,25 @@ function DestinoBlock({
             </TouchableOpacity>
           </View>
           {destino.openDropdown === 'dia' && (
-            <DropdownList items={DAYS} selected={destino.dia} onSelect={(v) => { onChange({ dia: v, openDropdown: null }); playSound('tic'); }} />
+            <DropdownList
+              items={DAYS}
+              selected={destino.dia}
+              onSelect={(v) => { onChange({ dia: v, openDropdown: null }); playSound('tic'); }}
+            />
           )}
           {destino.openDropdown === 'mes' && (
-            <DropdownList items={MONTHS} selected={destino.mes} onSelect={(v) => { onChange({ mes: v, openDropdown: null }); playSound('tic'); }} />
+            <DropdownList
+              items={MONTHS}
+              selected={destino.mes}
+              onSelect={(v) => { onChange({ mes: v, openDropdown: null }); playSound('tic'); }}
+            />
           )}
           {destino.openDropdown === 'anio' && (
-            <DropdownList items={YEARS} selected={destino.anio} onSelect={(v) => { onChange({ anio: v, openDropdown: null }); playSound('tic'); }} />
+            <DropdownList
+              items={YEARS}
+              selected={destino.anio}
+              onSelect={(v) => { onChange({ anio: v, openDropdown: null }); playSound('tic'); }}
+            />
           )}
         </View>
       )}
@@ -935,7 +1059,8 @@ function DestinoBlock({
     {fotosViaje !== undefined && (
       <FotoPickerModal
         visible={pickerVisible}
-        fotosDisponibles={fotosViaje}
+        fotosDisponibles={fotosDisponiblesPickerBlock ?? []}
+        huboFotosPreseleccionadas={fotosViaje.length > 0}
         fotosActuales={destino.fotos}
         maxSeleccion={Math.max(0, 4 - destino.fotos.length)}
         onConfirm={(uris) => {
@@ -990,12 +1115,13 @@ export default function CargarViaje() {
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
     hasParamCoords ? { lat: parseFloat(pLat), lng: parseFloat(pLng) } : null
   );
-  const [geoStatus, setGeoStatus] = useState<'idle' | 'buscando' | 'encontrada' | 'no_encontrada' | 'error'>(
+  const [geoStatus, setGeoStatus] = useState<'idle' | 'buscando' | 'encontrada' | 'no_encontrada' | 'error' | 'multiples'>(
     hasParamCoords ? 'encontrada' : 'idle'
   );
   const [geoNombre, setGeoNombre] = useState('');
+  const [geoOpciones, setGeoOpciones] = useState<GeoOpcion[]>([]);
+  const [geoSoloPais, setGeoSoloPais] = useState(false);
   const [ciudadSugs, setCiudadSugs] = useState<string[]>([]);
-  const [paisSugs, setPaisSugs] = useState<string[]>([]);
   const [learnedCities, setLearnedCities] = useState<CityEntry[]>([]);
   const [cantCiudades, setCantCiudades] = useState<'una' | 'mas'>('una');
   const [destinos, setDestinos] = useState<DestinoState[]>(() => [createDestino(), createDestino()]);
@@ -1063,6 +1189,14 @@ export default function CargarViaje() {
     setDestinos(prev => prev.map((d, i) => i === idx ? { ...d, ...patch } : d));
   }
 
+  // URIs del pool de fotos del viaje ya asignadas a otros destinos de la misma cadena
+  // (evita elegir por error la misma foto en dos destinos).
+  function fotosUsadasPorOtrosDestinos(idx: number): string[] {
+    const usadas: string[] = [];
+    destinos.forEach((d, j) => { if (j !== idx) usadas.push(...d.fotos); });
+    return usadas;
+  }
+
   function agregarCiudad() {
     setDestinos(prev => {
       const last = prev[prev.length - 1];
@@ -1105,14 +1239,38 @@ export default function CargarViaje() {
         return;
       }
       if (!d.coords) {
-        Alert.alert('Ubicación requerida', `Destino ${toRoman(i + 1)}: buscá y confirmá la ubicación.`);
+        Alert.alert('Destino sin validar', `Destino ${toRoman(i + 1)}: presioná "VALIDAR" antes de guardar.`);
         return;
       }
       if (tipo === 'real' && (!d.dia.trim() || !d.mes.trim() || !d.anio.trim())) {
         Alert.alert('Falta información', `Destino ${toRoman(i + 1)}: la fecha es obligatoria.`);
         return;
       }
+      if (tipo === 'real' && !isValidCalendarDate(d.dia, d.mes, d.anio)) {
+        Alert.alert('Fecha inválida', `Destino ${toRoman(i + 1)}: la fecha ingresada no existe. Revisala e intentá de nuevo.`);
+        return;
+      }
+      if (tipo === 'real' && isFutureDate(d.dia, d.mes, d.anio)) {
+        Alert.alert('Fecha inválida', `Destino ${toRoman(i + 1)}: un viaje realizado no puede tener una fecha posterior a hoy.`);
+        return;
+      }
     }
+
+    if (tipo === 'real' && destinos.length > 1 && hayBrechaExcesiva(destinos)) {
+      Alert.alert(
+        'Viaje multidestino',
+        'Hay más de 30 días entre algunos destinos de este viaje multidestino. ¿Querés revisar las fechas o guardar igualmente?',
+        [
+          { text: 'Revisar', style: 'cancel' },
+          { text: 'Guardar igualmente', onPress: () => guardarMultidestino() },
+        ]
+      );
+      return;
+    }
+    await guardarMultidestino();
+  }
+
+  async function guardarMultidestino() {
     Keyboard.dismiss();
     try {
       console.log('[FinalizarViaje] Step 1: leyendo trips existentes');
@@ -1168,7 +1326,7 @@ export default function CargarViaje() {
 
   function handleCiudadChange(t: string) {
     setCiudad(t);
-    if (geoStatus === 'encontrada') resetGeo();
+    if (geoStatus !== 'idle' && geoStatus !== 'buscando') resetGeo();
     if (t.trim().length > 0) {
       const lower = t.trim().toLowerCase();
       const seen = new Set<string>();
@@ -1183,41 +1341,28 @@ export default function CargarViaje() {
       setCiudadSugs(matches);
     } else {
       setCiudadSugs([]);
-      setPais('');
-      setPaisSugs([]);
     }
   }
 
   function selectCiudad(name: string) {
     setCiudad(name);
     setCiudadSugs([]);
-    if (geoStatus === 'encontrada') resetGeo();
+    if (geoStatus !== 'idle' && geoStatus !== 'buscando') resetGeo();
     const paises = getPaisesPorCiudad(name, learnedCities);
-    if (paises.length === 1) {
+    if (paises.length === 1 && !pais.trim()) {
       setPais(paises[0]);
-      setPaisSugs([]);
-    } else if (paises.length > 1) {
-      setPais('');
-      setPaisSugs(paises);
     }
   }
 
   function handlePaisChange(t: string) {
     setPais(t);
-    setPaisSugs([]);
-    if (geoStatus === 'encontrada') resetGeo();
-  }
-
-  function selectPais(country: string) {
-    setPais(country);
-    setPaisSugs([]);
+    if (geoStatus !== 'idle' && geoStatus !== 'buscando') resetGeo();
   }
 
   function resetForm() {
     setCiudad('');
     setCiudadSugs([]);
     setPais('');
-    setPaisSugs([]);
     setDia('');
     setMes('');
     setAnio('');
@@ -1228,6 +1373,8 @@ export default function CargarViaje() {
     setCoords(null);
     setGeoStatus('idle');
     setGeoNombre('');
+    setGeoOpciones([]);
+    setGeoSoloPais(false);
     setTimeout(() => {
       scrollRef.current?.scrollToPosition?.(0, 0, false);
       scrollRef.current?.scrollTo?.({ x: 0, y: 0, animated: false });
@@ -1255,29 +1402,54 @@ export default function CargarViaje() {
     setCoords(null);
     setGeoStatus('idle');
     setGeoNombre('');
+    setGeoOpciones([]);
+    setGeoSoloPais(false);
   }
 
   async function buscarUbicacion() {
     if (!ciudad.trim() || !pais.trim()) {
-      Alert.alert('Faltan datos', 'Ingresá ciudad y país antes de buscar la ubicación.');
+      Alert.alert('Faltan datos', 'Ingresá ciudad y país antes de validar el destino.');
       return;
     }
     setGeoStatus('buscando');
     setCoords(null);
     setGeoNombre('');
+    setGeoOpciones([]);
+    setGeoSoloPais(false);
     try {
-      const q = encodeURIComponent(`${ciudad.trim()}, ${pais.trim()}`);
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1`,
-        { headers: { 'User-Agent': 'MyWorldXP/1.0', 'Accept-Language': 'es' } }
-      );
-      const data = await res.json();
-      if (data.length > 0) {
+      const data = await geocodeNominatim(`${ciudad.trim()}, ${pais.trim()}`, 5);
+      if (data.length === 1) {
         setCoords({ lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) });
         setGeoNombre(data[0].display_name);
         setGeoStatus('encontrada');
         guardarCiudadAprendida(ciudad.trim(), pais.trim());
+      } else if (data.length > 1) {
+        setGeoStatus('multiples');
+        setGeoOpciones(data);
       } else {
+        setGeoStatus('no_encontrada');
+      }
+    } catch {
+      setGeoStatus('error');
+    }
+  }
+
+  function elegirOtraCiudad() {
+    resetGeo();
+  }
+
+  async function confirmarSoloPais() {
+    setGeoStatus('buscando');
+    try {
+      const data = await geocodeNominatim(pais.trim(), 1);
+      if (data.length > 0) {
+        setCoords({ lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) });
+        setGeoNombre(`${ciudad.trim()}, ${pais.trim()}`);
+        setGeoStatus('encontrada');
+        setGeoOpciones([]);
+        setGeoSoloPais(true);
+      } else {
+        Alert.alert('País no encontrado', 'No pudimos validar el país ingresado. Revisalo e intentá de nuevo.');
         setGeoStatus('no_encontrada');
       }
     } catch {
@@ -1345,12 +1517,20 @@ export default function CargarViaje() {
       return false;
     }
     if (!coords) {
-      Alert.alert('Ubicación requerida', 'Buscá y confirmá la ubicación antes de guardar.');
+      Alert.alert('Destino sin validar', 'Presioná "VALIDAR" antes de guardar.');
       return false;
     }
     if (tipo === 'real') {
       if (!dia.trim() || !mes.trim() || !anio.trim()) {
         Alert.alert('Falta información', 'La fecha de inicio es obligatoria para viajes reales.');
+        return false;
+      }
+      if (!isValidCalendarDate(dia, mes, anio)) {
+        Alert.alert('Fecha inválida', 'La fecha ingresada no existe. Revisala e intentá de nuevo.');
+        return false;
+      }
+      if (isFutureDate(dia, mes, anio)) {
+        Alert.alert('Fecha inválida', 'Un viaje realizado no puede tener una fecha posterior a hoy.');
         return false;
       }
     }
@@ -1585,31 +1765,19 @@ export default function CargarViaje() {
               </View>
               <View style={styles.sugContainer}>
                 <TextInput
-                  style={[styles.input, { marginBottom: paisSugs.length > 0 ? 0 : 10 }]}
+                  style={styles.input}
                   placeholder="País"
                   placeholderTextColor={MUTED}
                   value={pais}
                   onChangeText={handlePaisChange}
-                  onBlur={() => setTimeout(() => setPaisSugs([]), 150)}
                   returnKeyType="done"
                 />
-                {paisSugs.length > 0 && (
-                  <View style={styles.sugList}>
-                    <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-                      {paisSugs.map((item) => (
-                        <TouchableOpacity key={item} style={styles.sugItem} onPress={() => selectPais(item)} activeOpacity={0.7}>
-                          <Text style={styles.sugText}>{item}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
-                  </View>
-                )}
               </View>
               <TouchableOpacity
                 style={[
                   styles.outlineBtn,
                   geoStatus === 'buscando' && styles.outlineBtnDisabled,
-                  geoStatus === 'encontrada' && styles.outlineBtnSuccess,
+                  geoStatus === 'encontrada' && styles.outlineBtnValidated,
                 ]}
                 onPress={buscarUbicacion}
                 activeOpacity={0.8}
@@ -1617,19 +1785,65 @@ export default function CargarViaje() {
               >
                 <Text style={[
                   styles.outlineBtnText,
-                  geoStatus === 'encontrada' && styles.outlineBtnTextSuccess,
+                  geoStatus === 'encontrada' && styles.outlineBtnTextValidated,
                   (geoStatus === 'no_encontrada' || geoStatus === 'error') && styles.outlineBtnTextError,
                 ]}>
-                  {geoStatus === 'buscando' ? 'Buscando...'
-                    : geoStatus === 'encontrada' ? '✓  Ubicación encontrada'
+                  {geoStatus === 'buscando' ? 'Validando...'
+                    : geoStatus === 'encontrada' ? 'OK'
                     : geoStatus === 'no_encontrada' ? 'No encontrada — intentá de nuevo'
-                    : geoStatus === 'error' ? 'Error al buscar — intentá de nuevo'
-                    : 'Buscar ubicación'}
+                    : geoStatus === 'error' ? 'Error al validar — intentá de nuevo'
+                    : geoStatus === 'multiples' ? 'Varias coincidencias — elegí una'
+                    : 'VALIDAR'}
                 </Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.outlineBtn} activeOpacity={0.8}>
-                <Text style={styles.outlineBtnText}>Elegir país de la lista</Text>
-              </TouchableOpacity>
+              {geoStatus === 'error' && (
+                <View style={styles.geoNotFound}>
+                  <Text style={styles.geoNotFoundText}>
+                    Error al conectar. Verificá tu conexión e intentá de nuevo.
+                  </Text>
+                </View>
+              )}
+              {geoStatus === 'no_encontrada' && (
+                <View style={styles.geoNotFound}>
+                  <Text style={styles.geoNotFoundText}>No encontramos la ciudad ingresada.</Text>
+                  <View style={styles.geoNotFoundActions}>
+                    <TouchableOpacity style={styles.geoActionBtn} onPress={elegirOtraCiudad} activeOpacity={0.8}>
+                      <Text style={styles.geoActionBtnText}>Elegir otra ciudad</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.geoActionBtn, styles.geoActionBtnPrimary]}
+                      onPress={confirmarSoloPais}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.geoActionBtnText, styles.geoActionBtnTextPrimary]}>
+                        Confirmar solo con el país
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+              {geoStatus === 'multiples' && geoOpciones.length > 0 && (
+                <View style={styles.sugList}>
+                  <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                    {geoOpciones.map((opt, i) => (
+                      <TouchableOpacity
+                        key={i}
+                        style={styles.sugItem}
+                        activeOpacity={0.7}
+                        onPress={() => {
+                          setCoords({ lat: parseFloat(opt.lat), lng: parseFloat(opt.lon) });
+                          setGeoNombre(opt.display_name);
+                          setGeoStatus('encontrada');
+                          setGeoOpciones([]);
+                          guardarCiudadAprendida(ciudad.trim(), pais.trim());
+                        }}
+                      >
+                        <Text style={styles.sugText}>{opt.display_name}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
             </View>
 
             {/* Fotos — solo para real */}
@@ -1718,13 +1932,25 @@ export default function CargarViaje() {
                   </TouchableOpacity>
                 </View>
                 {openDropdown === 'dia' && (
-                  <DropdownList items={DAYS} selected={dia} onSelect={(v) => { setDia(v); setOpenDropdown(null); playSound('tic'); }} />
+                  <DropdownList
+                    items={DAYS}
+                    selected={dia}
+                    onSelect={(v) => { setDia(v); setOpenDropdown(null); playSound('tic'); }}
+                  />
                 )}
                 {openDropdown === 'mes' && (
-                  <DropdownList items={MONTHS} selected={mes} onSelect={(v) => { setMes(v); setOpenDropdown(null); playSound('tic'); }} />
+                  <DropdownList
+                    items={MONTHS}
+                    selected={mes}
+                    onSelect={(v) => { setMes(v); setOpenDropdown(null); playSound('tic'); }}
+                  />
                 )}
                 {openDropdown === 'anio' && (
-                  <DropdownList items={YEARS} selected={anio} onSelect={(v) => { setAnio(v); setOpenDropdown(null); playSound('tic'); }} />
+                  <DropdownList
+                    items={YEARS}
+                    selected={anio}
+                    onSelect={(v) => { setAnio(v); setOpenDropdown(null); playSound('tic'); }}
+                  />
                 )}
               </View>
             )}
@@ -1803,6 +2029,7 @@ export default function CargarViaje() {
                 onLearnCity={guardarCiudadAprendida}
                 scrollRef={scrollRef}
                 fotosViaje={fotosViaje}
+                fotosUsadasPorOtros={fotosUsadasPorOtrosDestinos(i)}
               />
             ))}
 
@@ -2083,27 +2310,13 @@ const styles = StyleSheet.create({
   },
   outlineBtnText: { color: MUTED, fontSize: 14, fontWeight: '500' },
   outlineBtnDisabled: { opacity: 0.5 },
-  outlineBtnSuccess: {
-    borderColor: 'rgba(212,175,55,0.5)',
-    backgroundColor: 'rgba(212,175,55,0.07)',
+  outlineBtnValidated: {
+    borderColor: 'rgba(122,168,140,0.5)',
+    backgroundColor: 'rgba(122,168,140,0.12)',
   },
-  outlineBtnTextSuccess: { color: GOLD, fontWeight: '600' },
+  outlineBtnTextValidated: { color: '#8fbf9f', fontWeight: '600' },
   outlineBtnTextError: { color: '#e07070' },
 
-  geoFound: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    backgroundColor: 'rgba(212,175,55,0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(212,175,55,0.35)',
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    marginBottom: 10,
-  },
-  geoCheck: { fontSize: 16, color: GOLD, fontWeight: '700', marginTop: 1 },
-  geoFoundText: { flex: 1, fontSize: 13, color: GOLD, lineHeight: 18 },
   geoNotFound: {
     backgroundColor: 'rgba(180,40,40,0.10)',
     borderWidth: 1,
@@ -2114,6 +2327,31 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   geoNotFoundText: { fontSize: 13, color: '#e07070', lineHeight: 18 },
+  geoNotFoundActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 12,
+  },
+  geoActionBtn: {
+    flex: 1,
+    borderWidth: 1.5,
+    borderColor: GOLD,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  geoActionBtnPrimary: {
+    backgroundColor: GOLD,
+  },
+  geoActionBtnText: {
+    color: GOLD,
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  geoActionBtnTextPrimary: {
+    color: BG,
+  },
 
   // ── Action buttons ──────────────────────────────────────────────────────────
   buttonsSection: {

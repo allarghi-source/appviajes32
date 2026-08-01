@@ -1,8 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import MapView, { Marker, Region } from 'react-native-maps';
+import { Alert, Animated, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import MapView, { Marker, MarkerDragStartEndEvent, Region } from 'react-native-maps';
 import Svg, { Circle, Path } from 'react-native-svg';
 import NavBar from '../components/NavBar';
 import { playSound, preloadSounds } from '../utils/soundEngine';
@@ -10,6 +10,13 @@ import { playSound, preloadSounds } from '../utils/soundEngine';
 const GOLD = '#d4af37';
 const GREEN = '#1a3a6e';
 const BG = '#01050d';
+
+// Posiciones visuales personalizadas de los pines (solo estéticas).
+// Se guardan por separado de los datos del viaje: nunca tocan `coords`,
+// que sigue siendo la fuente de verdad para stats, timeline, XP y logros.
+const PIN_VISUAL_KEY = 'pin_visual_overrides';
+
+type VisualOverrides = Record<string, { lat: number; lng: number }>;
 
 interface Trip {
   id: string;
@@ -72,7 +79,9 @@ function PinWishlist() {
 export default function Mapa() {
   const router = useRouter();
   const [trips, setTrips] = useState<Trip[]>([]);
-  const [selectedGroup, setSelectedGroup] = useState<Trip[] | null>(null);
+  const [selectedGroup, setSelectedGroup] = useState<TripGroup | null>(null);
+  const [visualOverrides, setVisualOverrides] = useState<VisualOverrides>({});
+  const [markerVersion, setMarkerVersion] = useState<Record<string, number>>({});
   const opacity = useRef(new Animated.Value(0)).current;
 
   // Recarga pins cada vez que la pantalla vuelve al foco (ej: después de guardar un viaje)
@@ -82,8 +91,61 @@ export default function Mapa() {
         const all: Trip[] = raw ? JSON.parse(raw) : [];
         setTrips(all.filter((t) => t.coords?.lat != null && t.coords?.lng != null));
       });
+      AsyncStorage.getItem(PIN_VISUAL_KEY).then((raw) => {
+        setVisualOverrides(raw ? JSON.parse(raw) : {});
+      });
     }, [])
   );
+
+  // Posición visual efectiva de un pin: la corrección manual si existe, si no, la original.
+  function getVisualCoordinate(group: TripGroup) {
+    const override = visualOverrides[group.key];
+    return override
+      ? { latitude: override.lat, longitude: override.lng }
+      : { latitude: group.lat, longitude: group.lng };
+  }
+
+  async function persistOverrides(next: VisualOverrides) {
+    setVisualOverrides(next);
+    try {
+      await AsyncStorage.setItem(PIN_VISUAL_KEY, JSON.stringify(next));
+    } catch {
+      // best-effort — no bloquea el flujo principal
+    }
+  }
+
+  function bumpMarkerVersion(groupKey: string) {
+    setMarkerVersion((v) => ({ ...v, [groupKey]: (v[groupKey] ?? 0) + 1 }));
+  }
+
+  async function resetVisualPosition(groupKey: string) {
+    if (!visualOverrides[groupKey]) return;
+    const next = { ...visualOverrides };
+    delete next[groupKey];
+    await persistOverrides(next);
+    bumpMarkerVersion(groupKey);
+  }
+
+  function handleDragEnd(group: TripGroup, event: MarkerDragStartEndEvent) {
+    const { latitude, longitude } = event.nativeEvent.coordinate;
+    Alert.alert(
+      'Confirmar posición',
+      '¿Guardar esta nueva posición del pin?',
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+          onPress: () => bumpMarkerVersion(group.key),
+        },
+        {
+          text: 'Guardar',
+          onPress: () => {
+            persistOverrides({ ...visualOverrides, [group.key]: { lat: latitude, lng: longitude } });
+          },
+        },
+      ]
+    );
+  }
 
   useEffect(() => {
     Animated.timing(opacity, { toValue: 1, duration: 700, useNativeDriver: true }).start();
@@ -124,10 +186,12 @@ export default function Mapa() {
         >
           {groups.map((group) => (
             <Marker
-              key={group.key}
-              coordinate={{ latitude: group.lat, longitude: group.lng }}
+              key={`${group.key}-${markerVersion[group.key] ?? 0}`}
+              coordinate={getVisualCoordinate(group)}
               tracksViewChanges={false}
-              onPress={() => { playSound('ding'); setSelectedGroup(group.trips); }}
+              draggable
+              onDragEnd={(e) => handleDragEnd(group, e)}
+              onPress={() => { playSound('ding'); setSelectedGroup(group); }}
             >
               {group.hasReal ? <PinReal /> : <PinWishlist />}
             </Marker>
@@ -146,8 +210,17 @@ export default function Mapa() {
               <View style={styles.overlayHandle} />
               <View style={styles.overlayHeader}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.overlayCity}>{selectedGroup[0].ciudad}</Text>
-                  <Text style={styles.overlayCountry}>{selectedGroup[0].pais}</Text>
+                  <Text style={styles.overlayCity}>{selectedGroup.trips[0].ciudad}</Text>
+                  <Text style={styles.overlayCountry}>{selectedGroup.trips[0].pais}</Text>
+                  {visualOverrides[selectedGroup.key] && (
+                    <TouchableOpacity
+                      onPress={() => resetVisualPosition(selectedGroup.key)}
+                      activeOpacity={0.7}
+                      style={styles.resetPinBtn}
+                    >
+                      <Text style={styles.resetPinText}>↺  Restablecer posición original del pin</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
                 <TouchableOpacity
                   style={styles.overlayCloseBtn}
@@ -163,7 +236,7 @@ export default function Mapa() {
                 nestedScrollEnabled
                 showsVerticalScrollIndicator={false}
               >
-                {selectedGroup.map((trip) => {
+                {selectedGroup.trips.map((trip) => {
                   const cover = trip.portada ?? trip.fotos[0] ?? null;
                   const isReal = trip.tipo === 'real';
                   return (
@@ -305,6 +378,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#4a5a6a',
     marginTop: 2,
+  },
+  resetPinBtn: {
+    marginTop: 8,
+    alignSelf: 'flex-start',
+  },
+  resetPinText: {
+    fontSize: 11,
+    color: GOLD,
+    fontWeight: '600',
+    letterSpacing: 0.2,
   },
   overlayCloseBtn: {
     width: 28,

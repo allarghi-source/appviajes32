@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
@@ -77,6 +77,52 @@ function toRoman(n: number): string {
   let result = '';
   for (let i = 0; i < vals.length; i++) {
     while (n >= vals[i]) { result += syms[i]; n -= vals[i]; }
+  }
+  return result;
+}
+
+// ─── ORDEN DEL TIMELINE (viajes multidestino como un único bloque) ────────────
+
+interface TimelineItem {
+  trip: Trip;
+  chainIndex: number; // 0 = viaje individual; 1..n = posición dentro de su viaje multidestino
+}
+
+// Agrupa los viajes reales por chainId (un viaje individual es un grupo de 1),
+// ordena cada grupo por fecha (estable ante empates: conserva el orden de carga),
+// y luego ordena los BLOQUES entre sí por la fecha más antigua de cada uno.
+// Así ningún viaje ajeno puede intercalarse dentro de un viaje multidestino.
+function buildTimelineOrder(rawTrips: Trip[]): TimelineItem[] {
+  const real = rawTrips.filter((t) => t.tipo === 'real');
+
+  const groups = new Map<string, Trip[]>();
+  const groupKeys: string[] = [];
+
+  for (const t of real) {
+    const key = t.chainId ?? `single:${t.id}`;
+    if (!groups.has(key)) {
+      groups.set(key, []);
+      groupKeys.push(key);
+    }
+    groups.get(key)!.push(t);
+  }
+
+  const blocks = groupKeys.map((key) => {
+    const members = [...groups.get(key)!].sort(
+      (a, b) => parseDate(a.fechaInicio).getTime() - parseDate(b.fechaInicio).getTime()
+    );
+    const blockDate = members.length > 0 ? parseDate(members[0].fechaInicio).getTime() : 0;
+    return { members, blockDate };
+  });
+
+  blocks.sort((a, b) => a.blockDate - b.blockDate);
+
+  const result: TimelineItem[] = [];
+  for (const block of blocks) {
+    const isChain = block.members[0]?.chainId != null;
+    block.members.forEach((trip, i) => {
+      result.push({ trip, chainIndex: isChain ? i + 1 : 0 });
+    });
   }
   return result;
 }
@@ -161,7 +207,7 @@ function TripCard({
 
 export default function Timeline() {
   const router = useRouter();
-  const [trips, setTrips] = useState<Trip[]>([]);
+  const [items, setItems] = useState<TimelineItem[]>([]);
   const [loading, setLoading] = useState(true);
   const scrollY = useRef(new Animated.Value(0)).current;
   const activeIndexRef = useRef(0);
@@ -170,7 +216,7 @@ export default function Timeline() {
   const tickDrainRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (trips.length === 0) return;
+    if (items.length === 0) return;
     activeIndexRef.current = 0;
     tickQueueRef.current = 0;
     lastSoundTimeRef.current = 0;
@@ -196,7 +242,7 @@ export default function Timeline() {
     const id = scrollY.addListener(({ value }) => {
       let bestIndex = 0;
       let bestDist = Infinity;
-      for (let i = 0; i < trips.length; i++) {
+      for (let i = 0; i < items.length; i++) {
         const optimalScroll = HEADER_H + LIST_PT + i * ITEM_H + CARD_H / 2 - SCREEN_H / 2;
         const dist = Math.abs(value - optimalScroll);
         if (dist < bestDist) { bestDist = dist; bestIndex = i; }
@@ -212,27 +258,26 @@ export default function Timeline() {
       scrollY.removeListener(id);
       if (tickDrainRef.current !== null) { clearTimeout(tickDrainRef.current); tickDrainRef.current = null; }
     };
-  }, [trips]);
+  }, [items]);
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const raw = await AsyncStorage.getItem('trips');
-        const all: Trip[] = raw ? JSON.parse(raw) : [];
-        const sorted = all
-          .filter((t) => t.tipo === 'real')
-          .sort((a, b) => parseDate(a.fechaInicio).getTime() - parseDate(b.fechaInicio).getTime());
-        setTrips(sorted);
-      } finally {
-        setLoading(false);
+  useFocusEffect(
+    useCallback(() => {
+      async function load() {
+        try {
+          const raw = await AsyncStorage.getItem('trips');
+          const all: Trip[] = raw ? JSON.parse(raw) : [];
+          setItems(buildTimelineOrder(all));
+        } finally {
+          setLoading(false);
+        }
       }
-    }
-    load();
-  }, []);
+      load();
+    }, [])
+  );
 
   const subtitle =
-    trips.length > 0
-      ? `${trips.length} viaje${trips.length !== 1 ? 's' : ''} realizado${trips.length !== 1 ? 's' : ''}`
+    items.length > 0
+      ? `${items.length} viaje${items.length !== 1 ? 's' : ''} realizado${items.length !== 1 ? 's' : ''}`
       : 'Tus viajes realizados';
 
   return (
@@ -246,7 +291,7 @@ export default function Timeline() {
         <View style={styles.center}>
           <Text style={styles.muted}>Cargando...</Text>
         </View>
-      ) : trips.length === 0 ? (
+      ) : items.length === 0 ? (
         <View style={styles.center}>
           <Text style={styles.emptyIcon}>✈</Text>
           <Text style={styles.emptyTitle}>Todavía no hay viajes</Text>
@@ -260,8 +305,8 @@ export default function Timeline() {
           <View style={styles.axisLine} pointerEvents="none" />
 
           <FlatList
-            data={trips}
-            keyExtractor={(t) => t.id}
+            data={items}
+            keyExtractor={(it) => it.trip.id}
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
             scrollEventThrottle={16}
@@ -269,23 +314,15 @@ export default function Timeline() {
               [{ nativeEvent: { contentOffset: { y: scrollY } } }],
               { useNativeDriver: false }
             )}
-            renderItem={({ item, index }) => {
-              let chainIndex = 0;
-              if (item.chainId) {
-                let start = index;
-                while (start > 0 && trips[start - 1].chainId === item.chainId) start--;
-                chainIndex = index - start + 1;
-              }
-              return (
-                <TripCard
-                  trip={item}
-                  index={index}
-                  scrollY={scrollY}
-                  onPress={() => router.push(`/detalle?id=${item.id}`)}
-                  chainIndex={chainIndex}
-                />
-              );
-            }}
+            renderItem={({ item, index }) => (
+              <TripCard
+                trip={item.trip}
+                index={index}
+                scrollY={scrollY}
+                onPress={() => router.push(`/detalle?id=${item.trip.id}`)}
+                chainIndex={item.chainIndex}
+              />
+            )}
           />
         </View>
       )}

@@ -1,11 +1,13 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { AchievementPopup } from '../components/AchievementPopup';
 import NavBar from '../components/NavBar';
 import {
   ALL_ACHIEVEMENTS,
   clearBadgeCount,
   loadUnlockedIds,
+  type Achievement,
 } from '../utils/achievementsEngine';
 
 const GOLD    = '#d4af37';
@@ -29,6 +31,7 @@ const CATEGORY_ORDER = [
 export default function Medallero() {
   const router = useRouter();
   const [unlocked, setUnlocked] = useState<Set<string>>(new Set());
+  const [previewAchievement, setPreviewAchievement] = useState<Achievement | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -73,10 +76,12 @@ export default function Medallero() {
               <View style={styles.grid}>
                 {items.map((a) => {
                   const isUnlocked = unlocked.has(a.id);
+                  const CellContainer = isUnlocked ? TouchableOpacity : View;
                   return (
-                    <View
+                    <CellContainer
                       key={a.id}
                       style={[styles.cell, isUnlocked && styles.cellOn]}
+                      {...(isUnlocked ? { onPress: () => setPreviewAchievement(a), activeOpacity: 0.75 } : {})}
                     >
                       <Text style={[styles.cellStar, !isUnlocked && styles.cellStarOff]}>
                         {isUnlocked ? '★' : '◆'}
@@ -94,7 +99,7 @@ export default function Medallero() {
                       ) : (
                         <Text style={styles.cellLocked}>Bloqueado</Text>
                       )}
-                    </View>
+                    </CellContainer>
                   );
                 })}
               </View>
@@ -105,6 +110,12 @@ export default function Medallero() {
         <View style={{ height: 20 }} />
       </ScrollView>
       <NavBar />
+      {previewAchievement && (
+        <AchievementPopup
+          achievements={[previewAchievement]}
+          onDone={() => setPreviewAchievement(null)}
+        />
+      )}
     </View>
   );
 }

@@ -19,6 +19,12 @@ import Svg, {
   Rect
 } from 'react-native-svg';
 import NavBar, { NAV_HEIGHT } from '../components/NavBar';
+
+// ─── PRUEBA DE DIRECCIÓN DE ARTE ────────────────────────────────────────────
+// Color de fondo del papel del pasaporte, extraído a constante para poder
+// cambiarlo fácilmente durante las pruebas de diseño (antes: sepia '#f0e8d0',
+// luego '#F4F9FC' — ajustado a una dominante fría apenas más perceptible).
+const PAPER_BG = '#E8F0F7';
 import { loadBadgeCount } from '../utils/achievementsEngine';
 import {
   StatsResult,
@@ -205,7 +211,7 @@ export default function PassportOpen({ onClose }: { onClose?: () => void } = {})
     loadData();
   }, []);
 
-  if (!userData) return null;
+  if (!userData) return <View style={{ flex: 1, backgroundColor: '#01050d' }} />;
 
   const xpProgress = Math.max(2, Math.round((stats?.progresoRango ?? 0) * 100));
   const _xpNow = stats?.xpTotal ?? 0;
@@ -275,11 +281,11 @@ const icon = '◉ ';
         {/* ── PAGE 1: STATS ── */}
         <View style={styles.passportPage}>
           {/* Background stamps */}
-          <Stamp size={80} top={-20} right={10} rotate={12} color="rgba(26,80,180,0.10)" label={'PARIS\nDEPARTURE\n15.08.2019'} />
-          <Stamp size={65} top={50} left={-10} rotate={-18} color="rgba(180,40,40,0.10)" label={'TOKYO\nARRIVAL\n2022'} />
-          <Stamp size={90} bottom={-25} left={30} rotate={-8} color="rgba(20,120,60,0.08)" label={'NEW YORK\nARRIVAL\n25 APR 2020'} />
-          <Stamp size={60} bottom={20} right={20} rotate={22} color="rgba(160,80,20,0.09)" label={'LONDON\nTRANSIT\n2021'} />
-          <Stamp size={70} top={120} right={-15} rotate={5} color="rgba(100,30,140,0.08)" label={'DUBAI\nARRIVAL\n2023'} />
+          <Stamp size={80} top={-20} right={10} rotate={12} color="rgba(26,80,180,0.11)" label={'PARIS\nDEPARTURE\n15.08.2019'} />
+          <Stamp size={65} top={50} left={-10} rotate={-18} color="rgba(180,40,40,0.11)" label={'TOKYO\nARRIVAL\n2022'} />
+          <Stamp size={90} bottom={-25} left={30} rotate={-8} color="rgba(20,120,60,0.09)" label={'NEW YORK\nARRIVAL\n25 APR 2020'} />
+          <Stamp size={60} bottom={20} right={20} rotate={22} color="rgba(160,80,20,0.10)" label={'LONDON\nTRANSIT\n2021'} />
+          <Stamp size={70} top={120} right={-15} rotate={5} color="rgba(100,30,140,0.09)" label={'DUBAI\nARRIVAL\n2023'} />
 
           {/* Content */}
           <Text style={styles.pageTitle}>Mi recorrido</Text>
@@ -318,10 +324,10 @@ const icon = '◉ ';
         {/* ── PAGE 2: IDENTITY ── */}
         <View style={[styles.passportPage, styles.passportPage2]}>
           {/* Background stamps */}
-          <Stamp size={85} top={-20} left={10} rotate={-14} color="rgba(26,80,180,0.10)" label={'SINGAPORE\nARRIVAL\n19.07.2018'} />
-          <Stamp size={70} top={40} right={-10} rotate={16} color="rgba(180,40,40,0.09)" label={'BUENOS AIRES\nDEPARTURE\nJAN 2019'} />
-          <Stamp size={75} bottom={-15} left={20} rotate={-10} color="rgba(20,120,60,0.08)" label={'AMSTERDAM\nTRANSIT\n25.02.2019'} />
-          <Stamp size={60} bottom={80} right={15} rotate={20} color="rgba(100,30,140,0.09)" label={'BANGKOK\nARR\n2017'} />
+          <Stamp size={85} top={-20} left={10} rotate={-14} color="rgba(26,80,180,0.11)" label={'SINGAPORE\nARRIVAL\n19.07.2018'} />
+          <Stamp size={70} top={40} right={-10} rotate={16} color="rgba(180,40,40,0.10)" label={'BUENOS AIRES\nDEPARTURE\nJAN 2019'} />
+          <Stamp size={75} bottom={-15} left={20} rotate={-10} color="rgba(20,120,60,0.09)" label={'AMSTERDAM\nTRANSIT\n25.02.2019'} />
+          <Stamp size={60} bottom={80} right={15} rotate={20} color="rgba(100,30,140,0.10)" label={'BANGKOK\nARR\n2017'} />
 
           {/* Country header */}
           <View style={styles.countryHeader}>
@@ -486,11 +492,11 @@ const styles = StyleSheet.create({
     elevation: 10,
     borderWidth: 1,
     borderColor: '#c8b48a',
-    backgroundColor: '#f0e8d0',
+    backgroundColor: PAPER_BG,
   },
 
   passportPage: {
-    backgroundColor: '#f0e8d0',
+    backgroundColor: PAPER_BG,
     position: 'relative',
     overflow: 'hidden',
     paddingHorizontal: 20,
@@ -775,7 +781,7 @@ xpBarWrap: {
   fontFamily: 'Georgia',
   fontSize: 11,
   fontWeight: '600',
-  color: '#8fbfff',
+  color: '#1a3a6e', // antes '#8fbfff': perdía contraste sobre el nuevo fondo claro
   letterSpacing: 1,
   opacity: 1,
 },
@@ -815,7 +821,7 @@ xpBarWrap: {
     justifyContent: 'center',
     paddingHorizontal: 4,
     borderWidth: 1.5,
-    borderColor: '#f0e8d0',
+    borderColor: PAPER_BG,
     zIndex: 10,
   },
   medalBadgeText: {

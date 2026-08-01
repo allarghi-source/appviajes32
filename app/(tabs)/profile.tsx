@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+import { copiarFotoPersistente, PERFIL_DIR } from '../../utils/fotoPersistente';
 export default function Profile() {
   const router = useRouter();
   const [image, setImage] = useState<string | null>(null);
@@ -61,6 +62,15 @@ async function validarUbicacion(c: string, p: string, campo: 'ciudad' | 'pais') 
     // Error de red — no bloquear al usuario
   }
 }
+async function guardarFotoPerfil(uri: string) {
+  try {
+    const persistida = await copiarFotoPersistente(uri, PERFIL_DIR);
+    setImage(persistida);
+  } catch {
+    Alert.alert('Error', 'No se pudo guardar la foto. Intentá de nuevo.');
+  }
+}
+
  const pickImage = async () => {
   const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (!perm.granted) return;
@@ -72,7 +82,7 @@ async function validarUbicacion(c: string, p: string, campo: 'ciudad' | 'pais') 
   });
   if (!result.canceled) {
     const uri = result.assets?.[0]?.uri;
-    if (uri) setImage(uri);
+    if (uri) await guardarFotoPerfil(uri);
   }
 };
 
@@ -87,7 +97,7 @@ const takePhoto = async () => {
   });
   if (!result.canceled) {
     const uri = result.assets?.[0]?.uri;
-    if (uri) setImage(uri);
+    if (uri) await guardarFotoPerfil(uri);
   }
 };
 
@@ -253,6 +263,22 @@ const selectPhoto = () => {
   <TouchableOpacity
   style={styles.button}
   onPress={async () => {
+    const faltantes: string[] = [];
+    if (!image) faltantes.push('Foto de perfil');
+    if (!nombre.trim()) faltantes.push('Nombre');
+    if (!apellido.trim()) faltantes.push('Apellido');
+    if (!nacionalidad.trim()) faltantes.push('Nacionalidad');
+    if (!ciudad.trim()) faltantes.push('Ciudad de residencia');
+    if (!pais.trim()) faltantes.push('País de residencia');
+
+    if (faltantes.length > 0) {
+      Alert.alert(
+        'Faltan datos',
+        `Para continuar debés completar:\n\n${faltantes.map((f) => `• ${f}`).join('\n')}`
+      );
+      return;
+    }
+
     if (ciudad.trim() && !pais.trim()) { setPaisError('País no encontrado'); return; }
     if (!ciudad.trim() && pais.trim()) { setCiudadError('Ciudad no encontrada'); return; }
     if (ciudadError || paisError) return;

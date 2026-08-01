@@ -14,7 +14,11 @@ import {
 } from 'react-native';
 import Svg, {
   Circle,
-  Path
+  Defs,
+  Line,
+  Path,
+  Text as SvgText,
+  TextPath,
 } from 'react-native-svg';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -51,6 +55,87 @@ const CornerOrnamentBottomRight = () => (
   <Svg width={16} height={16} viewBox="0 0 16 16" style={{ opacity: 0.5, transform: [{ scaleX: -1 }] }}>
     <Path d="M2,14 L2,8 L8,14 Z" fill="none" stroke="#d4af37" strokeWidth={0.8} />
     <Circle cx={2} cy={14} r={0.8} fill="#d4af37" />
+  </Svg>
+);
+
+// ─── SELLO "CONFIG" (marca oficial estampada, sin imágenes) ───────────────────
+
+const STAMP_GOLD = '#d4af37';
+const STAMP_SIZE = 117;
+const STAMP_CX = 40;
+const STAMP_CY = 40;
+
+// Genera el borde dentado fino (alterna entre radio exterior e interior)
+function buildDentedRingPath(cx: number, cy: number, rOuter: number, rInner: number, teeth: number): string {
+  const step = Math.PI / teeth;
+  const points: string[] = [];
+  for (let i = 0; i < teeth * 2; i++) {
+    const r = i % 2 === 0 ? rOuter : rInner;
+    const angle = i * step - Math.PI / 2;
+    const x = cx + r * Math.cos(angle);
+    const y = cy + r * Math.sin(angle);
+    points.push(`${i === 0 ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`);
+  }
+  return `${points.join(' ')} Z`;
+}
+
+const CONFIG_STAMP_DENTED_PATH = buildDentedRingPath(STAMP_CX, STAMP_CY, 39, 36.5, 36);
+const CONFIG_STAMP_TOP_ARC = `M ${STAMP_CX - 24},${STAMP_CY} A 24,24 0 0 1 ${STAMP_CX + 24},${STAMP_CY}`;
+const CONFIG_STAMP_BOTTOM_ARC = `M ${STAMP_CX + 24},${STAMP_CY} A 24,24 0 0 1 ${STAMP_CX - 24},${STAMP_CY}`;
+
+const ConfigStamp = () => (
+  <Svg
+    width={STAMP_SIZE}
+    height={STAMP_SIZE}
+    viewBox="0 0 80 80"
+    style={{ transform: [{ rotate: '-12deg' }] }}
+  >
+    <Defs>
+      <Path id="configTopArc" d={CONFIG_STAMP_TOP_ARC} />
+      <Path id="configBottomArc" d={CONFIG_STAMP_BOTTOM_ARC} />
+    </Defs>
+
+    {/* Fondo opaco (mismo tono del cuero del pasaporte): evita que cualquier
+        elemento detrás del sello (p. ej. los adornos de esquina de la tapa)
+        se asome entre sus trazos. Nada debe verse fuera de los círculos del sello. */}
+    <Circle cx={STAMP_CX} cy={STAMP_CY} r={39} fill="#0a1628" />
+
+    {/* Borde dentado fino */}
+    <Path d={CONFIG_STAMP_DENTED_PATH} fill="none" stroke={STAMP_GOLD} strokeWidth={0.6} opacity={0.85} />
+
+    {/* Doble aro — exterior con más cuerpo, interior fino */}
+    <Circle cx={STAMP_CX} cy={STAMP_CY} r={34} fill="none" stroke={STAMP_GOLD} strokeWidth={2.6} opacity={0.85} />
+    <Circle cx={STAMP_CX} cy={STAMP_CY} r={30} fill="none" stroke={STAMP_GOLD} strokeWidth={0.8} opacity={0.55} />
+
+    {/* MYWORLDXP — arco superior e inferior */}
+    <SvgText fill={STAMP_GOLD} fontFamily="Georgia" fontSize={5.4} fontWeight="700" letterSpacing={1.1} opacity={0.8}>
+      <TextPath href="#configTopArc" startOffset="50%" textAnchor="middle">MYWORLDXP</TextPath>
+    </SvgText>
+    <SvgText fill={STAMP_GOLD} fontFamily="Georgia" fontSize={5.4} fontWeight="700" letterSpacing={1.1} opacity={0.8}>
+      <TextPath href="#configBottomArc" startOffset="50%" textAnchor="middle">MYWORLDXP</TextPath>
+    </SvgText>
+
+    {/* Anillo separador entre los textos circulares y el CONFIG central */}
+    <Circle cx={STAMP_CX} cy={STAMP_CY} r={22.5} fill="none" stroke={STAMP_GOLD} strokeWidth={0.6} opacity={0.5} />
+
+    {/* Líneas finas + CONFIG centrado */}
+    <Line x1={22} y1={35} x2={58} y2={35} stroke={STAMP_GOLD} strokeWidth={0.5} opacity={0.6} />
+    <SvgText
+      x={STAMP_CX}
+      y={42}
+      fill={STAMP_GOLD}
+      stroke={STAMP_GOLD}
+      strokeWidth={0.28}
+      fontFamily="Georgia"
+      fontSize={7.7}
+      fontWeight="700"
+      letterSpacing={1}
+      textAnchor="middle"
+      opacity={0.95}
+    >
+      CONFIG
+    </SvgText>
+    <Line x1={22} y1={47} x2={58} y2={47} stroke={STAMP_GOLD} strokeWidth={0.5} opacity={0.6} />
   </Svg>
 );
 
@@ -119,13 +204,7 @@ export default function PassportCover() {
           style={styles.settingsBtn}
           activeOpacity={0.7}
         >
-          <View style={styles.settingsStampOuter}>
-            <View style={styles.settingsStampInner}>
-              <View style={styles.stampDecoLine} />
-              <Text style={styles.settingsStampText} numberOfLines={1}>CONFIG</Text>
-              <View style={styles.stampDecoLine} />
-            </View>
-          </View>
+          <ConfigStamp />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -196,44 +275,6 @@ const styles = StyleSheet.create({
     right: 22,
     zIndex: 10,
     padding: 4,
-  },
-
-  settingsStampOuter: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    borderWidth: 2,
-    borderColor: 'rgba(212,175,55,0.55)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    transform: [{ rotate: '-10deg' }],
-  },
-
-  settingsStampInner: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    borderWidth: 1,
-    borderColor: 'rgba(212,175,55,0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 3,
-  },
-
-  stampDecoLine: {
-    width: 28,
-    height: 0.6,
-    backgroundColor: 'rgba(212,175,55,0.45)',
-  },
-
-  settingsStampText: {
-    fontFamily: 'Georgia',
-    fontSize: 7.5,
-    fontWeight: '700',
-    color: 'rgba(212,175,55,0.65)',
-    letterSpacing: 1.0,
-    textTransform: 'uppercase',
-    textAlign: 'center',
   },
 
   passport: {
@@ -332,6 +373,7 @@ const styles = StyleSheet.create({
   brandLine: {
     flexDirection: 'row',
     alignItems: 'baseline',
+    marginTop: 34,
   },
   brandMy: {
     fontSize: 14,

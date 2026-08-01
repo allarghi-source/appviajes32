@@ -9,6 +9,7 @@ export interface Trip {
   fotos: string[];
   portada: string | null;
   nota: string;
+  tipsViaje?: string;
   xp: number;
   distancia: number;
   chainId: string | null;

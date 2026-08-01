@@ -1,12 +1,26 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { resetAchievements } from '../utils/achievementsEngine';
+import {
+  applyBackup,
+  BACKUP_KEY,
+  BackupPayload,
+  buildRestoreConfirmMessage,
+  formatBackupDate,
+  getRawBackup,
+  hasCurrentData,
+  parseBackup,
+} from '../utils/backupEngine';
+import { copiarFotoPersistente, PERFIL_DIR } from '../utils/fotoPersistente';
 import { playSound } from '../utils/soundEngine';
+import Constants from 'expo-constants';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
   Image,
+  Linking,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -23,7 +37,7 @@ const TEXT = '#e8e0d0';
 const MUTED = '#4a5a6a';
 const SECTION_BG = '#07101e';
 const DANGER = '#c0392b';
-const BACKUP_KEY = 'backup_myworldxp';
+const REPORT_EMAIL = 'myworldxp.app@gmail.com';
 
 interface UserData {
   foto?: string;
@@ -65,10 +79,15 @@ export default function Settings() {
   };
 
   const savePhoto = async (uri: string) => {
-    setFoto(uri);
-    const current = await AsyncStorage.getItem('userData');
-    const existing: UserData = current ? JSON.parse(current) : {};
-    await AsyncStorage.setItem('userData', JSON.stringify({ ...existing, foto: uri }));
+    try {
+      const persistida = await copiarFotoPersistente(uri, PERFIL_DIR);
+      const current = await AsyncStorage.getItem('userData');
+      const existing: UserData = current ? JSON.parse(current) : {};
+      await AsyncStorage.setItem('userData', JSON.stringify({ ...existing, foto: persistida }));
+      setFoto(persistida);
+    } catch {
+      Alert.alert('Error', 'No se pudo guardar la foto. Intentá de nuevo.');
+    }
   };
 
   const openGallery = async () => {
@@ -130,25 +149,46 @@ export default function Settings() {
     }
   };
 
+  const handleApplyBackup = async (parsed: BackupPayload) => {
+    try {
+      await applyBackup(parsed);
+      setBackupMsg('Backup restaurado correctamente ✓');
+      setTimeout(() => setBackupMsg(''), 3500);
+      // Refresh local state from restored data
+      if (parsed.userData) {
+        setNombre(parsed.userData.nombre ?? '');
+        setApellido(parsed.userData.apellido ?? '');
+        setNacionalidad(parsed.userData.nacionalidad ?? '');
+        setFoto(parsed.userData.foto);
+      }
+    } catch {
+      Alert.alert('Error', 'El archivo de backup está dañado o no se puede leer.');
+    }
+  };
+
   const loadBackup = async () => {
     try {
-      const raw = await AsyncStorage.getItem(BACKUP_KEY);
+      const raw = await getRawBackup();
       if (!raw) {
         Alert.alert('Sin backup', 'No se encontró ningún backup guardado en este dispositivo.');
         return;
       }
-      const { userData, trips } = JSON.parse(raw);
-      if (userData) await AsyncStorage.setItem('userData', JSON.stringify(userData));
-      if (trips) await AsyncStorage.setItem('trips', JSON.stringify(trips));
-      setBackupMsg('Backup restaurado correctamente ✓');
-      setTimeout(() => setBackupMsg(''), 3500);
-      // Refresh local state from restored data
-      if (userData) {
-        setNombre(userData.nombre ?? '');
-        setApellido(userData.apellido ?? '');
-        setNacionalidad(userData.nacionalidad ?? '');
-        setFoto(userData.foto);
+      const parsed = parseBackup(raw);
+
+      if (!(await hasCurrentData())) {
+        await handleApplyBackup(parsed);
+        return;
       }
+
+      const fecha = parsed.savedAt ? formatBackupDate(parsed.savedAt) : null;
+      Alert.alert(
+        'Backup encontrado',
+        buildRestoreConfirmMessage(true, fecha),
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Cargar Backup', style: 'destructive', onPress: () => handleApplyBackup(parsed) },
+        ]
+      );
     } catch {
       Alert.alert('Error', 'El archivo de backup está dañado o no se puede leer.');
     }
@@ -172,6 +212,42 @@ export default function Settings() {
         },
       ]
     );
+  };
+
+  const reportarProblema = async () => {
+    const appVersion = Constants.expoConfig?.version ?? '1.0.0';
+    const deviceInfo = `${Platform.OS === 'ios' ? 'iOS' : 'Android'} ${Platform.Version}`;
+    const subject = 'Reporte de problema - MyWorldXP';
+    const body = [
+      'Contanos qué ocurrió:',
+      '',
+      '¿Qué estabas haciendo cuando apareció el problema?',
+      '',
+      '¿Qué esperabas que pasara?',
+      '',
+      '¿Qué pasó realmente?',
+      '',
+      `Modelo de dispositivo: ${deviceInfo}`,
+      `Versión de la app: ${appVersion}`,
+    ].join('\n');
+    const mailtoUrl = `mailto:${REPORT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+    try {
+      const supported = await Linking.canOpenURL(mailtoUrl);
+      if (!supported) {
+        Alert.alert(
+          'No se encontró una app de correo',
+          `Podés escribirnos manualmente a:\n${REPORT_EMAIL}`
+        );
+        return;
+      }
+      await Linking.openURL(mailtoUrl);
+    } catch {
+      Alert.alert(
+        'No se pudo abrir el correo',
+        `Podés escribirnos manualmente a:\n${REPORT_EMAIL}`
+      );
+    }
   };
 
   return (
@@ -296,6 +372,18 @@ export default function Settings() {
           </Text>
           <TouchableOpacity style={styles.btnDanger} onPress={clearAll} activeOpacity={0.8}>
             <Text style={styles.btnDangerText}>Borrar todos los datos</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* ── SOPORTE ── */}
+        <Text style={styles.sectionLabel}>SOPORTE</Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionDesc}>
+            ¿Encontraste un error o algo no funciona como esperabas? Contanos qué pasó.
+          </Text>
+          <TouchableOpacity style={styles.btnSecondary} onPress={reportarProblema} activeOpacity={0.8}>
+            <Text style={styles.btnSecondaryIcon}>✉</Text>
+            <Text style={styles.btnSecondaryText}>Reportar problema</Text>
           </TouchableOpacity>
         </View>
 
