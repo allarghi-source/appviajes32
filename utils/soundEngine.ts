@@ -1,4 +1,4 @@
-import { Audio } from 'expo-av';
+import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
 
 const soundSources = {
   abrir_hoja: require('../assets/sounds/abrir_hoja.mp3'),
@@ -14,28 +14,28 @@ const soundSources = {
 
 type SoundName = keyof typeof soundSources;
 
-const cache: Partial<Record<SoundName, Audio.Sound>> = {};
+const cache: Partial<Record<SoundName, AudioPlayer>> = {};
 
-async function getSound(name: SoundName): Promise<Audio.Sound> {
+async function getPlayer(name: SoundName): Promise<AudioPlayer> {
   if (cache[name]) {
-    await cache[name]!.setPositionAsync(0);
+    await cache[name]!.seekTo(0);
     return cache[name]!;
   }
-  const { sound } = await Audio.Sound.createAsync(soundSources[name]);
-  cache[name] = sound;
-  return sound;
+  const player = createAudioPlayer(soundSources[name]);
+  cache[name] = player;
+  return player;
 }
 
 export async function preloadSounds() {
   for (const name of Object.keys(soundSources) as SoundName[]) {
-    await getSound(name);
+    await getPlayer(name);
   }
 }
 
 export async function playSound(name: SoundName) {
   try {
-    const sound = await getSound(name);
-    await sound.playAsync();
+    const player = await getPlayer(name);
+    player.play();
   } catch (e) {
     console.log('Error reproduciendo sonido:', e);
   }
