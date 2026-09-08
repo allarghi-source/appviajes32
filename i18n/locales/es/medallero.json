@@ -1,0 +1,17 @@
+{
+  "backButton": "← Volver",
+  "title": "Medallero",
+  "subtitle": "{{count}} de {{total}} logros desbloqueados",
+  "categories": {
+    "progreso": "Progreso",
+    "continentes": "Continentes",
+    "comportamiento": "Comportamiento",
+    "planificacion": "Planificación",
+    "cumplimiento": "Cumplimiento",
+    "experiencia": "Experiencia",
+    "actividad": "Actividad",
+    "especiales": "Especiales"
+  },
+  "hiddenName": "???",
+  "locked": "Bloqueado"
+}

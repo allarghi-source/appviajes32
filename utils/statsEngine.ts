@@ -14,6 +14,10 @@ export interface Trip {
   distancia: number;
   chainId: string | null;
   coords: { lat: number; lng: number } | null;
+  // Residencia vigente al momento de crear el viaje (solo trips 'real'; las wishlist
+  // nunca lo tienen). Trips viejos sin este campo no aportan km hasta ser migrados
+  // por utils/tripOriginMigration.ts — nunca se asume ni se inventa un origen.
+  origenCoords?: { lat: number; lng: number } | null;
 }
 
 export interface StatsResult {
@@ -36,8 +40,6 @@ export interface StatsResult {
 }
 
 // ─── CONSTANTES ───────────────────────────────────────────────────────────────
-
-const HOME_COORDS = { lat: -34.6037, lng: -58.3816 }; // Buenos Aires (default)
 
 export const ALL_CONTINENTS = [
   'América del Norte',
@@ -302,10 +304,7 @@ export function formatHoras(h: number): string {
 
 // ─── MOTOR PRINCIPAL ──────────────────────────────────────────────────────────
 
-export function calcularStats(
-  trips: Trip[],
-  homeCoords: { lat: number; lng: number } = HOME_COORDS
-): StatsResult {
+export function calcularStats(trips: Trip[]): StatsResult {
   const realTrips = trips
     .filter((t) => t.tipo === 'real')
     .sort((a, b) => parseDate(a.fechaInicio) - parseDate(b.fechaInicio));
@@ -400,25 +399,34 @@ export function calcularStats(
 
   let kmTotales = 0;
 
-  // Viajes normales: casa → destino → casa (ida + vuelta)
+  // Viajes normales: casa → destino → casa (ida + vuelta).
+  // Sin origenCoords (trip real viejo todavía no migrado) no se inventa un origen:
+  // simplemente no aporta km hasta que utils/tripOriginMigration.ts lo complete.
   for (const trip of standaloneTrips) {
-    if (trip.coords) {
-      kmTotales += haversineKm(homeCoords, trip.coords) * 2;
+    if (trip.coords && trip.origenCoords) {
+      kmTotales += haversineKm(trip.origenCoords, trip.coords) * 2;
     }
   }
 
-  // Viajes encadenados: casa → d1 → d2 → ... → dn → casa
+  // Viajes encadenados: casa → d1 → d2 → ... → dn → casa.
+  // El origen (residencia vigente al crear la cadena) se toma del primer destino;
+  // los tramos destino→destino no dependen de ningún origen y siempre se calculan.
   for (const [, chain] of chainGroups) {
     const withCoords = [...chain]
       .sort((a, b) => parseDate(a.fechaInicio) - parseDate(b.fechaInicio))
       .filter((t) => t.coords != null);
     if (withCoords.length === 0) continue;
 
-    kmTotales += haversineKm(homeCoords, withCoords[0].coords!);
+    const origen = withCoords[0].origenCoords;
+    if (origen) {
+      kmTotales += haversineKm(origen, withCoords[0].coords!);
+    }
     for (let i = 0; i < withCoords.length - 1; i++) {
       kmTotales += haversineKm(withCoords[i].coords!, withCoords[i + 1].coords!);
     }
-    kmTotales += haversineKm(withCoords[withCoords.length - 1].coords!, homeCoords);
+    if (origen) {
+      kmTotales += haversineKm(withCoords[withCoords.length - 1].coords!, origen);
+    }
   }
 
   const horasVuelo = kmTotales / 800;

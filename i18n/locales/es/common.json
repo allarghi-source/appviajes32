@@ -1,0 +1,21 @@
+{
+  "cancel": "Cancelar",
+  "error": "Error",
+  "save": "Guardar",
+  "saving": "Guardando...",
+  "genericSaveError": "No se pudo guardar. Intentá de nuevo.",
+  "genericSaveErrorShort": "No se pudo guardar.",
+  "backupCorrupt": "El archivo de backup está dañado o no se puede leer.",
+  "photoPicker": {
+    "takePhoto": "Tomar foto",
+    "chooseFromGallery": "Elegir de galería"
+  },
+  "permission": {
+    "titleNecesario": "Permiso necesario",
+    "galleryNecesario": "Necesitamos acceso a tu galería.",
+    "cameraNecesario": "Necesitamos acceso a tu cámara.",
+    "titleRequerido": "Permiso requerido",
+    "galleryRequerido": "Necesitás permitir el acceso a la galería.",
+    "cameraRequerido": "Necesitás permitir el acceso a la cámara."
+  }
+}

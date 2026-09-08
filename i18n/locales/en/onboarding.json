@@ -1,0 +1,16 @@
+{
+  "brand": { "my": "My ", "world": "World", "xp": "XP" },
+  "subtitle": "TU MUNDO · TU HISTORIA · TUS LOGROS",
+  "features": {
+    "trips": { "title": "Registrá tus viajes", "desc": "Cada ciudad, cada país" },
+    "xp": { "title": "Ganá XP", "desc": "Subí de nivel viajando" },
+    "passport": { "title": "Tu pasaporte", "desc": "Historial de viajes y stats" }
+  },
+  "cta": "CREAR MI PASAPORTE →",
+  "restoreLink": "RESTAURAR BACKUP",
+  "alerts": {
+    "restoreTitle": "Restaurar backup",
+    "restoreButtonLoad": "Cargar Backup",
+    "restoreButtonRestore": "Restaurar"
+  }
+}

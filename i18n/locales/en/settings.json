@@ -1,0 +1,53 @@
+{
+  "header": { "title": "Configuración" },
+  "profile": {
+    "sectionLabel": "PERFIL",
+    "photoLabel": "Foto de perfil",
+    "photoHint": "Tocar para tomar foto o elegir de galería",
+    "nombreLabel": "NOMBRE",
+    "nombrePlaceholder": "Tu nombre",
+    "apellidoLabel": "APELLIDO",
+    "apellidoPlaceholder": "Tu apellido",
+    "nacionalidadLabel": "NACIONALIDAD",
+    "nacionalidadPlaceholder": "Ej: Argentina",
+    "savedButton": "Guardado ✓",
+    "saveButton": "Guardar cambios"
+  },
+  "backup": {
+    "sectionLabel": "DATOS Y BACKUP",
+    "savedBanner": "Backup guardado correctamente ✓",
+    "restoredBanner": "Backup restaurado correctamente ✓",
+    "description": "El backup almacena tu perfil y todos tus viajes localmente en el dispositivo.",
+    "saveButton": "Guardar backup",
+    "loadButton": "Cargar backup",
+    "saveErrorMessage": "No se pudo guardar el backup.",
+    "notFoundTitle": "Sin backup",
+    "notFoundMessage": "No se encontró ningún backup guardado en este dispositivo.",
+    "foundTitle": "Backup encontrado",
+    "loadButtonLabel": "Cargar Backup"
+  },
+  "danger": {
+    "sectionLabel": "ZONA DE PELIGRO",
+    "description": "Elimina permanentemente todos tus viajes, estadísticas y datos de perfil. No se puede deshacer.",
+    "button": "Borrar todos los datos",
+    "confirmTitle": "Borrar todos los datos",
+    "confirmMessage": "Se eliminarán permanentemente todos tus viajes, estadísticas y datos de perfil. Esta acción no se puede deshacer.",
+    "confirmButton": "Borrar todo"
+  },
+  "support": {
+    "sectionLabel": "SOPORTE",
+    "description": "¿Encontraste un error o algo no funciona como esperabas? Contanos qué pasó.",
+    "button": "Reportar problema",
+    "emailSubject": "Reporte de problema - MyWorldXP",
+    "emailBodyIntro": "Contanos qué ocurrió:",
+    "emailBodyQ1": "¿Qué estabas haciendo cuando apareció el problema?",
+    "emailBodyQ2": "¿Qué esperabas que pasara?",
+    "emailBodyQ3": "¿Qué pasó realmente?",
+    "emailBodyDevice": "Modelo de dispositivo: {{device}}",
+    "emailBodyVersion": "Versión de la app: {{version}}",
+    "noMailAppTitle": "No se encontró una app de correo",
+    "mailtoFailedTitle": "No se pudo abrir el correo",
+    "manualEmailMessage": "Podés escribirnos manualmente a:\n{{email}}"
+  },
+  "footer": "MyWorldXP · v1.0"
+}

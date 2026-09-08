@@ -1,0 +1,19 @@
+{
+  "achievement": {
+    "shareDialogTitle": "Compartir logro",
+    "unlockedLabel": "LOGRO DESBLOQUEADO",
+    "xpBadge": "+{{xp}} XP",
+    "shareButton": "Compartir logro",
+    "tapToContinue": "Toca para continuar"
+  },
+  "levelUp": {
+    "shareDialogTitle": "Compartir nivel",
+    "leveledUpLabel": "SUBISTE DE NIVEL",
+    "categoryLabel": "PROGRESO",
+    "title": "Subiste de nivel",
+    "description": "Pasaste de {{prevRango}} a {{newRango}}",
+    "xpBadge": "{{count}} XP para el próximo nivel",
+    "shareButton": "Compartir nivel"
+  },
+  "brand": { "my": "MyWorld", "xp": "XP" }
+}

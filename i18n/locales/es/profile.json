@@ -1,0 +1,33 @@
+{
+  "title": "CREÁ TU PERFIL",
+  "subtitle": "Contanos quién sos para empezar tu viaje",
+  "photoHint": "Tocá para agregar tu foto",
+  "placeholders": {
+    "nombre": "Nombre",
+    "apellido": "Apellido",
+    "nacionalidad": "Nacionalidad",
+    "ciudad": "Ciudad donde resides",
+    "pais": "País donde resides"
+  },
+  "errors": {
+    "ciudadNoEncontrada": "Ciudad no encontrada",
+    "paisNoEncontrado": "País no encontrado"
+  },
+  "cta": "CONTINUAR →",
+  "alerts": {
+    "selectImage": { "title": "Seleccionar imagen", "message": "Elegí una opción" },
+    "savePhotoError": "No se pudo guardar la foto. Intentá de nuevo.",
+    "missingFields": {
+      "title": "Faltan datos",
+      "intro": "Para continuar debés completar:"
+    }
+  },
+  "fields": {
+    "foto": "Foto de perfil",
+    "nombre": "Nombre",
+    "apellido": "Apellido",
+    "nacionalidad": "Nacionalidad",
+    "ciudad": "Ciudad de residencia",
+    "pais": "País de residencia"
+  }
+}

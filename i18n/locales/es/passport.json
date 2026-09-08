@@ -1,0 +1,67 @@
+{
+  "cover": {
+    "stampBrand": "MYWORLDXP",
+    "configLabel": "CONFIG",
+    "brand": { "my": "MY ", "world": "WORLD", "xp": "XP" },
+    "title": "PASSPORT",
+    "subtitle": "PASSEPORT · PASAPORTE · REISEPASS · PASSAPORTO"
+  },
+  "inside": {
+    "page1": {
+      "title": "Mi recorrido",
+      "stats": {
+        "continentes": "Continentes",
+        "paisesVisitados": "Países visitados",
+        "ciudadesVisitadas": "Ciudades visitadas",
+        "quieroVisitar": "Quiero visitar",
+        "kmRecorridos": "Km recorridos",
+        "horasDeVuelo": "Horas de vuelo",
+        "dash": "—"
+      },
+      "spaceFact": {
+        "percentOfLap": "◉ Recorriste el {{percent}}% de una vuelta a {{ref}}",
+        "laps": "◉ Le diste {{count}} vueltas a {{ref}}",
+        "moonTripPercent": "◉ Recorriste el {{percent}}% del viaje a la Luna",
+        "jupiterLaps": "◉ Le diste {{count}} vueltas a Júpiter",
+        "jupiterLapsFinal": "Le diste {{count}} vueltas a Júpiter 🟠",
+        "refs": {
+          "moon": "la Luna",
+          "mars": "Marte",
+          "earth": "la Tierra",
+          "neptune": "Neptuno"
+        }
+      },
+      "emptyState": "✦  Cargá tus viajes para ver\n    tu dato espacial 🚀"
+    },
+    "page2": {
+      "issuer": "MyWorldXP",
+      "passportNumber": "MWX · 263524",
+      "fields": {
+        "apellido": "Apellido",
+        "nombre": "Nombre",
+        "nacionalidad": "Nacionalidad"
+      },
+      "defaultRank": "Novato",
+      "xpLabel": "XP",
+      "xpToNext": "+{{count}} XP",
+      "mrzLine2Static": "MWX263524<ARG9901014M3012315<<<<",
+      "tapToClose": "Tocar para cerrar"
+    },
+    "decorativeStamps": {
+      "_note": "Sellos decorativos en inglés por diseño (estilo visa/pasaporte). No traducir salvo decisión explícita de diseño.",
+      "page1": [
+        "PARIS\nDEPARTURE\n15.08.2019",
+        "TOKYO\nARRIVAL\n2022",
+        "NEW YORK\nARRIVAL\n25 APR 2020",
+        "LONDON\nTRANSIT\n2021",
+        "DUBAI\nARRIVAL\n2023"
+      ],
+      "page2": [
+        "SINGAPORE\nARRIVAL\n19.07.2018",
+        "BUENOS AIRES\nDEPARTURE\nJAN 2019",
+        "AMSTERDAM\nTRANSIT\n25.02.2019",
+        "BANGKOK\nARR\n2017"
+      ]
+    }
+  }
+}

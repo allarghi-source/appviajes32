@@ -3,10 +3,12 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
 
 const GOLD = '#d4af37';
-const INACTIVE = '#3a4a5a';
+// Gris claro, cercano al blanco pero no puro: color único para ícono + texto
+// del botón no seleccionado (cada botón es una sola unidad visual).
+const INACTIVE = '#d6d6da';
 const NAV_BG = '#010810';
 
-export const NAV_HEIGHT = 68;
+export const NAV_HEIGHT = 78;
 
 function PassportIcon({ active }: { active: boolean }) {
   const c = active ? GOLD : INACTIVE;
@@ -67,11 +69,13 @@ function StatsIcon({ active }: { active: boolean }) {
 }
 
 const ITEMS = [
-  { route: '/passportinside', label: 'Home',     Icon: PassportIcon },
-  { route: '/cargar',         label: 'Cargar',   Icon: AddIcon      },
-  { route: '/timeline',       label: 'Timeline', Icon: TimelineIcon },
-  { route: '/estadisticas',   label: 'Stats',    Icon: StatsIcon    },
-  { route: '/mapa',           label: 'Mapa',     Icon: MapIcon      },
+  // PassportCover renderiza PassportInside embebido como fondo (sin cambiar de ruta)
+  // mientras anima la tapa; por eso Home también debe quedar activo en esa ruta.
+  { route: '/passportinside', match: ['/passportinside', '/passportcover'], label: 'Home',     Icon: PassportIcon },
+  { route: '/cargar',         match: ['/cargar'],                           label: 'Cargar',   Icon: AddIcon      },
+  { route: '/timeline',       match: ['/timeline'],                        label: 'Timeline', Icon: TimelineIcon },
+  { route: '/estadisticas',   match: ['/estadisticas'],                    label: 'Stats',    Icon: StatsIcon    },
+  { route: '/mapa',           match: ['/mapa'],                            label: 'Mapa',     Icon: MapIcon      },
 ] as const;
 
 export default function NavBar() {
@@ -80,8 +84,8 @@ export default function NavBar() {
 
   return (
     <View style={styles.bar}>
-      {ITEMS.map(({ route, label, Icon }) => {
-        const active = pathname === route;
+      {ITEMS.map(({ route, match, label, Icon }) => {
+        const active = (match as readonly string[]).includes(pathname);
         return (
           <TouchableOpacity
             key={route}

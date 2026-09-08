@@ -52,6 +52,7 @@ interface TripData {
   xp: number;
   distancia: number;
   chainId: string | null;
+  origenCoords?: { lat: number; lng: number } | null;
 }
 
 interface GeoOpcion { display_name: string; lat: string; lon: string; }
@@ -85,6 +86,25 @@ function genId(): string {
 
 function buildFechaInicio(dia: string, mes: string, anio: string): string {
   return `${dia.padStart(2, '0')}/${mes.padStart(2, '0')}/${anio}`;
+}
+
+// Lee la residencia validada del perfil (país elegido de lista + ciudad
+// geocodificada, con lat/lng finitos). Es el "kilómetro cero" de todo viaje real
+// nuevo. Devuelve null si falta o está incompleta — nunca inventa un origen.
+async function getResidenciaValidada(): Promise<{ lat: number; lng: number } | null> {
+  const raw = await AsyncStorage.getItem('userData');
+  const userData = raw ? JSON.parse(raw) : {};
+  const residencia = userData?.residencia;
+  const lat = residencia?.lat;
+  const lng = residencia?.lng;
+  const valida =
+    residencia &&
+    typeof residencia.countryCode === 'string' &&
+    residencia.ciudad &&
+    residencia.pais &&
+    Number.isFinite(lat) &&
+    Number.isFinite(lng);
+  return valida ? { lat, lng } : null;
 }
 
 // ─── FOTO PERSISTENCE ─────────────────────────────────────────────────────────
@@ -1272,6 +1292,16 @@ export default function CargarViaje() {
 
   async function guardarMultidestino() {
     Keyboard.dismiss();
+    // Misma residencia (si aplica) para todos los destinos de esta cadena: representa
+    // el kilómetro cero vigente al momento de crear el viaje completo.
+    const origen = tipo === 'real' ? await getResidenciaValidada() : null;
+    if (tipo === 'real' && !origen) {
+      Alert.alert(
+        'Residencia requerida',
+        'Para calcular correctamente tus distancias, primero confirmá tu ciudad de residencia en Configuración.'
+      );
+      return;
+    }
     try {
       console.log('[FinalizarViaje] Step 1: leyendo trips existentes');
       const rawBefore = await AsyncStorage.getItem('trips');
@@ -1299,6 +1329,7 @@ export default function CargarViaje() {
           xp: 0,
           distancia: 0,
           chainId,
+          origenCoords: tipo === 'real' ? origen : undefined,
         };
         console.log(`[FinalizarViaje] Step 4: guardando en AsyncStorage destino ${di + 1}`);
         await saveTrip(trip);
@@ -1537,7 +1568,11 @@ export default function CargarViaje() {
     return true;
   }
 
-  function buildTrip(chainId: string | null, persistedFotos?: string[]): TripData {
+  function buildTrip(
+    chainId: string | null,
+    persistedFotos: string[] | undefined,
+    origen: { lat: number; lng: number } | null
+  ): TripData {
     const esReal = tipo === 'real';
     const finalFotos = persistedFotos ?? (esReal ? fotos : []);
     let portada: string | null = null;
@@ -1562,6 +1597,7 @@ export default function CargarViaje() {
       xp: 0,
       distancia: 0,
       chainId,
+      origenCoords: esReal ? origen : undefined,
     };
   }
 
@@ -1612,6 +1648,17 @@ export default function CargarViaje() {
   async function handleGuardar() {
     if (!validate()) return;
     Keyboard.dismiss();
+    let origen: { lat: number; lng: number } | null = null;
+    if (tipo === 'real') {
+      origen = await getResidenciaValidada();
+      if (!origen) {
+        Alert.alert(
+          'Residencia requerida',
+          'Para calcular correctamente tus distancias, primero confirmá tu ciudad de residencia en Configuración.'
+        );
+        return;
+      }
+    }
     try {
       console.log('[Guardar] Step 1: leyendo trips existentes');
       const rawBefore = await AsyncStorage.getItem('trips');
@@ -1619,7 +1666,7 @@ export default function CargarViaje() {
       console.log('[Guardar] Step 2: copiando fotos (', fotos.length, ')');
       const persistedFotos = tipo === 'real' ? await copiarAalmacenamientoPersistente(fotos) : [];
       console.log('[Guardar] Step 3: armando objeto trip');
-      const trip = buildTrip(null, persistedFotos);
+      const trip = buildTrip(null, persistedFotos, origen);
       console.log('[Guardar] Step 4: guardando en AsyncStorage');
       await saveTrip(trip);
       console.log('[Guardar] Step 5: OK — trip guardado');

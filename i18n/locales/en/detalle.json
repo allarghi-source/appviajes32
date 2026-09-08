@@ -1,0 +1,69 @@
+{
+  "header": { "back": "Volver" },
+  "loading": "Cargando...",
+  "gallery": {
+    "coverBadge": "◆  PORTADA",
+    "tapToSetCover": "Tocar para hacer portada",
+    "addMore": "+ Agregar",
+    "done": "Listo",
+    "photoCount": "{{count}} fotos",
+    "editPhotos": "Editar fotos",
+    "noPhotos": "Sin fotos",
+    "addPhotos": "+ Agregar fotos"
+  },
+  "location": {
+    "label": "UBICACIÓN",
+    "edit": "Editar",
+    "cityPlaceholder": "Ciudad",
+    "countryPlaceholder": "País",
+    "confirmed": "✓ Ubicación confirmada",
+    "notFound": "No se encontró. Revisá los datos.",
+    "connectionError": "Error de conexión. Intentá de nuevo.",
+    "searching": "Buscando...",
+    "search": "Buscar"
+  },
+  "date": {
+    "label": "FECHA DEL VIAJE",
+    "dd": "DD",
+    "mm": "MM",
+    "yyyy": "AAAA",
+    "invalidTitle": "Fecha inválida",
+    "invalidMessage": "Ingresá una fecha completa (DD, MM y año de 4 dígitos).",
+    "chainTitle": "Viaje de varios destinos",
+    "chainMessage": "Este viaje forma parte de un viaje de varios destinos. Estás cambiando el año.\n\n¿Qué querés hacer?",
+    "chainOnlyThis": "Solo este destino",
+    "chainAll": "Cambiar todos"
+  },
+  "note": {
+    "label": "COMENTARIO",
+    "add": "+ Agregar",
+    "edit": "Editar",
+    "placeholder": "Escribí algo sobre este viaje...",
+    "empty": "Sin comentario"
+  },
+  "tips": {
+    "label": "TIPS DE VIAJE",
+    "add": "+ Agregar",
+    "edit": "Editar",
+    "placeholder": "Cargar datos útiles de este destino, bares, restaurantes, lugares imperdibles...",
+    "share": "↑ Compartir tips",
+    "shareCopiedTitle": "¡Copiado!",
+    "shareCopiedMessage": "Texto copiado. Ahora podés pegarlo donde quieras.",
+    "shareTemplate": "{{nombre}} de MyWorldXP te recomienda que si visitás {{ciudad}}, {{pais}} tengas en cuenta:\n\n{{tips}}"
+  },
+  "delete": {
+    "button": "Eliminar viaje",
+    "confirmTitle": "¿Eliminar viaje?",
+    "confirmMessage": "¿Estás seguro de que querés eliminar el viaje a {{ciudad}}?",
+    "confirmButton": "Eliminar"
+  },
+  "errors": {
+    "loadTrip": "No se pudo cargar el viaje.",
+    "maxPhotosTitle": "Máximo 4 fotos",
+    "maxPhotosMessage": "Ya cargaste el máximo de fotos permitidas.",
+    "addPhotosTitle": "Agregar fotos",
+    "savePhotosError": "No se pudieron guardar las fotos.",
+    "savePhotoEditsError": "No se pudieron guardar los cambios.",
+    "deleteTripError": "No se pudo eliminar el viaje."
+  }
+}

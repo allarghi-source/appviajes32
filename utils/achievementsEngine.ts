@@ -54,8 +54,8 @@ export const ALL_ACHIEVEMENTS: Achievement[] = [
 
 // ─── STORAGE KEYS ─────────────────────────────────────────────────────────────
 
-const KEY_UNLOCKED = 'achievements_unlocked';
-const KEY_BADGE    = 'achievements_new_count';
+export const KEY_UNLOCKED = 'achievements_unlocked';
+export const KEY_BADGE    = 'achievements_new_count';
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 

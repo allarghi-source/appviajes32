@@ -1,0 +1,9 @@
+{
+  "repositionAlert": {
+    "title": "Confirmar posición",
+    "message": "¿Guardar esta nueva posición del pin?"
+  },
+  "resetPosition": "↺  Restablecer posición original del pin",
+  "wishlistBadge": "PENDIENTE",
+  "markAchieved": "¡Lo logré!"
+}

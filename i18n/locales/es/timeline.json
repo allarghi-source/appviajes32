@@ -1,0 +1,13 @@
+{
+  "title": "Timeline",
+  "subtitle": {
+    "tripCount_one": "{{count}} viaje realizado",
+    "tripCount_other": "{{count}} viajes realizados",
+    "fallback": "Tus viajes realizados"
+  },
+  "loading": "Cargando...",
+  "empty": {
+    "title": "Todavía no hay viajes",
+    "hint": "Cargá tu primer viaje desde la sección Cargar"
+  }
+}

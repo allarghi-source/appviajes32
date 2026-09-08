@@ -22,6 +22,11 @@ import {
 const { width: SCREEN_W } = Dimensions.get('window');
 const PHOTO_H = Math.round(SCREEN_W * 0.68);
 
+// Grilla 2x2 de casilleros que se muestra solo durante la edición de fotos
+const EDIT_GRID_GAP = 10;
+const EDIT_GRID_PADDING = 20;
+const EDIT_SLOT_SIZE = (SCREEN_W - EDIT_GRID_PADDING * 2 - EDIT_GRID_GAP) / 2;
+
 const BG      = '#01050d';
 const GOLD    = '#d4af37';
 const SURFACE = '#0b1525';
@@ -54,6 +59,9 @@ interface Trip {
   distancia: number;
   chainId: string | null;
   coords: { lat: number; lng: number } | null;
+  // Residencia vigente al crear el viaje (solo trips reales). No se toca al
+  // editar: el spread de persistTrip/detachAndSave/saveAllInChain ya lo preserva.
+  origenCoords?: { lat: number; lng: number } | null;
 }
 
 function parseDate(s: string | null): Date {
@@ -533,7 +541,10 @@ export default function DetalleViaje() {
   // En modo edición, la galería muestra el estado pendiente (no el guardado)
   const displayFotos   = editingPhotos ? pendingFotos   : trip.fotos;
   const displayPortada = editingPhotos ? pendingPortada : (trip.portada ?? trip.fotos[0] ?? null);
-  const hasPhotos = displayFotos.length > 0;
+  // Editar fotos solo se puede iniciar si ya había fotos, así que mientras se
+  // edita la grilla se mantiene visible aunque el usuario borre todas (para
+  // dejar los 4 casilleros vacíos con "+" disponibles).
+  const hasPhotos = editingPhotos || trip.fotos.length > 0;
 
   // ─── Render ───────────────────────────────────────────────────────────────────
 
@@ -563,20 +574,26 @@ export default function DetalleViaje() {
           {/* ── GALERÍA ──────────────────────────────────────────────────────── */}
           {hasPhotos && (
             <View style={styles.galleryWrap}>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                decelerationRate="fast"
-                snapToInterval={SCREEN_W}
-                snapToAlignment="center"
-                bounces={false}
-              >
-                {displayFotos.map((uri) => {
-                  const isCover = uri === displayPortada;
-                  if (editingPhotos) {
+              {editingPhotos ? (
+                <View style={styles.editGrid}>
+                  {Array.from({ length: 4 }).map((_, i) => {
+                    const uri = pendingFotos[i];
+                    if (!uri) {
+                      return (
+                        <TouchableOpacity
+                          key={`empty-${i}`}
+                          style={[styles.editSlot, styles.editSlotEmpty]}
+                          onPress={handleAddPhotos}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={styles.editSlotPlus}>+</Text>
+                        </TouchableOpacity>
+                      );
+                    }
+                    const isCover = uri === pendingPortada;
                     return (
-                      <View key={uri} style={styles.photoSlot}>
-                        <Image source={{ uri }} style={styles.photo} resizeMode="cover" />
+                      <View key={uri} style={styles.editSlot}>
+                        <Image source={{ uri }} style={styles.editSlotImage} resizeMode="cover" />
                         {isCover && <View style={styles.coverFrame} pointerEvents="none" />}
                         <TouchableOpacity
                           style={styles.deletePhotoBtn}
@@ -587,43 +604,47 @@ export default function DetalleViaje() {
                         </TouchableOpacity>
                       </View>
                     );
-                  }
-                  return (
-                    <TouchableOpacity
-                      key={uri}
-                      onPress={() => handleSetPortada(uri)}
-                      activeOpacity={0.92}
-                      style={styles.photoSlot}
-                    >
-                      <Image source={{ uri }} style={styles.photo} resizeMode="cover" />
-                      <View style={styles.photoOverlay} pointerEvents="none" />
-                      {isCover ? (
-                        <View style={styles.coverBadge}>
-                          <Text style={styles.coverBadgeText}>◆  PORTADA</Text>
-                        </View>
-                      ) : (
-                        <View style={styles.tapHint}>
-                          <Text style={styles.tapHintText}>Tocar para hacer portada</Text>
-                        </View>
-                      )}
-                      {isCover && <View style={styles.coverFrame} pointerEvents="none" />}
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
+                  })}
+                </View>
+              ) : (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  decelerationRate="fast"
+                  snapToInterval={SCREEN_W}
+                  snapToAlignment="center"
+                  bounces={false}
+                >
+                  {displayFotos.map((uri) => {
+                    const isCover = uri === displayPortada;
+                    return (
+                      <TouchableOpacity
+                        key={uri}
+                        onPress={() => handleSetPortada(uri)}
+                        activeOpacity={0.92}
+                        style={styles.photoSlot}
+                      >
+                        <Image source={{ uri }} style={styles.photo} resizeMode="cover" />
+                        <View style={styles.photoOverlay} pointerEvents="none" />
+                        {isCover ? (
+                          <View style={styles.coverBadge}>
+                            <Text style={styles.coverBadgeText}>◆  PORTADA</Text>
+                          </View>
+                        ) : (
+                          <View style={styles.tapHint}>
+                            <Text style={styles.tapHintText}>Tocar para hacer portada</Text>
+                          </View>
+                        )}
+                        {isCover && <View style={styles.coverFrame} pointerEvents="none" />}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              )}
 
               <View style={styles.photoControls}>
                 {editingPhotos ? (
                   <>
-                    {pendingFotos.length < 4 && (
-                      <TouchableOpacity
-                        style={styles.photoCtrlBtn}
-                        onPress={handleAddPhotos}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={styles.photoCtrlBtnText}>+ Agregar</Text>
-                      </TouchableOpacity>
-                    )}
                     <TouchableOpacity
                       style={styles.photoCtrlBtn}
                       onPress={cancelPhotoEdits}
@@ -1040,6 +1061,31 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   deletePhotoBtnText: { color: '#e74c3c', fontSize: 14, fontWeight: '700' },
+
+  // Grilla 2x2 (solo modo edición de fotos)
+  editGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: EDIT_GRID_PADDING,
+    gap: EDIT_GRID_GAP,
+  },
+  editSlot: {
+    width: EDIT_SLOT_SIZE,
+    height: EDIT_SLOT_SIZE,
+    borderRadius: 10,
+    overflow: 'hidden',
+    position: 'relative',
+    backgroundColor: SURFACE,
+  },
+  editSlotImage: { width: '100%', height: '100%' },
+  editSlotEmpty: {
+    borderWidth: 1.5,
+    borderColor: BORDER,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editSlotPlus: { fontSize: 30, color: MUTED, fontWeight: '300' },
 
   photoControls: {
     flexDirection: 'row',

@@ -1,0 +1,23 @@
+{
+  "names": {
+    "novato": "Novato",
+    "corsario": "Corsario",
+    "viajero": "Viajero",
+    "trotamundos": "Trotamundos",
+    "navegante": "Navegante",
+    "astronauta": "Astronauta"
+  },
+  "continents": {
+    "americaDelNorte": "América del Norte",
+    "americaDelSur": "América del Sur",
+    "europa": "Europa",
+    "africa": "África",
+    "asia": "Asia",
+    "oceania": "Oceanía"
+  },
+  "units": {
+    "millionSuffix": "M",
+    "minutesSuffix": "min",
+    "hoursSuffix": "h"
+  }
+}

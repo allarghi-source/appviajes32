@@ -1,0 +1,109 @@
+{
+  "header": {
+    "title": "Cargar Viaje",
+    "subtitle": "Registrá tu experiencia o tu próximo destino"
+  },
+  "toggle": {
+    "real": "Ya lo hice",
+    "wishlist": "Lo quiero hacer",
+    "singleCity": "Visité una ciudad",
+    "multiCity": "Visité más de una ciudad"
+  },
+  "months": {
+    "1": "ENE", "2": "FEB", "3": "MAR", "4": "ABR",
+    "5": "MAY", "6": "JUN", "7": "JUL", "8": "AGO",
+    "9": "SEP", "10": "OCT", "11": "NOV", "12": "DIC"
+  },
+  "datePlaceholders": { "dd": "DD", "mm": "Mes", "yyyy": "AAAA" },
+  "photoPickerModal": {
+    "title": "Fotos del viaje",
+    "done": "Listo ({{count}})",
+    "emptyAllAssigned": "Todas las fotos preseleccionadas ya están asignadas a otros destinos de este viaje.",
+    "emptyNonePreselected": "Todavía no preseleccionaste fotos para este viaje.\nUsá \"Seleccionar fotos del viaje\" para agregar.",
+    "hint_one": "Seleccioná hasta {{count}} foto para este destino",
+    "hint_other": "Seleccioná hasta {{count}} fotos para este destino"
+  },
+  "destino": {
+    "title": "Destino {{n}}",
+    "sectionLabel": "Destino",
+    "cityPlaceholder": "Ciudad",
+    "countryPlaceholder": "País",
+    "validate": {
+      "idle": "VALIDAR",
+      "loading": "Validando...",
+      "ok": "OK",
+      "notFound": "No encontrada — intentá de nuevo",
+      "error": "Error al validar — intentá de nuevo",
+      "multiple": "Varias coincidencias — elegí una"
+    },
+    "connectionError": "Error al conectar. Verificá tu conexión e intentá de nuevo.",
+    "cityNotFound": "No encontramos la ciudad ingresada.",
+    "chooseAnotherCity": "Elegir otra ciudad",
+    "confirmCountryOnly": "Confirmar solo con el país"
+  },
+  "photos": {
+    "sectionLabel": "Fotos ({{count}}/4)",
+    "addPhotosMulti": "Agregar fotos",
+    "addPhotosSingle": "Cargar fotos",
+    "fromTrip": "Del viaje",
+    "fromGalleryCamera": "Galería · Cámara",
+    "setCoverTitle": "¿Portada?",
+    "setCoverMessage": "¿Deseás asignar esta foto como portada?",
+    "setCoverConfirm": "Asignar",
+    "coverBadge": "Portada",
+    "firstPhotoHint": "La primera foto será la portada del viaje."
+  },
+  "note": {
+    "label": "Nota",
+    "optional": "(opcional)",
+    "placeholderMulti": "Contá algo de este destino...",
+    "placeholderSingle": "Contá algo de este viaje...",
+    "counter": "{{count}}/1000"
+  },
+  "tripPhotosPreselect": {
+    "title": "Preseleccionar fotos de todo el viaje",
+    "subtitle": "Seleccioná todas las fotos que podrían formar parte de este viaje. Más adelante podrás asignarlas a cada ciudad.",
+    "changeSelection_one": "{{count}} foto · Cambiar selección",
+    "changeSelection_other": "{{count}} fotos · Cambiar selección",
+    "selectPhotos": "Seleccionar fotos",
+    "overflowBadge": "+{{count}}"
+  },
+  "buttons": {
+    "saveTrip": "Guardar viaje",
+    "saveDestination": "Guardar destino",
+    "addCity": "+ Agregar ciudad",
+    "finish": "Finalizar viaje"
+  },
+  "alerts": {
+    "missingInfoTitle": "Falta información",
+    "notValidatedTitle": "Destino sin validar",
+    "invalidDateTitle": "Fecha inválida",
+    "missingCityMulti": "Destino {{n}}: la ciudad es obligatoria.",
+    "missingCountryMulti": "Destino {{n}}: el país es obligatorio.",
+    "notValidatedMulti": "Destino {{n}}: presioná \"VALIDAR\" antes de guardar.",
+    "missingDateMulti": "Destino {{n}}: la fecha es obligatoria.",
+    "invalidDateMulti": "Destino {{n}}: la fecha ingresada no existe. Revisala e intentá de nuevo.",
+    "futureDateMulti": "Destino {{n}}: un viaje realizado no puede tener una fecha posterior a hoy.",
+    "multiTripTitle": "Viaje multidestino",
+    "dateGapMessage": "Hay más de 30 días entre algunos destinos de este viaje multidestino. ¿Querés revisar las fechas o guardar igualmente?",
+    "review": "Revisar",
+    "saveAnyway": "Guardar igualmente",
+    "savedTitle": "¡Guardado!",
+    "savedMultiMessage": "Tu viaje con {{count}} ciudades fue guardado correctamente.",
+    "savedSingleMessage_real": "Tu viaje fue guardado correctamente.",
+    "savedSingleMessage_wishlist": "Tu destino fue guardado correctamente.",
+    "missingCityCountryTitle": "Faltan datos",
+    "missingCityCountryMessage": "Ingresá ciudad y país antes de validar el destino.",
+    "countryNotFoundTitle": "País no encontrado",
+    "countryNotFoundMessage": "No pudimos validar el país ingresado. Revisalo e intentá de nuevo.",
+    "maxPhotosTitle": "Máximo 4 fotos",
+    "maxPhotosMessage": "Ya cargaste el máximo de fotos permitidas.",
+    "loadPhotosTitle": "Cargar fotos",
+    "missingCitySingle": "La ciudad es obligatoria.",
+    "missingCountrySingle": "El país es obligatorio.",
+    "notValidatedSingle": "Presioná \"VALIDAR\" antes de guardar.",
+    "missingDateSingle": "La fecha de inicio es obligatoria para viajes reales.",
+    "invalidDateSingle": "La fecha ingresada no existe. Revisala e intentá de nuevo.",
+    "futureDateSingle": "Un viaje realizado no puede tener una fecha posterior a hoy."
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "title": "Estadísticas",
+  "subtitle": "Tu resumen de viajero",
+  "loading": "Cargando...",
+  "rank": {
+    "label": "RANGO ACTUAL",
+    "xpSuffix": " XP",
+    "arrow": "→",
+    "maxRank": "MÁXIMO ★",
+    "xpRemaining": "Faltan {{count}} XP para {{nextRank}}"
+  },
+  "continents": {
+    "label": "CONTINENTES",
+    "counter": "{{count}} / {{total}}",
+    "percentExplored": "{{percent}}% del mundo explorado",
+    "notVisited": "Sin visitar",
+    "percentVisited": "{{percent}}%",
+    "dash": "—",
+    "tripCount_one": "{{count}} viaje",
+    "tripCount_other": "{{count}} viajes"
+  },
+  "topCountries": {
+    "label": "TOP PAÍSES MÁS VISITADOS",
+    "empty": "—",
+    "rankPrefix": "#",
+    "visitCount_one": "{{count}} vez",
+    "visitCount_other": "{{count}} veces"
+  },
+  "topCities": {
+    "label": "TOP CIUDADES MÁS VISITADAS",
+    "empty": "—",
+    "rankPrefix": "#",
+    "tripCount_one": "{{count}} viaje",
+    "tripCount_other": "{{count}} viajes"
+  }
+}

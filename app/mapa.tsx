@@ -5,6 +5,7 @@ import { Alert, Animated, Image, ScrollView, StyleSheet, Text, TouchableOpacity,
 import MapView, { Marker, MarkerDragStartEndEvent, Region } from 'react-native-maps';
 import Svg, { Circle, Path } from 'react-native-svg';
 import NavBar from '../components/NavBar';
+import { STORAGE_KEYS } from '../utils/backupEngine';
 import { playSound, preloadSounds } from '../utils/soundEngine';
 
 const GOLD = '#d4af37';
@@ -14,7 +15,7 @@ const BG = '#01050d';
 // Posiciones visuales personalizadas de los pines (solo estéticas).
 // Se guardan por separado de los datos del viaje: nunca tocan `coords`,
 // que sigue siendo la fuente de verdad para stats, timeline, XP y logros.
-const PIN_VISUAL_KEY = 'pin_visual_overrides';
+const PIN_VISUAL_KEY = STORAGE_KEYS.pinVisualOverrides;
 
 type VisualOverrides = Record<string, { lat: number; lng: number }>;
 
