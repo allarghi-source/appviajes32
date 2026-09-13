@@ -1347,8 +1347,14 @@ export default function CargarViaje() {
         scrollRef.current?.scrollTo?.({ x: 0, y: 0, animated: false });
       }, 50);
       playSound('cargar');
-      Alert.alert('¡Guardado!', `Tu viaje con ${destinos.length} ciudades fue guardado correctamente.`);
-      _checkAchievements(prevStats.rangoActual);
+      // El chequeo de logros/nivel recién dispara notifQueue cuando el usuario
+      // cierra este Alert nativo — así nunca queda un popup de logro montado
+      // (y animando) detrás de este mensaje.
+      Alert.alert(
+        '¡Guardado!',
+        `Tu viaje con ${destinos.length} ciudades fue guardado correctamente.`,
+        [{ text: 'OK', onPress: () => _checkAchievements(prevStats.rangoActual) }]
+      );
     } catch (err) {
       console.error('[FinalizarViaje] ERROR COMPLETO al guardar:', err);
       Alert.alert('Error', 'No se pudo guardar. Intentá de nuevo.');
@@ -1674,8 +1680,13 @@ export default function CargarViaje() {
       chainIdRef.current = null;
       resetForm();
       playSound('cargar');
-      Alert.alert('¡Guardado!', `Tu ${tipo === 'real' ? 'viaje' : 'destino'} fue guardado correctamente.`);
-      _checkAchievements(prevStats.rangoActual);
+      // Ver comentario equivalente en handleFinalizarViaje: se difiere el
+      // chequeo de logros/nivel hasta que el usuario cierra este Alert.
+      Alert.alert(
+        '¡Guardado!',
+        `Tu ${tipo === 'real' ? 'viaje' : 'destino'} fue guardado correctamente.`,
+        [{ text: 'OK', onPress: () => _checkAchievements(prevStats.rangoActual) }]
+      );
     } catch (err) {
       console.error('[Guardar] ERROR COMPLETO al guardar:', err);
       Alert.alert('Error', 'No se pudo guardar. Intentá de nuevo.');

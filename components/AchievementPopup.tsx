@@ -1,10 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, Easing, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import type { Achievement } from '../utils/achievementsEngine';
 
 const GOLD = '#d4af37';
+
+// Prueba visual: la estrella "sale hacia adelante", da una vuelta completa con
+// perspectiva 2.5D y vuelve exactamente a su posición/tamaño original. Un solo
+// Animated.Value maneja todo (scale/translate/rotateX/rotateY vía interpolate)
+// para no depender de múltiples animaciones encadenadas que haya que limpiar.
+const STAR_CINE_DELAY_MS = 180;
+const STAR_CINE_DURATION_MS = 1750;
 
 interface Props {
   achievements: Achievement[];
@@ -17,6 +24,37 @@ export function AchievementPopup({ achievements, onDone }: Props) {
   const scale   = useRef(new Animated.Value(0.88)).current;
   const cardRef = useRef<View>(null);
 
+  // Valor propio de la estrella, expuesto como estado (no como ref) para no
+  // leerlo durante el render y no introducir nuevas violaciones de lint.
+  const [starProgress] = useState(() => new Animated.Value(0));
+
+  const starScale = starProgress.interpolate({
+    inputRange:  [0, 0.15, 0.5, 0.85, 0.93, 1],
+    outputRange: [1, 1.15, 1.75, 1.05, 0.985, 1],
+  });
+  const starTranslateY = starProgress.interpolate({
+    inputRange:  [0, 0.5, 1],
+    outputRange: [0, -16, 0],
+  });
+  const starTranslateX = starProgress.interpolate({
+    inputRange:  [0, 0.3, 0.7, 1],
+    outputRange: [0, 5, -4, 0],
+  });
+  const starRotateY = starProgress.interpolate({
+    inputRange:  [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+  const starRotateX = starProgress.interpolate({
+    inputRange:  [0, 0.5, 1],
+    outputRange: ['0deg', '8deg', '0deg'],
+  });
+  // Destello: pico angosto centrado en 0.5, el mismo punto donde starScale
+  // llega a su máximo (1.75) — sincronizado por construcción, sin timer propio.
+  const starSparkleOpacity = starProgress.interpolate({
+    inputRange:  [0, 0.40, 0.5, 0.62, 1],
+    outputRange: [0, 0,    0.5, 0,    0],
+  });
+
   useEffect(() => {
     opacity.setValue(0);
     scale.setValue(0.88);
@@ -25,7 +63,24 @@ export function AchievementPopup({ achievements, onDone }: Props) {
       Animated.spring(scale, { toValue: 1, friction: 7, tension: 110, useNativeDriver: true }),
     ]).start();
     // No timer — popup stays until user closes with ✕
-  }, [index]);
+
+    starProgress.setValue(0);
+    Animated.timing(starProgress, {
+      toValue: 1,
+      duration: STAR_CINE_DURATION_MS,
+      delay: STAR_CINE_DELAY_MS,
+      easing: Easing.inOut(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+
+    return () => {
+      starProgress.stopAnimation();
+    };
+    // `starProgress` se agrega para no ampliar el warning preexistente de
+    // dependencias faltantes de este efecto (opacity/scale, ajenas a esta
+    // tarea); su identidad nunca cambia (no se usa su setter), así que
+    // incluirlo no altera cuándo se re-ejecuta el efecto.
+  }, [index, starProgress]);
 
   function advance() {
     Animated.parallel([
@@ -80,8 +135,29 @@ export function AchievementPopup({ achievements, onDone }: Props) {
             )}
           </View>
 
-          {/* Star icon */}
-          <Text style={styles.star}>★</Text>
+          {/* Star icon — la Text conserva su estilo intacto; solo el wrapper anima */}
+          <Animated.View
+            style={{
+              transform: [
+                { perspective: 800 },
+                { translateX: starTranslateX },
+                { translateY: starTranslateY },
+                { rotateX: starRotateX },
+                { rotateY: starRotateY },
+                { scale: starScale },
+              ],
+            }}
+          >
+            <Text style={styles.star}>★</Text>
+            {/* Destello — misma posición/transform que la estrella (hereda las
+                del wrapper), solo su opacity se anima por separado */}
+            <Animated.Text
+              style={[styles.star, styles.starSparkle, { opacity: starSparkleOpacity }]}
+              pointerEvents="none"
+            >
+              ★
+            </Animated.Text>
+          </Animated.View>
 
           {/* Categoria */}
           <Text style={styles.categoria}>{a.categoria.toUpperCase()}</Text>
@@ -194,6 +270,15 @@ const styles = StyleSheet.create({
     fontSize: 44,
     color: GOLD,
     marginVertical: 6,
+  },
+  starSparkle: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    textAlign: 'center',
+    color: '#fff8e6',
+    textShadowColor: '#fff8e6',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 18,
   },
   categoria: {
     fontSize: 9,

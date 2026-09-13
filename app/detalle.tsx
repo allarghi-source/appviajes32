@@ -96,6 +96,106 @@ async function copiarFoto(uri: string): Promise<string> {
   return dest;
 }
 
+// ─── Presentación cinematográfica (solo estado inicial de la galería) ─────────
+// Doble buffer de dos <Animated.Image>: nunca hay más de 2 fotos decodificadas
+// a la vez, y la foto "entrante" siempre se prepara mientras está invisible
+// (con todo el dwell siguiente de margen), así el crossfade nunca expone un
+// frame en blanco. No toca pendingFotos/pendingPortada/trip: es puramente visual.
+const CINE_DWELL_MS = 2800;
+const CINE_FADE_MS = 1100;
+const CINE_KEN_BURNS_SCALE = 1.045;
+
+function CinematicPhotoGallery({ fotos, onInteract }: { fotos: string[]; onInteract: () => void }) {
+  // `fotos` es la prop (no un ref): leerla durante el render es válido y es lo
+  // que arma el estado inicial de cada capa del doble buffer.
+  const [uriA, setUriA] = useState(fotos[0]);
+  const [uriB, setUriB] = useState(fotos[1 % fotos.length]);
+
+  // Los Animated.Value deben mantener la misma identidad en cada render sin
+  // volver a crearse, igual que con useRef(...).current, pero expuestos como
+  // estado (nunca se llama al setter) para no leer un ref durante el render.
+  const [opacityA] = useState(() => new Animated.Value(1));
+  const [opacityB] = useState(() => new Animated.Value(0));
+  const [scaleA]   = useState(() => new Animated.Value(1));
+  const [scaleB]   = useState(() => new Animated.Value(1));
+
+  const frontIsARef   = useRef(true); // true = A visible ahora, B oculta preparándose
+  const frontIndexRef = useRef(0);    // índice en `fotos` de la foto al frente
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const liveRef  = useRef(true);
+
+  useEffect(() => {
+    liveRef.current = true;
+
+    scaleA.setValue(1);
+    Animated.timing(scaleA, {
+      toValue: CINE_KEN_BURNS_SCALE,
+      duration: CINE_DWELL_MS + CINE_FADE_MS,
+      useNativeDriver: true,
+    }).start();
+
+    function scheduleAdvance() {
+      timerRef.current = setTimeout(advance, CINE_DWELL_MS);
+    }
+
+    function advance() {
+      if (!liveRef.current || fotos.length < 2) return;
+      const showingA  = frontIsARef.current;
+      const outOpacity = showingA ? opacityA : opacityB;
+      const inOpacity  = showingA ? opacityB : opacityA;
+      const inScale    = showingA ? scaleB   : scaleA;
+
+      inScale.setValue(1);
+      Animated.parallel([
+        Animated.timing(outOpacity, { toValue: 0, duration: CINE_FADE_MS, useNativeDriver: true }),
+        Animated.timing(inOpacity,  { toValue: 1, duration: CINE_FADE_MS, useNativeDriver: true }),
+        Animated.timing(inScale,    { toValue: CINE_KEN_BURNS_SCALE, duration: CINE_DWELL_MS + CINE_FADE_MS, useNativeDriver: true }),
+      ]).start(({ finished }) => {
+        if (!finished || !liveRef.current) return;
+        frontIsARef.current = !showingA;
+        frontIndexRef.current = (frontIndexRef.current + 1) % fotos.length;
+
+        // La capa que acaba de quedar oculta se prepara ahora con la SIGUIENTE
+        // foto: al estar invisible, tiene todo el próximo dwell para decodificar.
+        const upcoming = fotos[(frontIndexRef.current + 1) % fotos.length];
+        if (showingA) setUriA(upcoming); else setUriB(upcoming);
+
+        scheduleAdvance();
+      });
+    }
+
+    scheduleAdvance();
+
+    return () => {
+      liveRef.current = false;
+      if (timerRef.current) clearTimeout(timerRef.current);
+      opacityA.stopAnimation();
+      opacityB.stopAnimation();
+      scaleA.stopAnimation();
+      scaleB.stopAnimation();
+    };
+    // `fotos` no cambia mientras este componente sigue montado (el padre lo
+    // desmonta si entra a edición o si el usuario interactúa con la cinemática),
+    // así que declararlo como dependencia es fiel a la realidad y el efecto
+    // sigue corriendo una única vez por montaje, sin necesitar eslint-disable.
+  }, [fotos, opacityA, opacityB, scaleA, scaleB]);
+
+  return (
+    <TouchableOpacity activeOpacity={1} onPressIn={onInteract} style={styles.cineFrame}>
+      <Animated.Image
+        source={{ uri: uriA }}
+        style={[styles.photo, styles.cineLayer, { opacity: opacityA, transform: [{ scale: scaleA }] }]}
+        resizeMode="cover"
+      />
+      <Animated.Image
+        source={{ uri: uriB }}
+        style={[styles.photo, styles.cineLayer, { opacity: opacityB, transform: [{ scale: scaleB }] }]}
+        resizeMode="cover"
+      />
+    </TouchableOpacity>
+  );
+}
+
 export default function DetalleViaje() {
   const params = useLocalSearchParams<{ id: string }>();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
@@ -133,6 +233,10 @@ export default function DetalleViaje() {
   const [pendingFotos, setPendingFotos] = useState<string[]>([]);
   const [pendingPortada, setPendingPortada] = useState<string | null>(null);
   const [toDeleteOnCommit, setToDeleteOnCommit] = useState<string[]>([]);
+  // Presentación cinematográfica: arranca en cada entrada a la pantalla; pasa a
+  // false apenas el usuario toca/desliza la zona de fotos y no vuelve a activarse
+  // hasta la próxima vez que se entra al detalle (ver reset junto a setTrip abajo).
+  const [manualMode, setManualMode] = useState(false);
 
   const scrollViewRef = useRef<ScrollView>(null);
   const paddedYRef    = useRef(0);
@@ -158,6 +262,7 @@ export default function DetalleViaje() {
           setTrip(found);
           setNota(found.nota);
           setTipsViaje(found.tipsViaje || '');
+          setManualMode(false);
           Animated.parallel([
             Animated.timing(fadeAnim, { toValue: 1, duration: 360, useNativeDriver: true }),
             Animated.timing(slideAnim, { toValue: 0, duration: 360, useNativeDriver: true }),
@@ -545,6 +650,9 @@ export default function DetalleViaje() {
   // edita la grilla se mantiene visible aunque el usuario borre todas (para
   // dejar los 4 casilleros vacíos con "+" disponibles).
   const hasPhotos = editingPhotos || trip.fotos.length > 0;
+  // Cinemática: solo fuera de edición, solo si el usuario no la detuvo todavía
+  // en esta visita, y solo con 2 a 4 fotos (con 1 sola no hace falta animación).
+  const showCinematic = !editingPhotos && !manualMode && displayFotos.length >= 2;
 
   // ─── Render ───────────────────────────────────────────────────────────────────
 
@@ -606,6 +714,11 @@ export default function DetalleViaje() {
                     );
                   })}
                 </View>
+              ) : showCinematic ? (
+                <CinematicPhotoGallery
+                  fotos={displayFotos}
+                  onInteract={() => setManualMode(true)}
+                />
               ) : (
                 <ScrollView
                   horizontal
@@ -1031,6 +1144,13 @@ const styles = StyleSheet.create({
   galleryWrap: { marginBottom: 22 },
   photoSlot:   { width: SCREEN_W, height: PHOTO_H, position: 'relative' },
   photo:       { width: SCREEN_W, height: PHOTO_H },
+  // Cinemática: mismo tamaño que photoSlot, recorta el zoom sutil del Ken Burns.
+  cineFrame: {
+    width: SCREEN_W, height: PHOTO_H,
+    position: 'relative', overflow: 'hidden',
+    backgroundColor: SURFACE,
+  },
+  cineLayer: { position: 'absolute', top: 0, left: 0 },
   photoOverlay: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     height: PHOTO_H * 0.4,

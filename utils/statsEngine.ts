@@ -82,6 +82,12 @@ const CONTINENT_MAP: Record<string, string> = {
   'trinidad y tobago': 'América del Norte',
   'barbados': 'América del Norte',
   'bahamas': 'América del Norte',
+  'antigua y barbuda': 'América del Norte',
+  'dominica': 'América del Norte',
+  'granada': 'América del Norte',
+  'san cristobal y nieves': 'América del Norte',
+  'san vicente y las granadinas': 'América del Norte',
+  'santa lucia': 'América del Norte',
 
   // América del Sur
   'argentina': 'América del Sur',
@@ -148,6 +154,11 @@ const CONTINENT_MAP: Record<string, string> = {
   'andorra': 'Europa',
   'san marino': 'Europa',
   'liechtenstein': 'Europa',
+  'azerbaiyan': 'Europa',
+  'bosnia y herzegovina': 'Europa',
+  'ciudad del vaticano': 'Europa',
+  'macedonia del norte': 'Europa',
+  'montenegro': 'Europa',
 
   // África
   'marruecos': 'África',
@@ -176,6 +187,37 @@ const CONTINENT_MAP: Record<string, string> = {
   'namibia': 'África',
   'botswana': 'África',
   'uganda': 'África',
+  'benin': 'África',
+  'botsuana': 'África',
+  'burkina faso': 'África',
+  'burundi': 'África',
+  'cabo verde': 'África',
+  'chad': 'África',
+  'comoras': 'África',
+  'eritrea': 'África',
+  'esuatini': 'África',
+  'gabon': 'África',
+  'gambia': 'África',
+  'guinea': 'África',
+  'guinea-bisau': 'África',
+  'guinea ecuatorial': 'África',
+  'lesoto': 'África',
+  'liberia': 'África',
+  'malaui': 'África',
+  'mauricio': 'África',
+  'mauritania': 'África',
+  'niger': 'África',
+  'republica centroafricana': 'África',
+  'republica del congo': 'África',
+  'republica democratica del congo': 'África',
+  'santo tome y principe': 'África',
+  'seychelles': 'África',
+  'sierra leona': 'África',
+  'somalia': 'África',
+  'sudan': 'África',
+  'sudan del sur': 'África',
+  'togo': 'África',
+  'yibuti': 'África',
 
   // Asia
   'china': 'Asia',
@@ -215,6 +257,19 @@ const CONTINENT_MAP: Record<string, string> = {
   'mongolia': 'Asia',
   'afganistan': 'Asia',
   'birmania': 'Asia',
+  'birmania (myanmar)': 'Asia',
+  'banglades': 'Asia',
+  'barein': 'Asia',
+  'brunei': 'Asia',
+  'butan': 'Asia',
+  'catar': 'Asia',
+  'kirguistan': 'Asia',
+  'oman': 'Asia',
+  'palestina': 'Asia',
+  'tayikistan': 'Asia',
+  'timor oriental': 'Asia',
+  'turkmenistan': 'Asia',
+  'yemen': 'Asia',
 
   // Oceanía
   'australia': 'Oceanía',
@@ -228,6 +283,13 @@ const CONTINENT_MAP: Record<string, string> = {
   'vanuatu': 'Oceanía',
   'polinesia francesa': 'Oceanía',
   'nueva caledonia': 'Oceanía',
+  'islas marshall': 'Oceanía',
+  'islas salomon': 'Oceanía',
+  'kiribati': 'Oceanía',
+  'micronesia': 'Oceanía',
+  'nauru': 'Oceanía',
+  'palaos': 'Oceanía',
+  'tuvalu': 'Oceanía',
 };
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -237,7 +299,8 @@ function normalize(s: string): string {
     .toLowerCase()
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
-    .trim();
+    .trim()
+    .replace(/\s+/g, ' ');
 }
 
 export function getContinent(pais: string): string | null {

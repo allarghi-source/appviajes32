@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Animated, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView, { Marker, MarkerDragStartEndEvent, Region } from 'react-native-maps';
 import Svg, { Circle, Path } from 'react-native-svg';
+import CompartirXpTab from '../components/map/CompartirXpTab';
+import SocialTabs, { MapSection } from '../components/map/SocialTabs';
 import NavBar from '../components/NavBar';
 import { STORAGE_KEYS } from '../utils/backupEngine';
 import { playSound, preloadSounds } from '../utils/soundEngine';
@@ -79,6 +81,7 @@ function PinWishlist() {
 
 export default function Mapa() {
   const router = useRouter();
+  const [activeSection, setActiveSection] = useState<MapSection>('mine');
   const [trips, setTrips] = useState<Trip[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<TripGroup | null>(null);
   const [visualOverrides, setVisualOverrides] = useState<VisualOverrides>({});
@@ -173,6 +176,10 @@ export default function Mapa() {
 
   return (
     <View style={styles.root}>
+      <SocialTabs active={activeSection} onChange={setActiveSection} />
+
+      <View style={styles.sectionContainer}>
+      {activeSection === 'mine' && (
       <Animated.View style={[styles.mapWrap, { opacity }]}>
         <MapView
           style={styles.map}
@@ -303,6 +310,20 @@ export default function Mapa() {
           </View>
         )}
       </Animated.View>
+      )}
+
+      {activeSection === 'others' && (
+        <View style={styles.otrosXpWrap}>
+          <Text style={styles.otrosXpTitle}>OtrosXP</Text>
+          <Text style={styles.otrosXpBody}>
+            Acá vas a poder ver los mundos que otros usuarios compartan con vos.
+          </Text>
+          <Text style={styles.otrosXpEmpty}>Todavía no tenés mundos compartidos.</Text>
+        </View>
+      )}
+
+      {activeSection === 'share' && <CompartirXpTab />}
+      </View>
 
       <NavBar />
     </View>
@@ -315,6 +336,35 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: BG,
+  },
+  sectionContainer: {
+    flex: 1,
+  },
+  otrosXpWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  otrosXpTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#e8e0d0',
+  },
+  otrosXpBody: {
+    fontSize: 14,
+    color: '#6b7a8d',
+    textAlign: 'center',
+    marginTop: 14,
+    lineHeight: 21,
+  },
+  otrosXpEmpty: {
+    fontSize: 13,
+    color: '#6b7a8d',
+    textAlign: 'center',
+    marginTop: 24,
+    fontStyle: 'italic',
+    opacity: 0.8,
   },
   mapWrap: {
     flex: 1,

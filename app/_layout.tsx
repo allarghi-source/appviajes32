@@ -3,6 +3,7 @@ import { Slot } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { I18nextProvider } from 'react-i18next';
 
+import { SessionProvider } from '../contexts/SessionProvider';
 import i18n, { initI18n } from '../i18n';
 import { runOrigenCoordsMigration } from '../utils/tripOriginMigration';
 
@@ -32,7 +33,9 @@ export default function RootLayout() {
 
   return (
     <I18nextProvider i18n={i18n}>
-      <Slot />
+      <SessionProvider>
+        <Slot />
+      </SessionProvider>
     </I18nextProvider>
   );
 }
