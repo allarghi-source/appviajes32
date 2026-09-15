@@ -10,6 +10,13 @@ const soundSources = {
   tic: require('../assets/sounds/tic.mp3'),
   anuncio_2: require('../assets/sounds/anuncio_2.mp3'),
   piloto: require('../assets/sounds/piloto.mp3'),
+  // Tac del Timeline (rueda mecánica sincronizada con el scroll) -- nombre
+  // propio, distinto de `tic` porque `tic` ya se usa para los selectores de
+  // fecha en cargar.tsx y no debe tocarse.
+  timeline_tac: require('../assets/sounds/timeline_tac_corto.mp3'),
+  // Guardar un viaje wishlist/deseado -- distinto del sonido de guardar un
+  // viaje real (`cargar`).
+  viaje_deseado: require('../assets/sounds/viaje_deseado_harpa.mp3'),
 };
 
 type SoundName = keyof typeof soundSources;
@@ -22,6 +29,10 @@ async function getPlayer(name: SoundName): Promise<AudioPlayer> {
     return cache[name]!;
   }
   const player = createAudioPlayer(soundSources[name]);
+  // Volumen bajo específico del tac del Timeline -- no afecta a ningún otro sonido.
+  if (name === 'timeline_tac') {
+    player.volume = 0.3;
+  }
   cache[name] = player;
   return player;
 }

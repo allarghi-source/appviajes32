@@ -10,7 +10,7 @@ import {
   parseBackup,
   writeBackup,
 } from '../utils/backupEngine';
-import { copiarFotoPersistente, PERFIL_DIR } from '../utils/fotoPersistente';
+import { copiarFotoPersistente, PERFIL_DIR, resolveFotoUri } from '../utils/fotoPersistente';
 import { GeoOpcion, geocodeNominatim } from '../utils/geocoding';
 import { buscarPaises, getPaisPorIso2, Pais } from '../utils/paises';
 import { playSound } from '../utils/soundEngine';
@@ -479,7 +479,7 @@ export default function Settings() {
           <TouchableOpacity style={styles.photoRow} onPress={pickPhoto} activeOpacity={0.75}>
             <View style={styles.photoBox}>
               {foto ? (
-                <Image source={{ uri: foto }} style={styles.photoImg} resizeMode="cover" />
+                <Image source={{ uri: resolveFotoUri(foto) ?? foto }} style={styles.photoImg} resizeMode="cover" />
               ) : (
                 <Text style={styles.photoPlaceholder}>+</Text>
               )}

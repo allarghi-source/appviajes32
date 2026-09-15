@@ -8,6 +8,7 @@ import CompartirXpTab from '../components/map/CompartirXpTab';
 import SocialTabs, { MapSection } from '../components/map/SocialTabs';
 import NavBar from '../components/NavBar';
 import { STORAGE_KEYS } from '../utils/backupEngine';
+import { resolveFotoUri } from '../utils/fotoPersistente';
 import { playSound, preloadSounds } from '../utils/soundEngine';
 
 const GOLD = '#d4af37';
@@ -271,7 +272,7 @@ export default function Mapa() {
                       }
                     >
                       {cover ? (
-                        <Image source={{ uri: cover }} style={styles.tripRowImg} />
+                        <Image source={{ uri: resolveFotoUri(cover) ?? cover }} style={styles.tripRowImg} />
                       ) : (
                         <View style={[
                           styles.tripRowImgEmpty,

@@ -15,6 +15,7 @@ import {
 import { useSession } from '../../contexts/SessionProvider';
 import { signOut } from '../../utils/auth';
 import { getMyUsername, getSocialErrorMessage } from '../../utils/social';
+import { requestSharedWorldSync } from '../../utils/socialSync';
 import PendingRequests from './PendingRequests';
 import UserSearch from './UserSearch';
 
@@ -53,6 +54,11 @@ export default function CompartirXpTab() {
   // sesión de la app). Sin polling.
   useEffect(() => {
     if (!verified || !userId) return;
+
+    // Red de seguridad, no el mecanismo principal: entrar a CompartirXP es
+    // una oportunidad razonable más para reintentar la foto social si algún
+    // sync anterior falló. Best-effort, no bloquea ni afecta esta pantalla.
+    requestSharedWorldSync();
 
     getMyUsername(userId)
       .then((u) => {

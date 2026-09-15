@@ -26,6 +26,7 @@ import NavBar, { NAV_HEIGHT } from '../components/NavBar';
 // luego '#F4F9FC' — ajustado a una dominante fría apenas más perceptible).
 const PAPER_BG = '#E8F0F7';
 import { loadBadgeCount } from '../utils/achievementsEngine';
+import { resolveFotoUri } from '../utils/fotoPersistente';
 import {
   StatsResult,
   Trip,
@@ -355,7 +356,7 @@ const icon = '◉ ';
                 <View style={[styles.photoCorner, { bottom: 4, right: 4, borderBottomWidth: 2, borderRightWidth: 2 }]} />
                 {userData?.foto ? (
                   <Image
-                    source={{ uri: userData.foto }}
+                    source={{ uri: resolveFotoUri(userData.foto) ?? userData.foto }}
                     style={{ width: '100%', height: '100%' }}
                     resizeMode="cover"
                   />

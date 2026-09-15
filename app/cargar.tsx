@@ -5,8 +5,9 @@ import * as ImagePicker from 'expo-image-picker';
 import { AchievementPopup } from '../components/AchievementPopup';
 import { LevelUpPopup } from '../components/LevelUpPopup';
 import { Achievement, checkAndSaveAchievements } from '../utils/achievementsEngine';
-import { calcularStats, getXpRestantes, Trip as StatsTrip } from '../utils/statsEngine';
+import { calcularStats, getXpRestantes, haversineKm, Trip as StatsTrip } from '../utils/statsEngine';
 import { playSound } from '../utils/soundEngine';
+import { requestSharedWorldSync } from '../utils/socialSync';
 import { useLocalSearchParams } from 'expo-router';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import React, { useEffect, useRef, useState } from 'react';
@@ -147,23 +148,25 @@ async function copiarAalmacenamientoPersistente(uris: string[]): Promise<string[
       continue;
     }
 
-    // Ya está en documentDirectory → no necesita copiarse
+    // Ya está en documentDirectory → no necesita copiarse; se guarda solo la
+    // parte relativa (nunca el absoluto — ver resolveFotoUri en fotoPersistente.ts).
     if (uri.startsWith(FileSystem.documentDirectory)) {
       console.log(`[Fotos] Foto ${i + 1}: ya persistida, usando directa`);
-      resultados.push(uri);
+      resultados.push(uri.slice(FileSystem.documentDirectory.length));
       continue;
     }
 
     const cleanUri = uri.split('?')[0];
     const rawExt = cleanUri.split('.').pop()?.toLowerCase() ?? 'jpg';
     const safeExt = ['jpg', 'jpeg', 'png', 'heic', 'webp'].includes(rawExt) ? rawExt : 'jpg';
-    const dest = `${FOTOS_DIR}${genId()}.${safeExt}`;
+    const relative = `fotos/${genId()}.${safeExt}`;
+    const dest = `${FileSystem.documentDirectory}${relative}`;
 
     try {
       console.log(`[Fotos] Foto ${i + 1}: copyAsync →`, dest.slice(-50));
       await FileSystem.copyAsync({ from: uri, to: dest });
       console.log(`[Fotos] Foto ${i + 1}: copiada OK`);
-      resultados.push(dest);
+      resultados.push(relative);
     } catch (copyErr) {
       console.error(`[Fotos] Foto ${i + 1}: ERROR en copyAsync — uri: ${uri.slice(0, 100)}`, copyErr);
       throw copyErr;
@@ -477,6 +480,34 @@ async function geocodeNominatim(query: string, limit: number): Promise<GeoOpcion
   return res.json();
 }
 
+// ─── DEDUPLICACIÓN POR PROXIMIDAD ──────────────────────────────────────────────
+// Nominatim puede devolver varias representaciones administrativas del mismo
+// destino físico (ej: el punto-ciudad y el polígono de la comarca/distrito que
+// la contiene) con display_name distinto pero coordenadas casi idénticas. Se
+// agrupan por distancia (Haversine) en vez de por texto: dentro del umbral son
+// el mismo destino, más allá son localidades realmente distintas. Único punto
+// de esta lógica: lo usan tanto el flujo de viaje simple como el multidestino.
+const GEO_DEDUP_KM = 9;
+
+function agruparResultadosGeo(data: GeoOpcion[]): GeoOpcion[] {
+  const grupos: GeoOpcion[][] = [];
+
+  for (const opt of data) {
+    const lat = parseFloat(opt.lat);
+    const lng = parseFloat(opt.lon);
+    const grupoExistente = grupos.find((g) => {
+      const rep = g[0];
+      return haversineKm({ lat, lng }, { lat: parseFloat(rep.lat), lng: parseFloat(rep.lon) }) <= GEO_DEDUP_KM;
+    });
+    if (grupoExistente) grupoExistente.push(opt);
+    else grupos.push([opt]);
+  }
+
+  // Un representante por grupo: el primero en el orden de relevancia que ya
+  // devuelve Nominatim (primer resultado que originó ese grupo).
+  return grupos.map((g) => g[0]);
+}
+
 // ─── DROPDOWN LIST COMPONENT ──────────────────────────────────────────────────
 
 const DropdownList = ({
@@ -722,16 +753,17 @@ function DestinoBlock({
     onChange({ geoStatus: 'buscando', coords: null, geoNombre: '', geoOpciones: [], geoSoloPais: false });
     try {
       const data = await geocodeNominatim(`${destino.ciudad.trim()}, ${destino.pais.trim()}`, 5);
-      if (data.length === 1) {
+      const agrupados = agruparResultadosGeo(data);
+      if (agrupados.length === 1) {
         onChange({
-          coords: { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) },
-          geoNombre: data[0].display_name,
+          coords: { lat: parseFloat(agrupados[0].lat), lng: parseFloat(agrupados[0].lon) },
+          geoNombre: agrupados[0].display_name,
           geoStatus: 'encontrada',
           geoOpciones: [],
         });
         onLearnCity(destino.ciudad.trim(), destino.pais.trim());
-      } else if (data.length > 1) {
-        onChange({ geoStatus: 'multiples', geoOpciones: data });
+      } else if (agrupados.length > 1) {
+        onChange({ geoStatus: 'multiples', geoOpciones: agrupados });
       } else {
         onChange({ geoStatus: 'no_encontrada', geoOpciones: [] });
       }
@@ -1336,6 +1368,7 @@ export default function CargarViaje() {
         console.log(`[FinalizarViaje] Destino ${di + 1} guardado OK`);
       }
       if (pWishlistId) await deleteWishlistTrip(pWishlistId);
+      requestSharedWorldSync();
       setDestinos([createDestino(), createDestino()]);
       setFotosViaje([]);
       setCantCiudades('una');
@@ -1346,7 +1379,7 @@ export default function CargarViaje() {
         scrollRef.current?.scrollToPosition?.(0, 0, false);
         scrollRef.current?.scrollTo?.({ x: 0, y: 0, animated: false });
       }, 50);
-      playSound('cargar');
+      playSound(tipo === 'real' ? 'cargar' : 'viaje_deseado');
       // El chequeo de logros/nivel recién dispara notifQueue cuando el usuario
       // cierra este Alert nativo — así nunca queda un popup de logro montado
       // (y animando) detrás de este mensaje.
@@ -1455,14 +1488,15 @@ export default function CargarViaje() {
     setGeoSoloPais(false);
     try {
       const data = await geocodeNominatim(`${ciudad.trim()}, ${pais.trim()}`, 5);
-      if (data.length === 1) {
-        setCoords({ lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) });
-        setGeoNombre(data[0].display_name);
+      const agrupados = agruparResultadosGeo(data);
+      if (agrupados.length === 1) {
+        setCoords({ lat: parseFloat(agrupados[0].lat), lng: parseFloat(agrupados[0].lon) });
+        setGeoNombre(agrupados[0].display_name);
         setGeoStatus('encontrada');
         guardarCiudadAprendida(ciudad.trim(), pais.trim());
-      } else if (data.length > 1) {
+      } else if (agrupados.length > 1) {
         setGeoStatus('multiples');
-        setGeoOpciones(data);
+        setGeoOpciones(agrupados);
       } else {
         setGeoStatus('no_encontrada');
       }
@@ -1677,9 +1711,10 @@ export default function CargarViaje() {
       await saveTrip(trip);
       console.log('[Guardar] Step 5: OK — trip guardado');
       if (pWishlistId) await deleteWishlistTrip(pWishlistId);
+      requestSharedWorldSync();
       chainIdRef.current = null;
       resetForm();
-      playSound('cargar');
+      playSound(tipo === 'real' ? 'cargar' : 'viaje_deseado');
       // Ver comentario equivalente en handleFinalizarViaje: se difiere el
       // chequeo de logros/nivel hasta que el usuario cierra este Alert.
       Alert.alert(
@@ -2108,6 +2143,7 @@ export default function CargarViaje() {
       <NavBar />
       {notifQueue.length > 0 && notifQueue[0].kind === 'levelup' && (
         <LevelUpPopup
+          key={`${notifQueue[0].prevRango}-${notifQueue[0].newRango}`}
           prevRango={notifQueue[0].prevRango}
           newRango={notifQueue[0].newRango}
           xpRestantes={notifQueue[0].xpRestantes}
@@ -2117,6 +2153,7 @@ export default function CargarViaje() {
       )}
       {notifQueue.length > 0 && notifQueue[0].kind === 'achievement' && (
         <AchievementPopup
+          key={notifQueue[0].achievement.id}
           achievements={[notifQueue[0].achievement]}
           onDone={popNotif}
         />

@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { GeoOpcion, geocodeNominatim } from '../../utils/geocoding';
-import { copiarFotoPersistente, PERFIL_DIR } from '../../utils/fotoPersistente';
+import { copiarFotoPersistente, PERFIL_DIR, resolveFotoUri } from '../../utils/fotoPersistente';
 import { buscarPaises, getPaisPorIso2, Pais } from '../../utils/paises';
 
 type UbicacionConfirmada = {
@@ -305,7 +305,7 @@ export default function Profile() {
               onPress={selectPhoto}
             >
               {image ? (
-                <Image source={{ uri: image }} style={styles.avatarImage} />
+                <Image source={{ uri: resolveFotoUri(image) ?? image }} style={styles.avatarImage} />
               ) : (
                 <View style={styles.avatarIcon}>
                   <View style={styles.avatarHead} />

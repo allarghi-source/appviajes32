@@ -1,6 +1,7 @@
 import type { Session } from '@supabase/supabase-js';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
+import { requestSharedWorldSync } from '../utils/socialSync';
 import { supabase } from '../utils/supabase';
 
 interface SessionContextValue {
@@ -48,6 +49,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // Oportunidad de primera foto / foto de recuperación: dispara best-effort
+  // apenas hay una sesión con email confirmado, sea porque la app arrancó
+  // con una sesión ya persistida, porque se acaba de confirmar el email
+  // (exchangeCodeForSession dispara este mismo onAuthStateChange más arriba)
+  // o por un login nuevo. `syncedForUserRef` evita repetirlo en cada render
+  // o en cada refresh de token silencioso -- solo dispara una vez por
+  // usuario verificado que pasa a estar activo.
+  const syncedForUserRef = useRef<string | null>(null);
+  useEffect(() => {
+    const verified = !!session?.user.email_confirmed_at;
+    const userId = session?.user.id ?? null;
+    if (!verified || !userId) return;
+    if (syncedForUserRef.current === userId) return;
+    syncedForUserRef.current = userId;
+    requestSharedWorldSync();
+  }, [session]);
+
   // Recomendación de Supabase para RN: sin esto, el refresh automático de
   // token no corre de forma confiable con la app en background.
   const appStateRef = useRef(AppState.currentState);
@@ -64,6 +82,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (appStateRef.current !== 'active' && nextState === 'active') {
         supabase.auth.startAutoRefresh();
+        requestSharedWorldSync();
       } else if (nextState !== 'active') {
         supabase.auth.stopAutoRefresh();
       }

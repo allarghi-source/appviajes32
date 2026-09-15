@@ -315,7 +315,7 @@ function parseDate(s: string | null): number {
   return isNaN(d.getTime()) ? 0 : d.getTime();
 }
 
-function haversineKm(
+export function haversineKm(
   a: { lat: number; lng: number },
   b: { lat: number; lng: number }
 ): number {

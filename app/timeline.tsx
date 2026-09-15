@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import NavBar from '../components/NavBar';
+import { resolveFotoUri } from '../utils/fotoPersistente';
 import { playSound } from '../utils/soundEngine';
 
 const BG = '#01050d';
@@ -178,7 +179,7 @@ function TripCard({
       {/* Main card: image fills the whole rectangle */}
       <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
         {cover ? (
-          <Image source={{ uri: cover }} style={styles.cardImage} resizeMode="cover" />
+          <Image source={{ uri: resolveFotoUri(cover) ?? cover }} style={styles.cardImage} resizeMode="cover" />
         ) : (
           <View style={[styles.cardImage, styles.cardImageEmpty]}>
             <Text style={styles.noPhotoIcon}>✈</Text>
@@ -210,22 +211,38 @@ export default function Timeline() {
   const [items, setItems] = useState<TimelineItem[]>([]);
   const [loading, setLoading] = useState(true);
   const scrollY = useRef(new Animated.Value(0)).current;
-  const activeIndexRef = useRef(0);
+  // Última posición de scroll en la que quedó "asentado" el acumulador de
+  // dientes de la rueda -- avanza en múltiplos exactos de TIC_DISTANCE_PX,
+  // nunca se salta al valor crudo del scroll, para que la grilla de dientes
+  // no se desfase con el tiempo.
+  const lastTicOffsetRef = useRef(0);
   const tickQueueRef = useRef(0);
   const lastSoundTimeRef = useRef(0);
   const tickDrainRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Vacía la cola sin reproducir lo que quede pendiente. Se llama cuando el
+  // scroll (incluida su inercia) termina de verdad, para que nunca quede un
+  // resto de tacs sonando después de que el movimiento visual ya se detuvo.
+  function clearTickQueue() {
+    tickQueueRef.current = 0;
+    if (tickDrainRef.current !== null) {
+      clearTimeout(tickDrainRef.current);
+      tickDrainRef.current = null;
+    }
+  }
+
   useEffect(() => {
     if (items.length === 0) return;
-    activeIndexRef.current = 0;
+    lastTicOffsetRef.current = 0;
     tickQueueRef.current = 0;
     lastSoundTimeRef.current = 0;
 
-    const MIN_TIC_MS = 85;
+    const MIN_TIC_MS = 45;
+    const TIC_DISTANCE_PX = 30;
 
     function drainTicks() {
       if (tickQueueRef.current <= 0) { tickDrainRef.current = null; return; }
-      playSound('tic');
+      playSound('timeline_tac');
       lastSoundTimeRef.current = Date.now();
       tickQueueRef.current--;
       tickDrainRef.current = tickQueueRef.current > 0 ? setTimeout(drainTicks, MIN_TIC_MS) : null;
@@ -239,24 +256,22 @@ export default function Timeline() {
       tickDrainRef.current = setTimeout(drainTicks, delay);
     }
 
+    // Disparo por distancia real recorrida, no por cambio de card: cada vez
+    // que el scroll (en cualquier dirección) acumula otros TIC_DISTANCE_PX
+    // desde el último diente, se encola un tac. Funciona igual durante drag
+    // que durante inercia/momentum, porque ambos actualizan `value` acá.
     const id = scrollY.addListener(({ value }) => {
-      let bestIndex = 0;
-      let bestDist = Infinity;
-      for (let i = 0; i < items.length; i++) {
-        const optimalScroll = HEADER_H + LIST_PT + i * ITEM_H + CARD_H / 2 - SCREEN_H / 2;
-        const dist = Math.abs(value - optimalScroll);
-        if (dist < bestDist) { bestDist = dist; bestIndex = i; }
-      }
-      if (bestIndex !== activeIndexRef.current) {
-        const delta = Math.abs(bestIndex - activeIndexRef.current);
-        activeIndexRef.current = bestIndex;
-        enqueueTics(delta);
+      const traveled = value - lastTicOffsetRef.current;
+      const steps = Math.trunc(Math.abs(traveled) / TIC_DISTANCE_PX);
+      if (steps > 0) {
+        lastTicOffsetRef.current += steps * TIC_DISTANCE_PX * Math.sign(traveled);
+        enqueueTics(steps);
       }
     });
 
     return () => {
       scrollY.removeListener(id);
-      if (tickDrainRef.current !== null) { clearTimeout(tickDrainRef.current); tickDrainRef.current = null; }
+      clearTickQueue();
     };
   }, [items]);
 
@@ -314,6 +329,7 @@ export default function Timeline() {
               [{ nativeEvent: { contentOffset: { y: scrollY } } }],
               { useNativeDriver: false }
             )}
+            onMomentumScrollEnd={clearTickQueue}
             renderItem={({ item, index }) => (
               <TripCard
                 trip={item.trip}

@@ -49,11 +49,14 @@ export interface FoundUser {
 // for function", es decir la función matcheó y el único problema fue no
 // tener una sesión autenticada — confirma la firma sin necesitar ver el SQL).
 //
-// La forma exacta de la fila que devuelve no se pudo observar en éxito sin
-// una sesión real, así que se parsea de forma defensiva: se acepta null,
-// array vacío, array con un objeto, o un objeto suelto, y solo se confía en
-// los campos `id`/`username` si son strings — cualquier otra forma se trata
-// como "no encontrado", nunca como crash.
+// La forma de la fila que devuelve SÍ se confirmó después, contra el SQL
+// real: `RETURNS TABLE(user_id uuid, username text)` — la columna del id es
+// `user_id`, no `id` (ver FoundUser.id más abajo, que sigue llamándose `id`
+// puertas adentro del cliente por ser el nombre que usa el resto de la app).
+// Se sigue parseando de forma defensiva: se acepta null, array vacío, array
+// con un objeto, o un objeto suelto, y solo se confía en `user_id`/`username`
+// si son strings — cualquier otra forma se trata como "no encontrado", nunca
+// como crash.
 export async function findUserExact(query: string): Promise<FoundUser | null> {
   const { data, error } = await supabase.rpc('find_user_exact', { p_query: query });
 
@@ -70,9 +73,9 @@ function parseFoundUser(data: unknown): FoundUser | null {
   const row = Array.isArray(data) ? data[0] : data;
   if (!row || typeof row !== 'object') return null;
 
-  const { id, username } = row as Record<string, unknown>;
-  if (typeof id === 'string' && id.length > 0 && typeof username === 'string' && username.length > 0) {
-    return { id, username };
+  const { user_id, username } = row as Record<string, unknown>;
+  if (typeof user_id === 'string' && user_id.length > 0 && typeof username === 'string' && username.length > 0) {
+    return { id: user_id, username };
   }
   return null;
 }

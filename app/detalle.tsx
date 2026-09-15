@@ -4,6 +4,8 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
+import { resolveFotoUri } from '../utils/fotoPersistente';
+import { requestSharedWorldSync } from '../utils/socialSync';
 import {
   Alert,
   Animated,
@@ -83,17 +85,20 @@ function buildFechaInicio(dia: string, mes: string, anio: string): string {
   return `${dia.padStart(2, '0')}/${mes.padStart(2, '0')}/${anio}`;
 }
 
+// Devuelve la ruta RELATIVA a documentDirectory (ej. 'fotos/xxx.jpg'), nunca
+// el absoluto — ver resolveFotoUri en utils/fotoPersistente.ts, usado en el
+// render, para por qué.
 async function copiarFoto(uri: string): Promise<string> {
   if (!FOTOS_DIR || !FileSystem.documentDirectory) throw new Error('FileSystem no disponible');
-  if (uri.startsWith(FileSystem.documentDirectory)) return uri;
+  if (uri.startsWith(FileSystem.documentDirectory)) return uri.slice(FileSystem.documentDirectory.length);
   const dirInfo = await FileSystem.getInfoAsync(FOTOS_DIR);
   if (!dirInfo.exists) await FileSystem.makeDirectoryAsync(FOTOS_DIR, { intermediates: true });
   const cleanUri = uri.split('?')[0];
   const rawExt = cleanUri.split('.').pop()?.toLowerCase() ?? 'jpg';
   const safeExt = ['jpg', 'jpeg', 'png', 'heic', 'webp'].includes(rawExt) ? rawExt : 'jpg';
-  const dest = `${FOTOS_DIR}${Math.random().toString(36).slice(2)}${Date.now().toString(36)}.${safeExt}`;
-  await FileSystem.copyAsync({ from: uri, to: dest });
-  return dest;
+  const relative = `fotos/${Math.random().toString(36).slice(2)}${Date.now().toString(36)}.${safeExt}`;
+  await FileSystem.copyAsync({ from: uri, to: `${FileSystem.documentDirectory}${relative}` });
+  return relative;
 }
 
 // ─── Presentación cinematográfica (solo estado inicial de la galería) ─────────
@@ -183,12 +188,12 @@ function CinematicPhotoGallery({ fotos, onInteract }: { fotos: string[]; onInter
   return (
     <TouchableOpacity activeOpacity={1} onPressIn={onInteract} style={styles.cineFrame}>
       <Animated.Image
-        source={{ uri: uriA }}
+        source={{ uri: resolveFotoUri(uriA) ?? uriA }}
         style={[styles.photo, styles.cineLayer, { opacity: opacityA, transform: [{ scale: scaleA }] }]}
         resizeMode="cover"
       />
       <Animated.Image
-        source={{ uri: uriB }}
+        source={{ uri: resolveFotoUri(uriB) ?? uriB }}
         style={[styles.photo, styles.cineLayer, { opacity: opacityB, transform: [{ scale: scaleB }] }]}
         resizeMode="cover"
       />
@@ -286,6 +291,7 @@ export default function DetalleViaje() {
         all[idx] = updated;
         await AsyncStorage.setItem('trips', JSON.stringify(all));
         setTrip(updated);
+        requestSharedWorldSync();
       }
     } catch {
       Alert.alert('Error', 'No se pudo guardar.');
@@ -488,11 +494,14 @@ export default function DetalleViaje() {
     setSaving(true);
     try {
       await persistTrip({ ...trip, fotos: pendingFotos, portada: pendingPortada });
-      // Solo eliminar archivos físicos después de que el guardado fue exitoso
+      // Solo eliminar archivos físicos después de que el guardado fue exitoso.
+      // `uri` puede ser relativo (formato nuevo) o absoluto (dato viejo):
+      // resolveFotoUri lo convierte a la ruta absoluta vigente antes de borrar.
       for (const uri of toDeleteOnCommit) {
         try {
-          if (FileSystem.documentDirectory && uri.startsWith(FileSystem.documentDirectory)) {
-            await FileSystem.deleteAsync(uri, { idempotent: true });
+          const absolute = resolveFotoUri(uri);
+          if (absolute && FileSystem.documentDirectory && absolute.startsWith(FileSystem.documentDirectory)) {
+            await FileSystem.deleteAsync(absolute, { idempotent: true });
           }
         } catch { /* eliminación de archivo es best-effort */ }
       }
@@ -618,6 +627,7 @@ export default function DetalleViaje() {
       }
 
       await AsyncStorage.setItem('trips', JSON.stringify(remaining));
+      requestSharedWorldSync();
       router.replace('/timeline');
     } catch {
       Alert.alert('Error', 'No se pudo eliminar el viaje.');
@@ -701,7 +711,7 @@ export default function DetalleViaje() {
                     const isCover = uri === pendingPortada;
                     return (
                       <View key={uri} style={styles.editSlot}>
-                        <Image source={{ uri }} style={styles.editSlotImage} resizeMode="cover" />
+                        <Image source={{ uri: resolveFotoUri(uri) ?? uri }} style={styles.editSlotImage} resizeMode="cover" />
                         {isCover && <View style={styles.coverFrame} pointerEvents="none" />}
                         <TouchableOpacity
                           style={styles.deletePhotoBtn}
@@ -737,7 +747,7 @@ export default function DetalleViaje() {
                         activeOpacity={0.92}
                         style={styles.photoSlot}
                       >
-                        <Image source={{ uri }} style={styles.photo} resizeMode="cover" />
+                        <Image source={{ uri: resolveFotoUri(uri) ?? uri }} style={styles.photo} resizeMode="cover" />
                         <View style={styles.photoOverlay} pointerEvents="none" />
                         {isCover ? (
                           <View style={styles.coverBadge}>

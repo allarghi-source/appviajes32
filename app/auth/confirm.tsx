@@ -38,21 +38,35 @@ export default function Confirm() {
     if (!code || exchangedRef.current) return;
     exchangedRef.current = true;
 
+    // Si exchangeCodeForSession falla, puede ser porque perdió la carrera
+    // contra otro canje del mismo `code` que sí tuvo éxito (el link se
+    // procesó dos veces). getSession() no adivina: solo hay sesión acá si el
+    // SDK ya la persistió de verdad, así que es prueba real de éxito, no una
+    // suposición. No se reintenta exchangeCodeForSession en ningún caso.
+    async function handleExchangeFailure(err: unknown) {
+      const { data } = await supabase.auth.getSession();
+      if (!mountedRef.current) return;
+      if (data.session) {
+        setStatus('success');
+        return;
+      }
+      setStatus('error');
+      setErrorMessage(getAuthErrorMessage(err, 'confirm'));
+    }
+
     supabase.auth
       .exchangeCodeForSession(code)
       .then(({ error }) => {
         if (!mountedRef.current) return;
         if (error) {
-          setStatus('error');
-          setErrorMessage(getAuthErrorMessage(error, 'confirm'));
+          handleExchangeFailure(error);
           return;
         }
         setStatus('success');
       })
       .catch((err) => {
         if (!mountedRef.current) return;
-        setStatus('error');
-        setErrorMessage(getAuthErrorMessage(err, 'confirm'));
+        handleExchangeFailure(err);
       });
   }, [code]);
 
