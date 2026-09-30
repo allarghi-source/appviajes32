@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Preview transición — MyWorldXP (solo escritorio, fuera de la app)</title>
+<style>
+  :root{
+    --gold:#d4af37;
+    --cream:#f2e6c9;
+    --bg-top:#01050d;
+    --bg-mid:#0c1f38;
+    --bg-bottom:#2b2032;
+  }
+  *{ box-sizing:border-box; }
+  html,body{
+    margin:0; min-height:100%;
+    background:#15161a;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:26px;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--cream);
+    padding:32px 16px;
+  }
+  h1{
+    font-size:12px; font-weight:600; letter-spacing:.6px; color:#8a8f9a;
+    margin:0; text-transform:uppercase; text-align:center;
+  }
+
+  /* ── "teléfono" simulado ── */
+  .phone{
+    position:relative;
+    width:min(380px, 86vw);
+    aspect-ratio:9/19.5;
+    border-radius:42px;
+    overflow:hidden;
+    background:linear-gradient(180deg, var(--bg-top) 0%, var(--bg-mid) 55%, var(--bg-bottom) 100%);
+    box-shadow:0 30px 60px rgba(0,0,0,.55), 0 0 0 1px rgba(212,175,55,.22), inset 0 0 0 6px #05070c;
+  }
+  .phone-inner{ position:absolute; inset:0; overflow:hidden; }
+  .phone-content{
+    position:absolute; inset:0; z-index:10; pointer-events:none;
+    display:flex; flex-direction:column; align-items:center; justify-content:space-between;
+    padding:56px 20px 40px;
+  }
+  .phone-title{ text-align:center; }
+  .phone-title .t1{ font-size:17px; font-weight:600; letter-spacing:.4px; }
+  .phone-title .t2{ font-size:11px; color:rgba(242,230,201,.5); margin-top:6px; }
+  .phone-foot{ font-size:10px; color:rgba(242,230,201,.32); text-align:center; }
+
+  .cloud{ position:absolute; opacity:0; will-change:transform, opacity; }
+  .cloud svg{ display:block; width:100%; height:100%; overflow:visible; }
+
+  .plane{ position:absolute; top:42%; left:0; will-change:transform; }
+  .plane img{ display:block; width:100%; height:auto; }
+  .plane-trail{
+    position:absolute; top:46%; width:26%; height:3px; border-radius:2px;
+    background:linear-gradient(90deg, rgba(212,175,55,0), rgba(212,175,55,.35));
+  }
+
+  /* ── controles fuera del teléfono ── */
+  button#playBtn{
+    background:var(--gold); color:#01050d; border:none;
+    padding:16px 34px; border-radius:30px;
+    font-size:13px; font-weight:700; letter-spacing:1.2px;
+    cursor:pointer; transition:opacity .15s ease;
+  }
+  button#playBtn:disabled{ opacity:.5; cursor:default; }
+  .hint{ font-size:11px; color:#6b7078; text-align:center; max-width:340px; line-height:1.5; }
+</style>
+</head>
+<body>
+
+  <h1>Preview de escritorio — no forma parte de MyWorldXP</h1>
+
+  <div class="phone" id="phone">
+    <div class="phone-inner" id="phoneInner">
+      <!-- nubes + avión se inyectan acá por JS -->
+    </div>
+    <div class="phone-content">
+      <div class="phone-title">
+        <div class="t1">Demo de transición</div>
+        <div class="t2">Prueba aislada — no forma parte del diseño final</div>
+      </div>
+      <div class="phone-foot">Pantalla de prueba temporal</div>
+    </div>
+  </div>
+
+  <button id="playBtn">PROBAR TRANSICIÓN</button>
+  <p class="hint">
+    Previa de escritorio, sin conexión con MyWorldXP, para afinar la estética antes de
+    volcar decisiones a <code>app/demo-transicion.tsx</code>. Los parámetros de timing,
+    avión y nubes están agrupados al principio del &lt;script&gt; para ajustarlos fácil.
+  </p>
+
+<script>
+(function () {
+  // ────────────────────────────────────────────────────────────────────
+  // PARÁMETROS AJUSTABLES — tocar solo esto para probar variantes.
+  // ────────────────────────────────────────────────────────────────────
+  const DURATION_MS     = 4000;  // duración total de la transición: 4s
+  // Timing en 3 fases, como fracción [0,1] del progreso total:
+  //   FASE 1  0.0s -> 0.5s  (progress 0     -> PHASE1_END) aparición de nubes, sin avión
+  //   FASE 2  0.5s -> 3.5s  (progress PHASE1_END -> PHASE2_END) cruce completo del avión, nubes en parallax
+  //   FASE 3  3.5s -> 4.0s  (progress PHASE2_END -> 1)     salida/desvanecido de nubes, avión ya afuera
+  const PHASE1_END = 0.5 / (DURATION_MS / 1000);  // = 0.125
+  const PHASE2_END = 3.5 / (DURATION_MS / 1000);  // = 0.875
+  // NOTA PARA LA INTEGRACIÓN REAL EN MyWorldXP (no implementar acá, es HTML
+  // de preview): durante exactamente la FASE 2 -- de PHASE1_END a PHASE2_END,
+  // es decir los 3000ms centrales -- deberán arrancar y terminar juntos: el
+  // sonido `cargar` ya existente en la app, y un haptic continuo/sostenido y
+  // suave (no un único pulso). Esa transición reemplazará al cartel "viaje
+  // guardado": Guardar viaje -> FASE 1 (nubes) -> FASE 2 (avión + sonido
+  // `cargar` + haptic continuo, 3s) -> FASE 3 (nubes se van) -> pantalla
+  // destino normal, sin mostrar el cartel actual.
+  const PLANE_WIDTH_PCT = 75;    // ancho del avión (aprobado, sin tocar) -- 2.5x el tamaño de la primera versión
+  const PLANE_RISE_PX   = 22;    // cuánto asciende (en px) mientras cruza -- sutil
+  const PLANE_TILT_DEG  = 5;     // inclinación (nariz arriba) hacia el final del recorrido -- sutil
+  const PLANE_SRC       = 'assets/transition-preview/avionpropio.png'; // imagen aprobada, exacta, sin tocar
+
+  const GOLD = '#d4af37';
+
+  // ── Nubes estilo "videojuego premium" (lenguaje visual, no asset de
+  // ningún juego puntual): masas compactas hechas de varios círculos
+  // superpuestos (puffs) de distinto tamaño, SIN blur -- el volumen sale
+  // de un degradado radial por puff (brillo arriba-izquierda -> sombra
+  // abajo-derecha), no de desenfocar nada. 3 plantillas con distinta
+  // cantidad/disposición de puffs para que no se vean todas calcadas.
+  // Coordenadas pensadas para un lienzo de 200x110 (el viewBox real en
+  // buildCloudSvg le agrega un margen de 10 por lado para no cortar puffs).
+  const CLUSTER_TEMPLATES = [
+    // A: ancha, base sólida + 3 lóbulos arriba
+    [
+      { cx:38,  cy:74, r:30 }, { cx:78,  cy:78, r:36 }, { cx:122, cy:76, r:32 }, { cx:162, cy:70, r:24 },
+      { cx:60,  cy:48, r:28 }, { cx:100, cy:36, r:36 }, { cx:138, cy:46, r:26 },
+    ],
+    // B: más compacta y alta, un solo pico central marcado
+    [
+      { cx:44,  cy:70, r:26 }, { cx:82,  cy:76, r:32 }, { cx:122, cy:72, r:30 }, { cx:156, cy:64, r:22 },
+      { cx:70,  cy:44, r:26 }, { cx:104, cy:32, r:34 }, { cx:134, cy:42, r:24 },
+    ],
+    // C: baja y estirada, para masas grandes que pasan por delante
+    [
+      { cx:22,  cy:76, r:22 }, { cx:56,  cy:70, r:28 }, { cx:92,  cy:66, r:32 }, { cx:128, cy:68, r:30 },
+      { cx:162, cy:74, r:24 }, { cx:184, cy:80, r:18 }, { cx:110, cy:44, r:26 },
+    ],
+  ];
+
+  // Tono/opacidad por capa de profundidad -- así se logra la sensación de
+  // "algo menos contrastadas" en las lejanas sin tocar blur ni forma.
+  const LAYER_STYLE = {
+    far:       { highlight:'#ffffff', mid:'#e7edf3', shadow:'#d3dce6' },
+    mid:       { highlight:'#ffffff', mid:'#f1f4f8', shadow:'#c9d2de' },
+    nearBack:  { highlight:'#ffffff', mid:'#ffffff', shadow:'#aebccd' },
+    nearFront: { highlight:'#ffffff', mid:'#ffffff', shadow:'#a7b6c8' },
+  };
+
+  // ── Capas de profundidad ──
+  // far / mid / nearBack quedan DETRÁS del avión; nearFront queda DELANTE
+  // (z-index más alto que el avión) para que, durante el cruce, una nube
+  // cercana pueda tapar parcial y brevemente una parte del avión -- nunca
+  // por completo, y nunca como recurso para "esconderlo" al final (el
+  // avión ahora completa todo el recorrido y sale por el borde derecho).
+  const Z = { far: 1, mid: 2, nearBack: 3, plane: 4, nearFront: 5 };
+
+  // Config de nubes. sizePct/topPct/startPct/endPct en % del ancho/alto del
+  // "teléfono". template = índice en CLUSTER_TEMPLATES.
+  //
+  // El drift (startPct -> endPct) es deliberadamente chico en todas las
+  // capas -- el avión recorre ~250% del ancho del teléfono en el mismo
+  // tiempo, así que incluso el drift "más rápido" (nearBack/nearFront)
+  // queda muy por debajo de eso: es parallax de fondo, no un desplazamiento
+  // que compita con el cruce del avión. Las posiciones dejan huecos
+  // deliberados alrededor de la franja vertical del avión (~40%-55% de
+  // alto) salvo las nearFront, pensadas para rozarlo brevemente.
+  const CLOUDS = [
+    // ── Lejanas: chicas, arriba, movimiento mínimo ──
+    { id:'far-1', layer:'far', template:0, sizePct:52, topPct:4,  startPct:-52, endPct:-45, maxOpacity:.55 },
+    { id:'far-2', layer:'far', template:1, sizePct:46, topPct:11, startPct:58,  endPct:52,  maxOpacity:.5  },
+    { id:'far-3', layer:'far', template:2, sizePct:58, topPct:1,  startPct:14,  endPct:9,   maxOpacity:.5  },
+    { id:'far-4', layer:'far', template:0, sizePct:40, topPct:17, startPct:-14, endPct:-10, maxOpacity:.45 },
+
+    // ── Medias: más presencia, movimiento suave ──
+    { id:'mid-1', layer:'mid', template:1, sizePct:76, topPct:20, startPct:-58, endPct:-46, maxOpacity:.85 },
+    { id:'mid-2', layer:'mid', template:0, sizePct:68, topPct:27, startPct:64,  endPct:53,  maxOpacity:.8  },
+    { id:'mid-3', layer:'mid', template:2, sizePct:58, topPct:13, startPct:22,  endPct:14,  maxOpacity:.78 },
+    { id:'mid-4', layer:'mid', template:1, sizePct:62, topPct:32, startPct:-6,  endPct:0,   maxOpacity:.78 },
+
+    // ── Cercanas (detrás del avión): grandes, abajo, algo más de movimiento ──
+    { id:'nb-1', layer:'nearBack', template:0, sizePct:100, topPct:56, startPct:-64, endPct:-48, maxOpacity:.98 },
+    { id:'nb-2', layer:'nearBack', template:2, sizePct:92,  topPct:65, startPct:80,  endPct:63,  maxOpacity:.96 },
+    { id:'nb-3', layer:'nearBack', template:1, sizePct:86,  topPct:73, startPct:24,  endPct:10,  maxOpacity:.94 },
+    { id:'nb-4', layer:'nearBack', template:0, sizePct:80,  topPct:59, startPct:-18, endPct:-7,  maxOpacity:.92 },
+
+    // ── Cercanas (delante del avión): moderadas, solo rozan su franja ──
+    // zIndex forzado a Z.nearBack: mismo color/tono "nearFront" (no se toca
+    // forma/posición/opacidad/timing), pero renderizan DETRÁS del avión en
+    // vez de delante -- pedido puntual para no tapar fuselaje/branding.
+    { id:'nf-1', layer:'nearFront', template:2, sizePct:52, topPct:39, startPct:-24, endPct:4,  maxOpacity:.85, zIndex:Z.nearBack },
+    { id:'nf-2', layer:'nearFront', template:0, sizePct:46, topPct:45, startPct:34,  endPct:58, maxOpacity:.8,  zIndex:Z.nearBack },
+  ];
+
+  const container = document.getElementById('phoneInner');
+
+  function buildCloudSvg(cfg){
+    const style = LAYER_STYLE[cfg.layer];
+    const gradId = 'puff-' + cfg.id;
+    const puffs = CLUSTER_TEMPLATES[cfg.template]
+      .map(p => '<circle cx="' + p.cx + '" cy="' + p.cy + '" r="' + p.r + '" fill="url(#' + gradId + ')"/>')
+      .join('');
+    return (
+      '<svg viewBox="-10 -10 220 130" preserveAspectRatio="none">' +
+      '<defs><radialGradient id="' + gradId + '" cx="32%" cy="26%" r="80%">' +
+        '<stop offset="0%" stop-color="' + style.highlight + '"/>' +
+        '<stop offset="55%" stop-color="' + style.mid + '"/>' +
+        '<stop offset="100%" stop-color="' + style.shadow + '"/>' +
+      '</radialGradient></defs>' +
+      puffs +
+      '</svg>'
+    );
+  }
+
+  const cloudEls = CLOUDS.map(cfg => {
+    const el = document.createElement('div');
+    el.className = 'cloud';
+    el.style.top = cfg.topPct + '%';
+    el.style.left = cfg.startPct + '%';
+    el.style.zIndex = String(cfg.zIndex != null ? cfg.zIndex : Z[cfg.layer]);
+    el.innerHTML = buildCloudSvg(cfg);
+    container.appendChild(el);
+    return el;
+  });
+
+  // Tamaño en PX (no %) calculado a partir del ancho medido del "teléfono",
+  // para no mezclar bases de porcentaje distintas entre width y height.
+  function sizeClouds(){
+    const phoneW = container.clientWidth;
+    const ASPECT = 130 / 220; // debe coincidir con el viewBox de buildCloudSvg
+    CLOUDS.forEach((cfg, i) => {
+      const w = phoneW * cfg.sizePct / 100;
+      cloudEls[i].style.width = w + 'px';
+      cloudEls[i].style.height = (w * ASPECT) + 'px';
+    });
+  }
+
+  // ── avión: imagen aprobada, exacta, sin recolorear ni redibujar ──
+  const plane = document.createElement('div');
+  plane.className = 'plane';
+  plane.style.zIndex = String(Z.plane);
+  plane.style.width = PLANE_WIDTH_PCT + '%';
+  plane.innerHTML =
+    '<div class="plane-trail"></div>' +
+    '<img src="' + PLANE_SRC + '" alt="" />';
+  container.appendChild(plane);
+
+  // ── helpers de interpolación por tramos, con extrapolate "clamp" ──
+  function clamp01(v){ return Math.max(0, Math.min(1, v)); }
+  function lerp(a, b, t){ return a + (b - a) * t; }
+  function interpolate(progress, stops){
+    if (progress <= stops[0][0]) return stops[0][1];
+    for (let i = 0; i < stops.length - 1; i++){
+      const [x0, y0] = stops[i], [x1, y1] = stops[i + 1];
+      if (progress <= x1){
+        const t = x1 === x0 ? 1 : (progress - x0) / (x1 - x0);
+        return lerp(y0, y1, t);
+      }
+    }
+    return stops[stops.length - 1][1];
+  }
+
+  function applyFrame(progress){
+    const phoneW = container.clientWidth;
+    const planeW = plane.offsetWidth;
+
+    // Avión: oculto durante toda la FASE 1 (todavía no aparece), cruza de
+    // punta a punta en movimiento único y continuo exactamente durante la
+    // FASE 2 (PHASE1_END -> PHASE2_END, los 3s centrales) y queda oculto ya
+    // afuera durante toda la FASE 3. Sin plateaus a mitad de pantalla, sin
+    // fade: la opacidad es fija (ver CSS .plane), la visibilidad la da solo
+    // la posición. Leve ascenso + leve cabeceo, interpolados sobre esa misma
+    // ventana de 3s.
+    const planeX = interpolate(progress, [
+      [0, -planeW], [PHASE1_END, -planeW], [PHASE2_END, phoneW + planeW], [1, phoneW + planeW],
+    ]);
+    const planeY = interpolate(progress, [
+      [PHASE1_END, PLANE_RISE_PX / 2], [PHASE2_END, -PLANE_RISE_PX / 2],
+    ]);
+    const planeTilt = interpolate(progress, [
+      [PHASE1_END, 0], [PHASE2_END, -PLANE_TILT_DEG],
+    ]);
+    plane.style.transform = 'translate(' + planeX + 'px,' + planeY + 'px) rotate(' + planeTilt + 'deg)';
+
+    // Nubes: aparecen juntas durante la FASE 1 (0 -> PHASE1_END), se
+    // mantienen en su opacidad plena mientras el avión cruza en la FASE 2
+    // (solo con su drift/parallax, sin cambios de opacidad) y se desvanecen
+    // juntas durante la FASE 3 (PHASE2_END -> 1) hasta quedar completamente
+    // invisibles al final. La forma/posición/color de cada nube no cambia.
+    CLOUDS.forEach((cfg, i) => {
+      const el = cloudEls[i];
+      const opacity = interpolate(progress, [
+        [0, 0], [PHASE1_END, cfg.maxOpacity], [PHASE2_END, cfg.maxOpacity], [1, 0],
+      ]);
+      const driftPct = interpolate(progress, [[0, cfg.startPct], [1, cfg.endPct]]) - cfg.startPct;
+      const scale = interpolate(progress, [[0, 0.94], [1, 1.06]]);
+      el.style.opacity = opacity;
+      el.style.transform = 'translateX(' + (driftPct / 100 * phoneW) + 'px) scale(' + scale + ')';
+    });
+  }
+
+  // ── loop de animación (requestAnimationFrame, sin dependencias) ──
+  let rafId = null;
+  let startTime = null;
+  const playBtn = document.getElementById('playBtn');
+
+  function tick(now){
+    if (startTime === null) startTime = now;
+    const progress = clamp01((now - startTime) / DURATION_MS);
+    applyFrame(progress);
+    if (progress < 1){
+      rafId = requestAnimationFrame(tick);
+    } else {
+      playBtn.disabled = false;
+      rafId = null;
+    }
+  }
+
+  function play(){
+    if (rafId !== null) return; // ya está corriendo, ignorar doble toque
+    playBtn.disabled = true;
+    startTime = null;
+    applyFrame(0); // resetea instantáneamente antes de arrancar de nuevo
+    rafId = requestAnimationFrame(tick);
+  }
+
+  playBtn.addEventListener('click', play);
+
+  // Estado inicial: todo oculto, listo para el primer toque.
+  function init(){
+    sizeClouds();
+    applyFrame(0);
+  }
+  const planeImg = plane.querySelector('img');
+  if (planeImg.complete) init(); else planeImg.addEventListener('load', init);
+  window.addEventListener('resize', sizeClouds);
+})();
+</script>
+</body>
+</html>

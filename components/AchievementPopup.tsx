@@ -2,9 +2,14 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
+import * as Haptics from 'expo-haptics';
 import type { Achievement } from '../utils/achievementsEngine';
 
 const GOLD = '#d4af37';
+
+// Microfeedback "TAC — TAC" al aparecer un logro: golpe suave, pausa breve,
+// golpe un poco más marcado. Duración perceptual total ~250-350ms.
+const ACHIEVEMENT_HAPTIC_GAP_MS = 180;
 
 // Prueba visual: la estrella "sale hacia adelante", da una vuelta completa con
 // perspectiva 2.5D y vuelve exactamente a su posición/tamaño original. Un solo
@@ -73,8 +78,18 @@ export function AchievementPopup({ achievements, onDone }: Props) {
       useNativeDriver: true,
     }).start();
 
+    // "TAC — TAC": un solo disparo por aparición de logro (este efecto
+    // corre una vez por índice, tanto al montar como al avanzar entre
+    // varios logros en cola). Primer impacto inmediato, segundo tras una
+    // pausa breve.
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const hapticTimer = setTimeout(() => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }, ACHIEVEMENT_HAPTIC_GAP_MS);
+
     return () => {
       starProgress.stopAnimation();
+      clearTimeout(hapticTimer);
     };
     // `starProgress` se agrega para no ampliar el warning preexistente de
     // dependencias faltantes de este efecto (opacity/scale, ajenas a esta

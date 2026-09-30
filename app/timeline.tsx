@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -13,7 +14,6 @@ import {
 } from 'react-native';
 import NavBar from '../components/NavBar';
 import { resolveFotoUri } from '../utils/fotoPersistente';
-import { playSound } from '../utils/soundEngine';
 
 const BG = '#01050d';
 const GOLD = '#d4af37';
@@ -211,67 +211,34 @@ export default function Timeline() {
   const [items, setItems] = useState<TimelineItem[]>([]);
   const [loading, setLoading] = useState(true);
   const scrollY = useRef(new Animated.Value(0)).current;
-  // Última posición de scroll en la que quedó "asentado" el acumulador de
-  // dientes de la rueda -- avanza en múltiplos exactos de TIC_DISTANCE_PX,
-  // nunca se salta al valor crudo del scroll, para que la grilla de dientes
-  // no se desfase con el tiempo.
-  const lastTicOffsetRef = useRef(0);
-  const tickQueueRef = useRef(0);
-  const lastSoundTimeRef = useRef(0);
-  const tickDrainRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Vacía la cola sin reproducir lo que quede pendiente. Se llama cuando el
-  // scroll (incluida su inercia) termina de verdad, para que nunca quede un
-  // resto de tacs sonando después de que el movimiento visual ya se detuvo.
-  function clearTickQueue() {
-    tickQueueRef.current = 0;
-    if (tickDrainRef.current !== null) {
-      clearTimeout(tickDrainRef.current);
-      tickDrainRef.current = null;
-    }
-  }
+  // Índice de la tarjeta actualmente centrada en pantalla. Se recalcula con la
+  // misma fórmula que ya usa TripCard para saber cuándo una tarjeta queda
+  // centrada (optimalScroll = HEADER_H + LIST_PT + index*ITEM_H + CARD_H/2 -
+  // SCREEN_H/2, invertida acá para ir de scrollY a index), así que no es una
+  // aproximación por píxeles recorridos: es el índice real de la tarjeta en
+  // el centro. null hasta el primer cálculo, para no disparar un haptic falso
+  // al montar la lista (recién ahí "cambia" de nada a la tarjeta inicial).
+  const centeredIndexRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (items.length === 0) return;
-    lastTicOffsetRef.current = 0;
-    tickQueueRef.current = 0;
-    lastSoundTimeRef.current = 0;
+    centeredIndexRef.current = null;
 
-    const MIN_TIC_MS = 45;
-    const TIC_DISTANCE_PX = 30;
-
-    function drainTicks() {
-      if (tickQueueRef.current <= 0) { tickDrainRef.current = null; return; }
-      playSound('timeline_tac');
-      lastSoundTimeRef.current = Date.now();
-      tickQueueRef.current--;
-      tickDrainRef.current = tickQueueRef.current > 0 ? setTimeout(drainTicks, MIN_TIC_MS) : null;
-    }
-
-    function enqueueTics(count: number) {
-      tickQueueRef.current += count;
-      if (tickDrainRef.current !== null) return;
-      const elapsed = Date.now() - lastSoundTimeRef.current;
-      const delay = elapsed >= MIN_TIC_MS ? 0 : MIN_TIC_MS - elapsed;
-      tickDrainRef.current = setTimeout(drainTicks, delay);
-    }
-
-    // Disparo por distancia real recorrida, no por cambio de card: cada vez
-    // que el scroll (en cualquier dirección) acumula otros TIC_DISTANCE_PX
-    // desde el último diente, se encola un tac. Funciona igual durante drag
-    // que durante inercia/momentum, porque ambos actualizan `value` acá.
+    // Un solo Haptics.selectionAsync() cada vez que el índice centrado
+    // cambia respecto del último valor conocido -- sin cola, sin await, sin
+    // temporizador: responde en el mismo tick del evento de scroll que lo
+    // detectó, y no hay nada pendiente que siga disparando tras detenerse.
     const id = scrollY.addListener(({ value }) => {
-      const traveled = value - lastTicOffsetRef.current;
-      const steps = Math.trunc(Math.abs(traveled) / TIC_DISTANCE_PX);
-      if (steps > 0) {
-        lastTicOffsetRef.current += steps * TIC_DISTANCE_PX * Math.sign(traveled);
-        enqueueTics(steps);
+      const rawIndex = (value - HEADER_H - LIST_PT - CARD_H / 2 + SCREEN_H / 2) / ITEM_H;
+      const idx = Math.max(0, Math.min(items.length - 1, Math.round(rawIndex)));
+      if (centeredIndexRef.current !== null && centeredIndexRef.current !== idx) {
+        Haptics.selectionAsync();
       }
+      centeredIndexRef.current = idx;
     });
 
     return () => {
       scrollY.removeListener(id);
-      clearTickQueue();
     };
   }, [items]);
 
@@ -329,7 +296,6 @@ export default function Timeline() {
               [{ nativeEvent: { contentOffset: { y: scrollY } } }],
               { useNativeDriver: false }
             )}
-            onMomentumScrollEnd={clearTickQueue}
             renderItem={({ item, index }) => (
               <TripCard
                 trip={item.trip}

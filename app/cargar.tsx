@@ -1,13 +1,15 @@
 import NavBar from '../components/NavBar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
+import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { AchievementPopup } from '../components/AchievementPopup';
 import { LevelUpPopup } from '../components/LevelUpPopup';
 import { Achievement, checkAndSaveAchievements } from '../utils/achievementsEngine';
 import { calcularStats, getXpRestantes, haversineKm, Trip as StatsTrip } from '../utils/statsEngine';
-import { playSound } from '../utils/soundEngine';
+import { playSound, preloadSounds } from '../utils/soundEngine';
 import { requestSharedWorldSync } from '../utils/socialSync';
+import { TripSavedTransition } from '../components/TripSavedTransition';
 import { useLocalSearchParams } from 'expo-router';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import React, { useEffect, useRef, useState } from 'react';
@@ -56,7 +58,7 @@ interface TripData {
   origenCoords?: { lat: number; lng: number } | null;
 }
 
-interface GeoOpcion { display_name: string; lat: string; lon: string; }
+interface GeoOpcion { display_name: string; lat: string; lon: string; addresstype?: string; }
 
 interface DestinoState {
   id: string;
@@ -508,6 +510,27 @@ function agruparResultadosGeo(data: GeoOpcion[]): GeoOpcion[] {
   return grupos.map((g) => g[0]);
 }
 
+// ─── FILTRO DE GRANULARIDAD (CIUDAD VS ENTIDAD ADMINISTRATIVA AMPLIA) ─────────
+// Nominatim puede devolver, para el mismo nombre, tanto la ciudad (addresstype
+// "city"/"town"/"village") como la provincia/estado/país que la contiene
+// (addresstype "state"/"region"/"country"/"province"/"county") con centroides
+// realmente distintos (ej. "Río de Janeiro" ciudad vs "Río de Janeiro" estado,
+// a ~100km de distancia). Es un problema distinto del que resuelve el
+// agrupamiento por distancia: acá no son representaciones equivalentes del
+// mismo lugar, son entidades administrativas distintas con el mismo nombre.
+// Cuando hay al menos un resultado a nivel ciudad, se descartan las entidades
+// administrativas amplias para no ofrecerlas como alternativa real. Único
+// punto de esta lógica: lo usan tanto el flujo de viaje simple como el
+// multidestino, igual que agruparResultadosGeo.
+const GEO_CITY_TYPES = new Set(['city', 'town', 'village', 'municipality', 'hamlet']);
+const GEO_BROAD_ADMIN_TYPES = new Set(['state', 'region', 'country', 'province', 'county']);
+
+function filtrarGranularidadGeo(data: GeoOpcion[]): GeoOpcion[] {
+  const hayResultadoCiudad = data.some((d) => d.addresstype && GEO_CITY_TYPES.has(d.addresstype));
+  if (!hayResultadoCiudad) return data;
+  return data.filter((d) => !(d.addresstype && GEO_BROAD_ADMIN_TYPES.has(d.addresstype)));
+}
+
 // ─── DROPDOWN LIST COMPONENT ──────────────────────────────────────────────────
 
 const DropdownList = ({
@@ -727,14 +750,45 @@ function DestinoBlock({
     onChange(patch);
   }
 
+  async function verificarUbicacion(ciudadTxt: string, paisTxt: string) {
+    onChange({ geoStatus: 'buscando', coords: null, geoNombre: '', geoOpciones: [], geoSoloPais: false });
+    try {
+      const data = await geocodeNominatim(`${ciudadTxt}, ${paisTxt}`, 5);
+      const agrupados = agruparResultadosGeo(filtrarGranularidadGeo(data));
+      if (agrupados.length === 1) {
+        onChange({
+          coords: { lat: parseFloat(agrupados[0].lat), lng: parseFloat(agrupados[0].lon) },
+          geoNombre: agrupados[0].display_name,
+          geoStatus: 'encontrada',
+          geoOpciones: [],
+        });
+        onLearnCity(ciudadTxt, paisTxt);
+      } else if (agrupados.length > 1) {
+        onChange({ geoStatus: 'multiples', geoOpciones: agrupados });
+      } else {
+        onChange({ geoStatus: 'no_encontrada', geoOpciones: [] });
+      }
+    } catch {
+      onChange({ geoStatus: 'error', geoOpciones: [] });
+    }
+  }
+
   function selectCiudad(name: string) {
     const patch: Partial<DestinoState> = { ciudad: name, ciudadSugs: [] };
     if (destino.geoStatus !== 'idle' && destino.geoStatus !== 'buscando') {
       patch.coords = null; patch.geoStatus = 'idle'; patch.geoNombre = ''; patch.geoOpciones = []; patch.geoSoloPais = false;
     }
     const paises = getPaisesPorCiudad(name, learnedCities);
-    if (paises.length === 1 && !destino.pais.trim()) patch.pais = paises[0];
+    const paisActual = destino.pais.trim();
+    if (paises.length === 1 && !paisActual) patch.pais = paises[0];
     onChange(patch);
+    // Selección explícita de una sugerencia de la lista local: si ya tenemos
+    // ciudad + país, dispara la misma verificación que el botón VALIDAR, sin
+    // esperar a que el usuario lo toque. Escribir manualmente NO pasa por acá.
+    const paisTxt = paisActual || (paises.length === 1 ? paises[0] : '');
+    if (name.trim() && paisTxt) {
+      verificarUbicacion(name.trim(), paisTxt);
+    }
   }
 
   function handlePaisChange(t: string) {
@@ -750,26 +804,7 @@ function DestinoBlock({
       Alert.alert('Faltan datos', 'Ingresá ciudad y país antes de validar el destino.');
       return;
     }
-    onChange({ geoStatus: 'buscando', coords: null, geoNombre: '', geoOpciones: [], geoSoloPais: false });
-    try {
-      const data = await geocodeNominatim(`${destino.ciudad.trim()}, ${destino.pais.trim()}`, 5);
-      const agrupados = agruparResultadosGeo(data);
-      if (agrupados.length === 1) {
-        onChange({
-          coords: { lat: parseFloat(agrupados[0].lat), lng: parseFloat(agrupados[0].lon) },
-          geoNombre: agrupados[0].display_name,
-          geoStatus: 'encontrada',
-          geoOpciones: [],
-        });
-        onLearnCity(destino.ciudad.trim(), destino.pais.trim());
-      } else if (agrupados.length > 1) {
-        onChange({ geoStatus: 'multiples', geoOpciones: agrupados });
-      } else {
-        onChange({ geoStatus: 'no_encontrada', geoOpciones: [] });
-      }
-    } catch {
-      onChange({ geoStatus: 'error', geoOpciones: [] });
-    }
+    verificarUbicacion(destino.ciudad.trim(), destino.pais.trim());
   }
 
   function elegirOtraCiudad() {
@@ -1071,21 +1106,21 @@ function DestinoBlock({
             <DropdownList
               items={DAYS}
               selected={destino.dia}
-              onSelect={(v) => { onChange({ dia: v, openDropdown: null }); playSound('tic'); }}
+              onSelect={(v) => { onChange({ dia: v, openDropdown: null }); Haptics.selectionAsync(); }}
             />
           )}
           {destino.openDropdown === 'mes' && (
             <DropdownList
               items={MONTHS}
               selected={destino.mes}
-              onSelect={(v) => { onChange({ mes: v, openDropdown: null }); playSound('tic'); }}
+              onSelect={(v) => { onChange({ mes: v, openDropdown: null }); Haptics.selectionAsync(); }}
             />
           )}
           {destino.openDropdown === 'anio' && (
             <DropdownList
               items={YEARS}
               selected={destino.anio}
-              onSelect={(v) => { onChange({ anio: v, openDropdown: null }); playSound('tic'); }}
+              onSelect={(v) => { onChange({ anio: v, openDropdown: null }); Haptics.selectionAsync(); }}
             />
           )}
         </View>
@@ -1184,10 +1219,24 @@ export default function CargarViaje() {
   const scrollRef = useRef<any>(null);
   const dateSectionY = useRef(0);
 
+  // Transición avión/nubes (real) o globo/nubes (wishlist) al guardar. Un
+  // solo estado con la variante activa (o null si no hay ninguna en curso)
+  // -- nunca hay más de una transición en pantalla a la vez.
+  const [activeTransition, setActiveTransition] = useState<'real' | 'wishlist' | null>(null);
+  const pendingAchievementsRef = useRef<string | null>(null);
+
   useEffect(() => {
     AsyncStorage.getItem('learned_cities').then(raw => {
       if (raw) setLearnedCities(JSON.parse(raw));
     }).catch(() => {});
+  }, []);
+
+  // Precarga los sonidos (incluidos "cargar" y "viaje_deseado") al entrar a
+  // esta pantalla, para que la primera vez que se guarda un viaje en la
+  // sesión el sonido no pague el costo de crear/decodificar el audio en el
+  // momento -- mismo patrón que ya usan mapa.tsx/passportcover.tsx.
+  useEffect(() => {
+    preloadSounds();
   }, []);
 
   useEffect(() => {
@@ -1197,6 +1246,18 @@ export default function CargarViaje() {
     if (!head) return;
     playSound(head.kind === 'levelup' ? 'subir_nivel' : 'anuncio_2');
   }, [notifQueue]);
+
+  // Se ejecuta cuando la transición de 4s termina de verdad (overlay
+  // desmontado), sea real o wishlist. Recién ahí, y solo si había un
+  // chequeo de logros/nivel pendiente, se dispara -- nunca durante la
+  // transición ni detrás de ella. El ref se limpia enseguida para que no
+  // pueda disparar dos veces.
+  function handleTransitionDone() {
+    setActiveTransition(null);
+    const prevRango = pendingAchievementsRef.current;
+    pendingAchievementsRef.current = null;
+    if (prevRango !== null) _checkAchievements(prevRango);
+  }
 
   const toggleAnim = useRef(new Animated.Value(0)).current;
 
@@ -1379,15 +1440,15 @@ export default function CargarViaje() {
         scrollRef.current?.scrollToPosition?.(0, 0, false);
         scrollRef.current?.scrollTo?.({ x: 0, y: 0, animated: false });
       }, 50);
-      playSound(tipo === 'real' ? 'cargar' : 'viaje_deseado');
-      // El chequeo de logros/nivel recién dispara notifQueue cuando el usuario
-      // cierra este Alert nativo — así nunca queda un popup de logro montado
-      // (y animando) detrás de este mensaje.
-      Alert.alert(
-        '¡Guardado!',
-        `Tu viaje con ${destinos.length} ciudades fue guardado correctamente.`,
-        [{ text: 'OK', onPress: () => _checkAchievements(prevStats.rangoActual) }]
-      );
+      // Viaje real -> transición avión/nubes. Wishlist -> transición
+      // globo/nubes. En ambos casos reemplaza el sonido + Alert de antes
+      // (incluido el mensaje "Tu viaje con N ciudades..."); el chequeo de
+      // logros/nivel se difiere hasta que la transición termina (ver
+      // handleTransitionDone).
+      if (activeTransition === null) {
+        pendingAchievementsRef.current = prevStats.rangoActual;
+        setActiveTransition(tipo);
+      }
     } catch (err) {
       console.error('[FinalizarViaje] ERROR COMPLETO al guardar:', err);
       Alert.alert('Error', 'No se pudo guardar. Intentá de nuevo.');
@@ -1419,8 +1480,16 @@ export default function CargarViaje() {
     setCiudadSugs([]);
     if (geoStatus !== 'idle' && geoStatus !== 'buscando') resetGeo();
     const paises = getPaisesPorCiudad(name, learnedCities);
-    if (paises.length === 1 && !pais.trim()) {
+    const paisActual = pais.trim();
+    if (paises.length === 1 && !paisActual) {
       setPais(paises[0]);
+    }
+    // Selección explícita de una sugerencia de la lista local: si ya tenemos
+    // ciudad + país, dispara la misma verificación que el botón VALIDAR, sin
+    // esperar a que el usuario lo toque. Escribir manualmente NO pasa por acá.
+    const paisTxt = paisActual || (paises.length === 1 ? paises[0] : '');
+    if (name.trim() && paisTxt) {
+      verificarUbicacion(name.trim(), paisTxt);
     }
   }
 
@@ -1476,24 +1545,20 @@ export default function CargarViaje() {
     setGeoSoloPais(false);
   }
 
-  async function buscarUbicacion() {
-    if (!ciudad.trim() || !pais.trim()) {
-      Alert.alert('Faltan datos', 'Ingresá ciudad y país antes de validar el destino.');
-      return;
-    }
+  async function verificarUbicacion(ciudadTxt: string, paisTxt: string) {
     setGeoStatus('buscando');
     setCoords(null);
     setGeoNombre('');
     setGeoOpciones([]);
     setGeoSoloPais(false);
     try {
-      const data = await geocodeNominatim(`${ciudad.trim()}, ${pais.trim()}`, 5);
-      const agrupados = agruparResultadosGeo(data);
+      const data = await geocodeNominatim(`${ciudadTxt}, ${paisTxt}`, 5);
+      const agrupados = agruparResultadosGeo(filtrarGranularidadGeo(data));
       if (agrupados.length === 1) {
         setCoords({ lat: parseFloat(agrupados[0].lat), lng: parseFloat(agrupados[0].lon) });
         setGeoNombre(agrupados[0].display_name);
         setGeoStatus('encontrada');
-        guardarCiudadAprendida(ciudad.trim(), pais.trim());
+        guardarCiudadAprendida(ciudadTxt, paisTxt);
       } else if (agrupados.length > 1) {
         setGeoStatus('multiples');
         setGeoOpciones(agrupados);
@@ -1503,6 +1568,14 @@ export default function CargarViaje() {
     } catch {
       setGeoStatus('error');
     }
+  }
+
+  async function buscarUbicacion() {
+    if (!ciudad.trim() || !pais.trim()) {
+      Alert.alert('Faltan datos', 'Ingresá ciudad y país antes de validar el destino.');
+      return;
+    }
+    verificarUbicacion(ciudad.trim(), pais.trim());
   }
 
   function elegirOtraCiudad() {
@@ -1714,14 +1787,14 @@ export default function CargarViaje() {
       requestSharedWorldSync();
       chainIdRef.current = null;
       resetForm();
-      playSound(tipo === 'real' ? 'cargar' : 'viaje_deseado');
-      // Ver comentario equivalente en handleFinalizarViaje: se difiere el
-      // chequeo de logros/nivel hasta que el usuario cierra este Alert.
-      Alert.alert(
-        '¡Guardado!',
-        `Tu ${tipo === 'real' ? 'viaje' : 'destino'} fue guardado correctamente.`,
-        [{ text: 'OK', onPress: () => _checkAchievements(prevStats.rangoActual) }]
-      );
+      // Viaje real -> transición avión/nubes. Wishlist -> transición
+      // globo/nubes. En ambos casos reemplaza el sonido + Alert de antes.
+      // El chequeo de logros/nivel se difiere hasta que la transición
+      // termina (ver handleTransitionDone) -- nunca durante ni detrás de ella.
+      if (activeTransition === null) {
+        pendingAchievementsRef.current = prevStats.rangoActual;
+        setActiveTransition(tipo);
+      }
     } catch (err) {
       console.error('[Guardar] ERROR COMPLETO al guardar:', err);
       Alert.alert('Error', 'No se pudo guardar. Intentá de nuevo.');
@@ -2028,21 +2101,21 @@ export default function CargarViaje() {
                   <DropdownList
                     items={DAYS}
                     selected={dia}
-                    onSelect={(v) => { setDia(v); setOpenDropdown(null); playSound('tic'); }}
+                    onSelect={(v) => { setDia(v); setOpenDropdown(null); Haptics.selectionAsync(); }}
                   />
                 )}
                 {openDropdown === 'mes' && (
                   <DropdownList
                     items={MONTHS}
                     selected={mes}
-                    onSelect={(v) => { setMes(v); setOpenDropdown(null); playSound('tic'); }}
+                    onSelect={(v) => { setMes(v); setOpenDropdown(null); Haptics.selectionAsync(); }}
                   />
                 )}
                 {openDropdown === 'anio' && (
                   <DropdownList
                     items={YEARS}
                     selected={anio}
-                    onSelect={(v) => { setAnio(v); setOpenDropdown(null); playSound('tic'); }}
+                    onSelect={(v) => { setAnio(v); setOpenDropdown(null); Haptics.selectionAsync(); }}
                   />
                 )}
               </View>
@@ -2157,6 +2230,9 @@ export default function CargarViaje() {
           achievements={[notifQueue[0].achievement]}
           onDone={popNotif}
         />
+      )}
+      {activeTransition !== null && (
+        <TripSavedTransition variant={activeTransition} onDone={handleTransitionDone} />
       )}
     </View>
   );
