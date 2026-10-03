@@ -11,7 +11,8 @@
   },
   "errors": {
     "ciudadNoEncontrada": "Ciudad no encontrada",
-    "paisNoEncontrado": "País no encontrado"
+    "paisNoEncontrado": "País no encontrado",
+    "photoRequired": "La foto de perfil es obligatoria."
   },
   "cta": "CONTINUAR →",
   "alerts": {
@@ -20,7 +21,10 @@
     "missingFields": {
       "title": "Faltan datos",
       "intro": "Para continuar debés completar:"
-    }
+    },
+    "noConnectionTitle": "Sin conexión",
+    "cityNotConfirmedTitle": "Ciudad no confirmada",
+    "cityNotConfirmedMessage": "Para continuar debés confirmar una ciudad de residencia válida."
   },
   "fields": {
     "foto": "Foto de perfil",

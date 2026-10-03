@@ -1,19 +1,19 @@
 {
   "names": {
-    "novato": "Novato",
-    "corsario": "Corsario",
-    "viajero": "Viajero",
-    "trotamundos": "Trotamundos",
-    "navegante": "Navegante",
-    "astronauta": "Astronauta"
+    "novato": "Rookie",
+    "corsario": "Tourist",
+    "viajero": "Explorer",
+    "trotamundos": "Globetrotter",
+    "navegante": "Lord of the Maps",
+    "astronauta": "Citizen of the World"
   },
   "continents": {
-    "americaDelNorte": "América del Norte",
-    "americaDelSur": "América del Sur",
-    "europa": "Europa",
-    "africa": "África",
+    "americaDelNorte": "North America",
+    "americaDelSur": "South America",
+    "europa": "Europe",
+    "africa": "Africa",
     "asia": "Asia",
-    "oceania": "Oceanía"
+    "oceania": "Oceania"
   },
   "units": {
     "millionSuffix": "M",

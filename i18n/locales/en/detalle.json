@@ -1,69 +1,76 @@
 {
-  "header": { "back": "Volver" },
-  "loading": "Cargando...",
+  "header": { "back": "Back" },
+  "loading": "Loading...",
   "gallery": {
-    "coverBadge": "◆  PORTADA",
-    "tapToSetCover": "Tocar para hacer portada",
-    "addMore": "+ Agregar",
-    "done": "Listo",
-    "photoCount": "{{count}} fotos",
-    "editPhotos": "Editar fotos",
-    "noPhotos": "Sin fotos",
-    "addPhotos": "+ Agregar fotos"
+    "coverBadge": "◆  MAIN PHOTO",
+    "tapToSetCover": "Tap to select as main photo",
+    "addMore": "+ Add",
+    "done": "Done",
+    "photoCount": "{{count}} photos",
+    "editPhotos": "Edit photos",
+    "noPhotos": "No photos",
+    "addPhotos": "+ Add Photos"
   },
   "location": {
-    "label": "UBICACIÓN",
-    "edit": "Editar",
-    "cityPlaceholder": "Ciudad",
-    "countryPlaceholder": "País",
-    "confirmed": "✓ Ubicación confirmada",
-    "notFound": "No se encontró. Revisá los datos.",
-    "connectionError": "Error de conexión. Intentá de nuevo.",
-    "searching": "Buscando...",
-    "search": "Buscar"
+    "label": "LOCATION",
+    "edit": "Edit",
+    "cityPlaceholder": "City",
+    "countryPlaceholder": "Country",
+    "confirmed": "✓ Location Confirmed",
+    "notFound": "Not found. Check the information and try again.",
+    "connectionError": "Connection error. Please try again.",
+    "searching": "Searching...",
+    "search": "Search",
+    "missingDataTitle": "Complete all information",
+    "missingDataMessage": "Enter a city and country."
   },
   "date": {
-    "label": "FECHA DEL VIAJE",
+    "label": "TRIP DATE",
+    "edit": "Edit",
     "dd": "DD",
     "mm": "MM",
-    "yyyy": "AAAA",
-    "invalidTitle": "Fecha inválida",
-    "invalidMessage": "Ingresá una fecha completa (DD, MM y año de 4 dígitos).",
-    "chainTitle": "Viaje de varios destinos",
-    "chainMessage": "Este viaje forma parte de un viaje de varios destinos. Estás cambiando el año.\n\n¿Qué querés hacer?",
-    "chainOnlyThis": "Solo este destino",
-    "chainAll": "Cambiar todos"
+    "yyyy": "YYYY",
+    "invalidTitle": "Invalid Date",
+    "invalidMessage": "Enter a complete date (DD, MM and 4-digit year).",
+    "chainTitle": "Multi-Destination Trip",
+    "chainMessage": "This trip is part of a multi-destination trip. You're changing the year. What would you like to do?",
+    "chainOnlyThis": "This Destination Only",
+    "chainAll": "Change All"
   },
   "note": {
-    "label": "COMENTARIO",
-    "add": "+ Agregar",
-    "edit": "Editar",
-    "placeholder": "Escribí algo sobre este viaje...",
-    "empty": "Sin comentario"
+    "label": "COMMENT",
+    "add": "+ Add",
+    "edit": "Edit",
+    "placeholder": "Write something about your trip...",
+    "empty": "Empty"
   },
   "tips": {
-    "label": "TIPS DE VIAJE",
-    "add": "+ Agregar",
-    "edit": "Editar",
-    "placeholder": "Cargar datos útiles de este destino, bares, restaurantes, lugares imperdibles...",
-    "share": "↑ Compartir tips",
-    "shareCopiedTitle": "¡Copiado!",
-    "shareCopiedMessage": "Texto copiado. Ahora podés pegarlo donde quieras.",
-    "shareTemplate": "{{nombre}} de MyWorldXP te recomienda que si visitás {{ciudad}}, {{pais}} tengas en cuenta:\n\n{{tips}}"
+    "label": "TRAVEL TIPS",
+    "add": "+ Add",
+    "edit": "Edit",
+    "placeholder": "Add useful tips about this destination: bars, restaurants, must-see places...",
+    "share": "↑ Share Tips",
+    "shareCopiedTitle": "Copied!",
+    "shareCopiedMessage": "Copied to clipboard. You can paste it anywhere.",
+    "shareTemplate": "{{nombre}} from MyWorldXP recommends these tips if you visit {{ciudad}}, {{pais}}:\n\n{{tips}}"
   },
   "delete": {
-    "button": "Eliminar viaje",
-    "confirmTitle": "¿Eliminar viaje?",
-    "confirmMessage": "¿Estás seguro de que querés eliminar el viaje a {{ciudad}}?",
-    "confirmButton": "Eliminar"
+    "button": "Delete trip",
+    "confirmTitle": "Delete Trip?",
+    "confirmMessage": "Are you sure you want to delete your trip to {{ciudad}}?",
+    "confirmButton": "Delete"
   },
   "errors": {
-    "loadTrip": "No se pudo cargar el viaje.",
-    "maxPhotosTitle": "Máximo 4 fotos",
-    "maxPhotosMessage": "Ya cargaste el máximo de fotos permitidas.",
-    "addPhotosTitle": "Agregar fotos",
-    "savePhotosError": "No se pudieron guardar las fotos.",
-    "savePhotoEditsError": "No se pudieron guardar los cambios.",
-    "deleteTripError": "No se pudo eliminar el viaje."
+    "loadTrip": "Couldn't load the trip.",
+    "maxPhotosTitle": "UP TO 4 PHOTOS",
+    "maxPhotosMessage": "You've reached the max of photos allowed.",
+    "addPhotosTitle": "Add Photos",
+    "savePhotosError": "Couldn't save the photos.",
+    "savePhotoEditsError": "Couldn't save the changes.",
+    "deleteTripError": "Couldn't delete the trip."
+  },
+  "addPhotos": {
+    "chooseFromGallery": "Choose from Gallery",
+    "takePhoto": "Take photo"
   }
 }

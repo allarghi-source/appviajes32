@@ -20,6 +20,8 @@ import esNavbar from './locales/es/navbar.json';
 import esAchievements from './locales/es/achievements.json';
 import esRanks from './locales/es/ranks.json';
 import esBackup from './locales/es/backup.json';
+import esAuth from './locales/es/auth.json';
+import esSocial from './locales/es/social.json';
 
 import enCommon from './locales/en/common.json';
 import enOnboarding from './locales/en/onboarding.json';
@@ -37,6 +39,8 @@ import enNavbar from './locales/en/navbar.json';
 import enAchievements from './locales/en/achievements.json';
 import enRanks from './locales/en/ranks.json';
 import enBackup from './locales/en/backup.json';
+import enAuth from './locales/en/auth.json';
+import enSocial from './locales/en/social.json';
 
 export const defaultNS = 'common';
 
@@ -58,6 +62,8 @@ export const resources = {
     achievements: esAchievements,
     ranks: esRanks,
     backup: esBackup,
+    auth: esAuth,
+    social: esSocial,
   },
   en: {
     common: enCommon,
@@ -76,13 +82,16 @@ export const resources = {
     achievements: enAchievements,
     ranks: enRanks,
     backup: enBackup,
+    auth: enAuth,
+    social: enSocial,
   },
 } as const;
 
 // Detección de idioma del dispositivo, con 'es' como fallback si no es 'en'.
-// Nota: hoy en/*.json es una copia literal de es/*.json, así que el resultado
-// visual es idéntico sin importar qué idioma detecte esta función.
-function resolveDeviceLanguage(): AppLanguage {
+// Exportada para que app/select-language.tsx la reuse tal cual para la
+// preselección visual de la pantalla de primera apertura (nunca persiste nada
+// por sí sola -- eso sigue pasando únicamente por setStoredLanguage()).
+export function resolveDeviceLanguage(): AppLanguage {
   const languageCode = Localization.getLocales()[0]?.languageCode;
   return languageCode === 'en' ? 'en' : 'es';
 }

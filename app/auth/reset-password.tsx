@@ -1,5 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -28,6 +29,7 @@ type Status = 'verifying' | 'form' | 'success' | 'error';
 // Expo Router resuelve el deep link y expone `code` vía useLocalSearchParams,
 // sin necesidad de un listener global de Linking.
 export default function ResetPassword() {
+  const { t } = useTranslation('auth');
   const router = useRouter();
   const params = useLocalSearchParams<{ code?: string }>();
   const code = Array.isArray(params.code) ? params.code[0] : params.code;
@@ -72,7 +74,7 @@ export default function ResetPassword() {
 
   const effectiveStatus: Status = !code ? 'error' : status;
   const effectiveErrorMessage = !code
-    ? 'El enlace no es válido: falta el código de recuperación.'
+    ? t('resetPassword.invalidLink')
     : errorMessage;
 
   async function handleSubmit() {
@@ -80,11 +82,11 @@ export default function ResetPassword() {
     setFormError(null);
 
     if (!isValidPassword(password)) {
-      setFormError(`La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres.`);
+      setFormError(t('validation.passwordTooShort', { count: MIN_PASSWORD_LENGTH }));
       return;
     }
     if (password !== confirmPassword) {
-      setFormError('Las contraseñas no coinciden.');
+      setFormError(t('validation.passwordsDontMatch'));
       return;
     }
 
@@ -120,28 +122,28 @@ export default function ResetPassword() {
         {effectiveStatus === 'verifying' && (
           <>
             <ActivityIndicator size="large" color={GOLD} />
-            <Text style={styles.title}>Verificando el enlace...</Text>
+            <Text style={styles.title}>{t('resetPassword.verifying')}</Text>
           </>
         )}
 
         {effectiveStatus === 'error' && (
           <>
             <Text style={[styles.icon, styles.iconError]}>✕</Text>
-            <Text style={styles.title}>No pudimos validar el enlace</Text>
+            <Text style={styles.title}>{t('resetPassword.invalidLinkTitle')}</Text>
             <Text style={styles.body}>{effectiveErrorMessage}</Text>
             <TouchableOpacity
               style={styles.primaryBtn}
               onPress={() => router.replace('/auth/forgot-password')}
               activeOpacity={0.85}
             >
-              <Text style={styles.primaryBtnText}>Solicitar un nuevo enlace</Text>
+              <Text style={styles.primaryBtnText}>{t('resetPassword.requestNewLink')}</Text>
             </TouchableOpacity>
           </>
         )}
 
         {effectiveStatus === 'form' && (
           <View style={styles.formWrap}>
-            <Text style={styles.title}>Elegir nueva contraseña</Text>
+            <Text style={styles.title}>{t('resetPassword.title')}</Text>
 
             {formError && (
               <View style={styles.errorBox}>
@@ -149,10 +151,10 @@ export default function ResetPassword() {
               </View>
             )}
 
-            <Text style={styles.label}>Nueva contraseña</Text>
+            <Text style={styles.label}>{t('resetPassword.newPasswordLabel')}</Text>
             <TextInput
               style={styles.input}
-              placeholder="Mínimo 8 caracteres"
+              placeholder={t('fields.passwordCreate.placeholder')}
               placeholderTextColor={MUTED}
               value={password}
               onChangeText={setPassword}
@@ -160,10 +162,10 @@ export default function ResetPassword() {
               autoCapitalize="none"
             />
 
-            <Text style={styles.label}>Repetir contraseña</Text>
+            <Text style={styles.label}>{t('fields.confirmPassword.label')}</Text>
             <TextInput
               style={styles.input}
-              placeholder="Repetí tu contraseña"
+              placeholder={t('fields.confirmPassword.placeholder')}
               placeholderTextColor={MUTED}
               value={confirmPassword}
               onChangeText={setConfirmPassword}
@@ -177,7 +179,7 @@ export default function ResetPassword() {
               disabled={submitting}
               activeOpacity={0.85}
             >
-              <Text style={styles.primaryBtnText}>{submitting ? 'Guardando...' : 'Guardar contraseña'}</Text>
+              <Text style={styles.primaryBtnText}>{submitting ? t('resetPassword.submitting') : t('resetPassword.submit')}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -185,10 +187,10 @@ export default function ResetPassword() {
         {effectiveStatus === 'success' && (
           <>
             <Text style={styles.icon}>✓</Text>
-            <Text style={styles.title}>Contraseña actualizada</Text>
-            <Text style={styles.body}>Tu contraseña se cambió correctamente.</Text>
+            <Text style={styles.title}>{t('resetPassword.successTitle')}</Text>
+            <Text style={styles.body}>{t('resetPassword.successBody')}</Text>
             <TouchableOpacity style={styles.primaryBtn} onPress={handleContinue} activeOpacity={0.85}>
-              <Text style={styles.primaryBtnText}>Continuar</Text>
+              <Text style={styles.primaryBtnText}>{t('common.continue')}</Text>
             </TouchableOpacity>
           </>
         )}

@@ -1,5 +1,6 @@
 import PassportOpen from './passportinside';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { playSound, preloadSounds } from '../utils/soundEngine';
 import { Image } from 'expo-image';
 import React, { useRef, useEffect } from 'react';
@@ -83,7 +84,9 @@ const CONFIG_STAMP_DENTED_PATH = buildDentedRingPath(STAMP_CX, STAMP_CY, 39, 36.
 const CONFIG_STAMP_TOP_ARC = `M ${STAMP_CX - 24},${STAMP_CY} A 24,24 0 0 1 ${STAMP_CX + 24},${STAMP_CY}`;
 const CONFIG_STAMP_BOTTOM_ARC = `M ${STAMP_CX + 24},${STAMP_CY} A 24,24 0 0 1 ${STAMP_CX - 24},${STAMP_CY}`;
 
-const ConfigStamp = () => (
+const ConfigStamp = () => {
+  const { t } = useTranslation('passport');
+  return (
   <Svg
     width={STAMP_SIZE}
     height={STAMP_SIZE}
@@ -109,10 +112,10 @@ const ConfigStamp = () => (
 
     {/* MYWORLDXP — arco superior e inferior */}
     <SvgText fill={STAMP_GOLD} fontFamily="Georgia" fontSize={5.4} fontWeight="700" letterSpacing={1.1} opacity={0.8}>
-      <TextPath href="#configTopArc" startOffset="50%" textAnchor="middle">MYWORLDXP</TextPath>
+      <TextPath href="#configTopArc" startOffset="50%" textAnchor="middle">{t('cover.stampBrand')}</TextPath>
     </SvgText>
     <SvgText fill={STAMP_GOLD} fontFamily="Georgia" fontSize={5.4} fontWeight="700" letterSpacing={1.1} opacity={0.8}>
-      <TextPath href="#configBottomArc" startOffset="50%" textAnchor="middle">MYWORLDXP</TextPath>
+      <TextPath href="#configBottomArc" startOffset="50%" textAnchor="middle">{t('cover.stampBrand')}</TextPath>
     </SvgText>
 
     {/* Anillo separador entre los textos circulares y el CONFIG central */}
@@ -133,11 +136,12 @@ const ConfigStamp = () => (
       textAnchor="middle"
       opacity={0.95}
     >
-      CONFIG
+      {t('cover.configLabel')}
     </SvgText>
     <Line x1={22} y1={47} x2={58} y2={47} stroke={STAMP_GOLD} strokeWidth={0.5} opacity={0.6} />
   </Svg>
-);
+  );
+};
 
 const TopLine = () => (
   <View style={styles.topLineContainer}>
@@ -157,6 +161,7 @@ const DividerLine = () => (
 
 export default function PassportCover() {
   const router = useRouter();
+  const { t } = useTranslation('passport');
   const coverAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => { preloadSounds(); }, []);
@@ -226,9 +231,9 @@ export default function PassportCover() {
                 </View>
               </View>
               <View style={styles.brandLine}>
-                <Text style={styles.brandMy}>MY </Text>
-                <Text style={styles.brandWorld}>WORLD</Text>
-                <Text style={styles.brandXp}>XP</Text>
+                <Text style={styles.brandMy}>{t('cover.brand.my')}</Text>
+                <Text style={styles.brandWorld}>{t('cover.brand.world')}</Text>
+                <Text style={styles.brandXp}>{t('cover.brand.xp')}</Text>
               </View>
             </View>
             <View style={styles.blockLogo}>
@@ -241,9 +246,9 @@ export default function PassportCover() {
             </View>
             <View style={styles.blockBottom}>
               <DividerLine />
-              <Text style={styles.passportTitle}>PASSPORT</Text>
+              <Text style={styles.passportTitle}>{t('cover.title')}</Text>
               <Text style={styles.passportSubtitle}>
-                PASSEPORT · PASAPORTE · REISEPASS · PASSAPORTO
+                {t('cover.subtitle')}
               </Text>
               <View style={styles.ornamentBottom}>
                 <CornerOrnamentBottomLeft />

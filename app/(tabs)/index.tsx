@@ -1,16 +1,39 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Redirect } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { getStoredLanguage } from '../../i18n/languageStorage';
+
+type Destination = '/passportcover' | '/onboarding' | '/select-language';
 
 export default function TabIndex() {
-  const [ready, setReady] = useState<boolean | null>(null);
+  const [destination, setDestination] = useState<Destination | null>(null);
 
   useEffect(() => {
-    AsyncStorage.getItem('userData')
-      .then((raw) => setReady(raw !== null))
-      .catch(() => setReady(false));
+    (async () => {
+      try {
+        const [userData, storedLanguage] = await Promise.all([
+          AsyncStorage.getItem('userData'),
+          getStoredLanguage(),
+        ]);
+        if (userData !== null) {
+          // Usuario con perfil ya creado (incluye instalaciones existentes de
+          // antes de esta etapa, aunque no tengan idioma guardado todavía):
+          // nunca ve la pantalla de selección, igual que siempre.
+          setDestination('/passportcover');
+        } else if (storedLanguage === null) {
+          // Primera apertura real: sin perfil y sin idioma elegido todavía.
+          setDestination('/select-language');
+        } else {
+          // Idioma ya elegido pero onboarding sin terminar (se fue a mitad
+          // de camino): no se le vuelve a preguntar el idioma.
+          setDestination('/onboarding');
+        }
+      } catch {
+        setDestination('/onboarding');
+      }
+    })();
   }, []);
 
-  if (ready === null) return null;
-  return <Redirect href={ready ? '/passportcover' : '/onboarding'} />;
+  if (destination === null) return null;
+  return <Redirect href={destination} />;
 }

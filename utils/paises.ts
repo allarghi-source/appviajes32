@@ -217,3 +217,49 @@ export function buscarPaises(query: string): Pais[] {
 export function getPaisPorIso2(iso2: string): Pais | undefined {
   return PAISES.find((p) => p.iso2 === iso2);
 }
+
+// ─── RESOLUCIÓN LOCAL DE PAÍS → ISO2 ──────────────────────────────────────────
+// Usada por utils/statsEngine.ts para darle identidad estable (countryKey) a
+// viajes históricos que no tienen Trip.countryCode. Cubre los 195 países de
+// PAISES_RAW más 21 alias que utils/statsEngine.ts (CONTINENT_MAP) ya
+// reconocía antes de esto -- nombres en inglés u otras variantes que Nominatim
+// puede haber devuelto en el pasado, y territorios que no son países soberanos
+// y por eso no están en PAISES_RAW. Completamente local, determinista, sin
+// red: nunca reemplaza a countryCode, solo lo infiere cuando falta.
+const ALIAS_EXTRA_ISO2: Array<[string, string]> = [
+  ['Puerto Rico', 'PR'],
+  ['Brazil', 'BR'],
+  ['Guyana Francesa', 'GF'],
+  ['France', 'FR'],
+  ['Germany', 'DE'],
+  ['UK', 'GB'],
+  ['Holanda', 'NL'],
+  ['Kenya', 'KE'],
+  ['Zimbabwe', 'ZW'],
+  ['Botswana', 'BW'],
+  ['Hong Kong', 'HK'],
+  ['Taiwan', 'TW'],
+  ['Myanmar', 'MM'],
+  ['Bangladesh', 'BD'],
+  ['Qatar', 'QA'],
+  ['Bahrain', 'BH'],
+  ['Birmania', 'MM'],
+  ['Nueva Zelandia', 'NZ'],
+  ['Fiji', 'FJ'],
+  ['Polinesia Francesa', 'PF'],
+  ['Nueva Caledonia', 'NC'],
+];
+
+function normalizeParaResolucion(s: string): string {
+  return normalizarTextoPais(s).replace(/\s+/g, ' ');
+}
+
+const NOMBRE_A_ISO2: Map<string, string> = new Map([
+  ...PAISES_RAW.map((p): [string, string] => [normalizeParaResolucion(p.nombre), p.iso2]),
+  ...ALIAS_EXTRA_ISO2.map(([nombre, iso2]): [string, string] => [normalizeParaResolucion(nombre), iso2]),
+]);
+
+export function resolverIso2Local(pais: string): string | null {
+  if (!pais) return null;
+  return NOMBRE_A_ISO2.get(normalizeParaResolucion(pais)) ?? null;
+}

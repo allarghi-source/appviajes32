@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
@@ -30,6 +31,7 @@ const DANGER = '#c0392b';
 // cuenta / email sin confirmar / conectado). Sin búsqueda, sin requests, sin
 // relaciones, sin RPCs — eso llega en un bloque posterior.
 export default function CompartirXpTab() {
+  const { t } = useTranslation('social');
   const router = useRouter();
   const { session, loading } = useSession();
   const [signingOut, setSigningOut] = useState(false);
@@ -83,7 +85,7 @@ export default function CompartirXpTab() {
       // SessionProvider actualiza `session` solo vía onAuthStateChange; no
       // hace falta navegar ni recargar nada acá.
     } catch {
-      Alert.alert('No se pudo cerrar sesión', 'Intentá de nuevo.');
+      Alert.alert(t('verified.signOutErrorTitle'), t('verified.signOutErrorMessage'));
     } finally {
       setSigningOut(false);
     }
@@ -93,7 +95,7 @@ export default function CompartirXpTab() {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="small" color={GOLD} />
-        <Text style={styles.loadingText}>Cargando...</Text>
+        <Text style={styles.loadingText}>{t('loading')}</Text>
       </View>
     );
   }
@@ -101,24 +103,23 @@ export default function CompartirXpTab() {
   if (!session) {
     return (
       <View style={styles.content}>
-        <Text style={styles.title}>CompartirXP</Text>
+        <Text style={styles.title}>{t('title')}</Text>
         <Text style={styles.body}>
-          Creá una cuenta para compartir tu mundo de viajes con otros usuarios de MyWorldXP y ver
-          los mundos que compartan con vos.
+          {t('loggedOut.body')}
         </Text>
         <TouchableOpacity
           style={styles.primaryBtn}
           onPress={() => router.push('/auth/signup')}
           activeOpacity={0.85}
         >
-          <Text style={styles.primaryBtnText}>CREAR CUENTA</Text>
+          <Text style={styles.primaryBtnText}>{t('loggedOut.createAccount')}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.secondaryBtn}
           onPress={() => router.push('/auth/login')}
           activeOpacity={0.85}
         >
-          <Text style={styles.secondaryBtnText}>INICIAR SESIÓN</Text>
+          <Text style={styles.secondaryBtnText}>{t('loggedOut.login')}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -127,10 +128,10 @@ export default function CompartirXpTab() {
   if (!session.user.email_confirmed_at) {
     return (
       <View style={styles.content}>
-        <Text style={styles.title}>CompartirXP</Text>
-        <Text style={styles.body}>Falta confirmar tu email.</Text>
+        <Text style={styles.title}>{t('title')}</Text>
+        <Text style={styles.body}>{t('emailUnconfirmed.body')}</Text>
         <Text style={styles.bodySecondary}>
-          Revisá tu correo y tocá el enlace de confirmación para activar CompartirXP.
+          {t('emailUnconfirmed.hint')}
         </Text>
         <TouchableOpacity
           style={styles.secondaryBtn}
@@ -139,7 +140,7 @@ export default function CompartirXpTab() {
           }
           activeOpacity={0.85}
         >
-          <Text style={styles.secondaryBtnText}>VER INSTRUCCIONES</Text>
+          <Text style={styles.secondaryBtnText}>{t('emailUnconfirmed.viewInstructions')}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -155,9 +156,9 @@ export default function CompartirXpTab() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>CompartirXP</Text>
+        <Text style={styles.title}>{t('title')}</Text>
 
-        {usernameLoading && <Text style={styles.bodySecondary}>Cargando tu usuario...</Text>}
+        {usernameLoading && <Text style={styles.bodySecondary}>{t('verified.loadingUsername')}</Text>}
 
         {!usernameLoading && username && <Text style={styles.myUsername}>@{username}</Text>}
 
@@ -166,7 +167,7 @@ export default function CompartirXpTab() {
         )}
 
         {!usernameLoading && !username && !usernameError && (
-          <Text style={styles.bodySecondary}>Todavía no tenés un nombre de usuario configurado.</Text>
+          <Text style={styles.bodySecondary}>{t('verified.noUsername')}</Text>
         )}
 
         {userId && <PendingRequests myUserId={userId} />}
@@ -179,7 +180,7 @@ export default function CompartirXpTab() {
           disabled={signingOut}
           activeOpacity={0.85}
         >
-          <Text style={styles.dangerBtnText}>{signingOut ? 'Cerrando sesión...' : 'CERRAR SESIÓN'}</Text>
+          <Text style={styles.dangerBtnText}>{signingOut ? t('verified.signingOut') : t('verified.signOut')}</Text>
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>

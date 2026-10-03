@@ -1,15 +1,32 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
 import { Dimensions, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import NavBar from '../components/NavBar';
 import {
-  ALL_CONTINENTS,
+  ALL_CONTINENT_IDS,
+  ContinentId,
   StatsResult,
   Trip,
   calcularStats,
-  getContinent,
   getXpRestantes,
+  resolveTripGeography,
 } from '../utils/statsEngine';
+
+// Conecta el ID estable de continente (utils/statsEngine.ts) con la clave que
+// usa i18n/locales/{es,en}/ranks.json para el nombre visible -- las dos
+// convenciones de nombres no coinciden 1 a 1 (north_america vs americaDelNorte).
+const CONTINENT_NAME_KEY: Record<
+  ContinentId,
+  'americaDelNorte' | 'americaDelSur' | 'europa' | 'africa' | 'asia' | 'oceania'
+> = {
+  north_america: 'americaDelNorte',
+  south_america: 'americaDelSur',
+  europe: 'europa',
+  africa: 'africa',
+  asia: 'asia',
+  oceania: 'oceania',
+};
 
 const BG = '#01050d';
 const GOLD = '#d4af37';
@@ -24,13 +41,13 @@ const SIDE_PAD = Math.max(20, Math.round((SCREEN_W - 640) / 2));
 // On tablets show 3 continent columns, phones keep 2
 const CONT_CARD_W = SCREEN_W >= 600 ? '30%' : '47%';
 
-const CONTINENT_ICON: Record<string, number> = {
-  'América del Norte': require('../assets/continents/north_america.png'),
-  'América del Sur':  require('../assets/continents/south_america.png'),
-  'Europa':           require('../assets/continents/europe.png'),
-  'África':           require('../assets/continents/africa.png'),
-  'Asia':             require('../assets/continents/asia.png'),
-  'Oceanía':          require('../assets/continents/oceania.png'),
+const CONTINENT_ICON: Record<ContinentId, number> = {
+  north_america: require('../assets/continents/north_america.png'),
+  south_america: require('../assets/continents/south_america.png'),
+  europe:        require('../assets/continents/europe.png'),
+  africa:        require('../assets/continents/africa.png'),
+  asia:          require('../assets/continents/asia.png'),
+  oceania:       require('../assets/continents/oceania.png'),
 };
 
 const TIER_COLOR: Record<string, string> = {
@@ -40,34 +57,38 @@ const TIER_COLOR: Record<string, string> = {
 };
 
 // Países soberanos por continente (denominador para el porcentaje)
-const CONTINENT_TOTAL_COUNTRIES: Record<string, number> = {
-  'América del Norte': 23,
-  'América del Sur': 12,
-  'Europa': 44,
-  'África': 54,
-  'Asia': 48,
-  'Oceanía': 14,
+const CONTINENT_TOTAL_COUNTRIES: Record<ContinentId, number> = {
+  north_america: 23,
+  south_america: 12,
+  europe: 44,
+  africa: 54,
+  asia: 48,
+  oceania: 14,
 };
 
 
 // ─── BARRA DE XP ──────────────────────────────────────────────────────────────
 
 function XpSection({ stats }: { stats: StatsResult }) {
+  const { t } = useTranslation('stats');
+  const { t: tRanks } = useTranslation('ranks');
   const tierColor = TIER_COLOR[stats.rangoTier];
   const xpProgress = Math.max(1, Math.round(stats.progresoRango * 100));
   const xpRestantes = getXpRestantes(stats.xpTotal);
+  const rangoActualNombre = tRanks(`names.${stats.rangoActualId}`);
+  const siguienteRangoNombre = stats.siguienteRangoId ? tRanks(`names.${stats.siguienteRangoId}`) : null;
 
   return (
     <View style={styles.card}>
-      <Text style={styles.cardLabel}>RANGO ACTUAL</Text>
+      <Text style={styles.cardLabel}>{t('rank.label')}</Text>
 
       <View style={styles.rankRow}>
         <View style={[styles.rankBadge, { borderColor: tierColor }]}>
           <Text style={[styles.rankBadgeText, { color: tierColor }]}>
-            {stats.rangoActual.toUpperCase()}
+            {rangoActualNombre.toUpperCase()}
           </Text>
         </View>
-        <Text style={styles.xpNumber}>{stats.xpTotal} XP</Text>
+        <Text style={styles.xpNumber}>{stats.xpTotal}{t('rank.xpSuffix')}</Text>
       </View>
 
       <View style={styles.progressWrap}>
@@ -76,20 +97,22 @@ function XpSection({ stats }: { stats: StatsResult }) {
 
       <View style={styles.progressLabels}>
         <Text style={[styles.progressLabel, { color: tierColor }]}>
-          {stats.rangoActual}
+          {rangoActualNombre}
         </Text>
-        {stats.siguienteRango ? (
+        {siguienteRangoNombre ? (
           <Text style={styles.progressLabelRight}>
-            {stats.siguienteRango} →
+            {siguienteRangoNombre} {t('rank.arrow')}
           </Text>
         ) : (
           <Text style={[styles.progressLabelRight, { color: tierColor }]}>
-            MÁXIMO ★
+            {t('rank.maxRank')}
           </Text>
         )}
       </View>
-      {stats.siguienteRango && xpRestantes !== null && (
-        <Text style={styles.xpRestantesHint}>Faltan {xpRestantes} XP para {stats.siguienteRango}</Text>
+      {siguienteRangoNombre && xpRestantes !== null && (
+        <Text style={styles.xpRestantesHint}>
+          {t('rank.xpRemaining', { count: xpRestantes, nextRank: siguienteRangoNombre })}
+        </Text>
       )}
     </View>
   );
@@ -106,30 +129,33 @@ function ContinentesSection({
   continentCounts: Record<string, number>;
   continentUniqueCountries: Record<string, number>;
 }) {
+  const { t } = useTranslation('stats');
+  const { t: tRanks } = useTranslation('ranks');
   const pct = Math.round(stats.porcentajeContinentes * 100);
-  const visited = new Set(stats.continentesNombres);
+  const visited = new Set(stats.continentesIds);
 
   return (
     <View style={styles.card}>
       <View style={styles.cardHeaderRow}>
-        <Text style={styles.cardLabel}>CONTINENTES</Text>
+        <Text style={styles.cardLabel}>{t('continents.label')}</Text>
         <Text style={styles.cardBadge}>
-          {stats.continentesVisitados} / {ALL_CONTINENTS.length}
+          {t('continents.counter', { count: stats.continentesVisitados, total: ALL_CONTINENT_IDS.length })}
         </Text>
       </View>
 
       <View style={styles.progressWrap}>
         <View style={[styles.progressFill, { width: `${pct}%`, backgroundColor: GOLD }]} />
       </View>
-      <Text style={styles.pctText}>{pct}% del mundo explorado</Text>
+      <Text style={styles.pctText}>{t('continents.percentExplored', { percent: pct })}</Text>
 
       <View style={styles.continentGrid}>
-        {ALL_CONTINENTS.map((cont) => {
+        {ALL_CONTINENT_IDS.map((cont) => {
           const done = visited.has(cont);
           const trips = continentCounts[cont] ?? 0;
           const uniqueVisited = continentUniqueCountries[cont] ?? 0;
           const totalInContinent = CONTINENT_TOTAL_COUNTRIES[cont] ?? 1;
           const contPct = done ? Math.round((uniqueVisited / totalInContinent) * 100) : 0;
+          const nombreContinente = tRanks(`continents.${CONTINENT_NAME_KEY[cont]}`);
 
           return (
             <View key={cont} style={[styles.continentCard, !done && styles.continentCardOff]}>
@@ -147,15 +173,15 @@ function ContinentesSection({
                 />
               )}
               <Text style={[styles.continentPct, !done && styles.continentPctOff]}>
-                {done ? `${contPct}%` : '—'}
+                {done ? t('continents.percentVisited', { percent: contPct }) : t('continents.dash')}
               </Text>
               <Text style={[styles.continentCardName, !done && styles.continentCardNameOff]}>
-                {cont}
+                {nombreContinente}
               </Text>
               <Text style={[styles.continentCardTrips, !done && styles.continentCardTripsOff]}>
                 {trips > 0
-                  ? `${trips} ${trips === 1 ? 'viaje' : 'viajes'}`
-                  : 'Sin visitar'}
+                  ? t('continents.tripCount', { count: trips })
+                  : t('continents.notVisited')}
               </Text>
             </View>
           );
@@ -168,11 +194,13 @@ function ContinentesSection({
 // ─── TOP PAÍSES ───────────────────────────────────────────────────────────────
 
 function TopPaisesSection({ stats }: { stats: StatsResult }) {
+  const { t } = useTranslation('stats');
+
   if (stats.paisesMasVisitados.length === 0) {
     return (
       <View style={styles.card}>
-        <Text style={styles.cardLabel}>TOP PAÍSES MÁS VISITADOS</Text>
-        <Text style={styles.emptyText}>—</Text>
+        <Text style={styles.cardLabel}>{t('topCountries.label')}</Text>
+        <Text style={styles.emptyText}>{t('topCountries.empty')}</Text>
       </View>
     );
   }
@@ -181,18 +209,18 @@ function TopPaisesSection({ stats }: { stats: StatsResult }) {
 
   return (
     <View style={styles.card}>
-      <Text style={styles.cardLabel}>TOP PAÍSES MÁS VISITADOS</Text>
+      <Text style={styles.cardLabel}>{t('topCountries.label')}</Text>
       <View style={styles.paisList}>
         {stats.paisesMasVisitados.map(({ pais, visitas }, i) => {
           const barW = Math.max(4, Math.round((visitas / maxVisitas) * 100));
           return (
             <View key={pais} style={styles.paisRow}>
-              <Text style={styles.paisRank}>#{i + 1}</Text>
+              <Text style={styles.paisRank}>{t('topCountries.rankPrefix')}{i + 1}</Text>
               <View style={styles.paisInfo}>
                 <View style={styles.paisNameRow}>
                   <Text style={styles.paisName}>{pais}</Text>
                   <Text style={styles.paisCount}>
-                    {visitas} {visitas === 1 ? 'vez' : 'veces'}
+                    {t('topCountries.visitCount', { count: visitas })}
                   </Text>
                 </View>
                 <View style={styles.paisBarBg}>
@@ -214,25 +242,27 @@ function TopCiudadesSection({
 }: {
   topCiudades: Array<{ ciudad: string; visitas: number }>;
 }) {
+  const { t } = useTranslation('stats');
+
   if (topCiudades.length === 0) {
     return (
       <View style={styles.card}>
-        <Text style={styles.cardLabel}>TOP CIUDADES MÁS VISITADAS</Text>
-        <Text style={styles.emptyText}>—</Text>
+        <Text style={styles.cardLabel}>{t('topCities.label')}</Text>
+        <Text style={styles.emptyText}>{t('topCities.empty')}</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.card}>
-      <Text style={styles.cardLabel}>TOP CIUDADES MÁS VISITADAS</Text>
+      <Text style={styles.cardLabel}>{t('topCities.label')}</Text>
       <View style={styles.cityList}>
         {topCiudades.map(({ ciudad, visitas }, i) => (
           <View key={ciudad} style={styles.cityRow}>
-            <Text style={styles.paisRank}>#{i + 1}</Text>
+            <Text style={styles.paisRank}>{t('topCities.rankPrefix')}{i + 1}</Text>
             <Text style={styles.cityName}>{ciudad}</Text>
             <Text style={styles.cityCount}>
-              {visitas} {visitas === 1 ? 'viaje' : 'viajes'}
+              {t('topCities.tripCount', { count: visitas })}
             </Text>
           </View>
         ))}
@@ -244,6 +274,7 @@ function TopCiudadesSection({
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 
 export default function Estadisticas() {
+  const { t } = useTranslation('stats');
   const [stats, setStats] = useState<StatsResult | null>(null);
   const [continentCounts, setContinentCounts] = useState<Record<string, number>>({});
   const [continentUniqueCountries, setContinentUniqueCountries] = useState<Record<string, number>>({});
@@ -259,19 +290,19 @@ export default function Estadisticas() {
 
         const realTrips = allTrips.filter((t) => t.tipo === 'real');
 
-        // Misma normalización que statsEngine usa internamente
-        const normPais = (s: string) =>
-          s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
-
+        // Misma identidad geográfica que usa calcularStats (countryCode nativo
+        // o resolución ISO2 local para históricos, con el texto como último
+        // recurso) -- nunca una segunda lógica propia de esta pantalla, para
+        // que el desglose por continente y el agregado nunca puedan diverger.
         const contMap: Record<string, number> = {};
         const contCountrySets: Record<string, Set<string>> = {};
 
         for (const trip of realTrips) {
-          const cont = getContinent(trip.pais);
+          const { continentId: cont, countryKey } = resolveTripGeography(trip);
           if (cont) {
             contMap[cont] = (contMap[cont] ?? 0) + 1;
             if (!contCountrySets[cont]) contCountrySets[cont] = new Set();
-            contCountrySets[cont].add(normPais(trip.pais));
+            contCountrySets[cont].add(countryKey);
           }
         }
 
@@ -303,13 +334,13 @@ export default function Estadisticas() {
   return (
     <View style={styles.root}>
       <View style={styles.header}>
-        <Text style={styles.title}>Estadísticas</Text>
-        <Text style={styles.subtitle}>Tu resumen de viajero</Text>
+        <Text style={styles.title}>{t('title')}</Text>
+        <Text style={styles.subtitle}>{t('subtitle')}</Text>
       </View>
 
       {loading ? (
         <View style={styles.center}>
-          <Text style={styles.mutedText}>Cargando...</Text>
+          <Text style={styles.mutedText}>{t('loading')}</Text>
         </View>
       ) : stats ? (
         <ScrollView

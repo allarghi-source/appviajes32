@@ -1,9 +1,27 @@
 {
-  "repositionAlert": {
-    "title": "Confirmar posición",
-    "message": "¿Guardar esta nueva posición del pin?"
+  "tabs": {
+    "mine": "MyWorldXP",
+    "others": "OtherXP",
+    "share": "ShareXP"
   },
-  "resetPosition": "↺  Restablecer posición original del pin",
-  "wishlistBadge": "PENDIENTE",
-  "markAchieved": "¡Lo logré!"
+  "repositionAlert": {
+    "title": "Confirm Position",
+    "message": "Save this new pin position?",
+    "cancel": "Cancel",
+    "save": "Save"
+  },
+  "resetPosition": "↺  Reset pin to original position",
+  "wishlistBadge": "PENDING",
+  "repeatBadge": "VISIT AGAIN",
+  "markAchieved": "I Made It!",
+  "othersSection": {
+    "body": "Here you'll be able to see the worlds other users share with you.",
+    "empty": "You don't have any shared worlds yet.",
+    "refresh": "↻ Refresh"
+  },
+  "otherWorld": {
+    "title": "Map of @{{username}}",
+    "xp": "Current XP: {{xp}}",
+    "stats": "Continents: {{continents}} · Countries: {{countries}} · Cities: {{cities}}"
+  }
 }

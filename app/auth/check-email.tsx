@@ -1,5 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { AUTH_FALLBACK_ROUTE, getAuthErrorMessage } from '../../utils/auth';
@@ -16,6 +17,7 @@ const DANGER = '#c0392b';
 const RESEND_COOLDOWN_SECONDS = 30;
 
 export default function CheckEmail() {
+  const { t } = useTranslation('auth');
   const router = useRouter();
   const params = useLocalSearchParams<{ email?: string }>();
   const email = Array.isArray(params.email) ? params.email[0] : params.email;
@@ -56,7 +58,7 @@ export default function CheckEmail() {
         setFeedback({ text: getAuthErrorMessage(error, 'resend'), isError: true });
         return;
       }
-      setFeedback({ text: 'Te reenviamos el email de confirmación.', isError: false });
+      setFeedback({ text: t('checkEmail.resent'), isError: false });
       setCooldown(RESEND_COOLDOWN_SECONDS);
     } catch (err) {
       if (!mountedRef.current) return;
@@ -76,19 +78,19 @@ export default function CheckEmail() {
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <Text style={styles.backIcon}>‹</Text>
-          <Text style={styles.backLabel}>Volver</Text>
+          <Text style={styles.backLabel}>{t('back')}</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.content}>
         <Text style={styles.icon}>✉</Text>
-        <Text style={styles.title}>Revisá tu email</Text>
+        <Text style={styles.title}>{t('checkEmail.title')}</Text>
         <Text style={styles.body}>
-          Te enviamos un enlace para confirmar tu cuenta{email ? ' a' : '.'}
+          {email ? t('checkEmail.bodyWithEmail') : t('checkEmail.bodyWithoutEmail')}
           {email ? <Text style={styles.emailText}>{'\n'}{email}</Text> : null}
         </Text>
         <Text style={styles.bodySecondary}>
-          Hasta que confirmes tu email, tu cuenta no queda habilitada para CompartirXP.
+          {t('checkEmail.bodySecondary')}
         </Text>
 
         {feedback && (
@@ -107,13 +109,13 @@ export default function CheckEmail() {
             activeOpacity={0.8}
           >
             <Text style={styles.secondaryBtnText}>
-              {resending ? 'Enviando...' : cooldown > 0 ? `Reenviar (${cooldown}s)` : 'Reenviar email'}
+              {resending ? t('common.sending') : cooldown > 0 ? t('checkEmail.resendCooldown', { seconds: cooldown }) : t('checkEmail.resend')}
             </Text>
           </TouchableOpacity>
         )}
 
         <TouchableOpacity style={styles.primaryBtn} onPress={goToLogin} activeOpacity={0.85}>
-          <Text style={styles.primaryBtnText}>Iniciar sesión</Text>
+          <Text style={styles.primaryBtnText}>{t('checkEmail.goToLogin')}</Text>
         </TouchableOpacity>
       </View>
     </View>

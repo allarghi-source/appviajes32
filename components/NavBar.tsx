@@ -1,4 +1,5 @@
 import { usePathname, useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
 
@@ -71,20 +72,21 @@ function StatsIcon({ active }: { active: boolean }) {
 const ITEMS = [
   // PassportCover renderiza PassportInside embebido como fondo (sin cambiar de ruta)
   // mientras anima la tapa; por eso Home también debe quedar activo en esa ruta.
-  { route: '/passportinside', match: ['/passportinside', '/passportcover'], label: 'Home',     Icon: PassportIcon },
-  { route: '/cargar',         match: ['/cargar'],                           label: 'Cargar',   Icon: AddIcon      },
-  { route: '/timeline',       match: ['/timeline'],                        label: 'Timeline', Icon: TimelineIcon },
-  { route: '/estadisticas',   match: ['/estadisticas'],                    label: 'Stats',    Icon: StatsIcon    },
-  { route: '/mapa',           match: ['/mapa'],                            label: 'Mapa',     Icon: MapIcon      },
+  { route: '/passportinside', match: ['/passportinside', '/passportcover'], labelKey: 'home',     Icon: PassportIcon },
+  { route: '/cargar',         match: ['/cargar'],                           labelKey: 'cargar',   Icon: AddIcon      },
+  { route: '/timeline',       match: ['/timeline'],                        labelKey: 'timeline', Icon: TimelineIcon },
+  { route: '/estadisticas',   match: ['/estadisticas'],                    labelKey: 'stats',    Icon: StatsIcon    },
+  { route: '/mapa',           match: ['/mapa'],                            labelKey: 'mapa',     Icon: MapIcon      },
 ] as const;
 
 export default function NavBar() {
+  const { t } = useTranslation('navbar');
   const router = useRouter();
   const pathname = usePathname();
 
   return (
     <View style={styles.bar}>
-      {ITEMS.map(({ route, match, label, Icon }) => {
+      {ITEMS.map(({ route, match, labelKey, Icon }) => {
         const active = (match as readonly string[]).includes(pathname);
         return (
           <TouchableOpacity
@@ -96,7 +98,7 @@ export default function NavBar() {
             <View style={[styles.iconWrap, active && styles.iconWrapActive]}>
               <Icon active={active} />
             </View>
-            <Text style={[styles.label, active && styles.labelActive]}>{label}</Text>
+            <Text style={[styles.label, active && styles.labelActive]}>{t(labelKey)}</Text>
           </TouchableOpacity>
         );
       })}

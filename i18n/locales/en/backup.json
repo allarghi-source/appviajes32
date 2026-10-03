@@ -1,9 +1,9 @@
 {
   "restoreConfirm": {
-    "existingWithDate": "Se encontró un backup guardado el:\n{{fecha}}\n\nSi continuás, todos los datos actuales serán reemplazados por el contenido de ese backup.\n\n¿Querés continuar?",
-    "existingNoDate": "Se encontró un backup guardado en este dispositivo.\n\nSi continuás, todos los datos actuales serán reemplazados por el contenido de ese backup.\n\n¿Querés continuar?",
-    "noneWithDate": "Se encontró un backup guardado el:\n{{fecha}}\n\n¿Querés restaurarlo?",
-    "noneNoDate": "Se encontró un backup guardado en este dispositivo.\n\n¿Querés restaurarlo?"
+    "existingWithDate": "A backup saved on:\n{{fecha}}\n\nIf you continue, all current data will be replaced with the contents of this backup.\n\nDo you want to continue?",
+    "existingNoDate": "A backup was found on this device.\n\nIf you continue, all current data will be replaced with the contents of this backup.\n\nDo you want to continue?",
+    "noneWithDate": "A backup saved on:\n{{fecha}}\n\nDo you want to restore it?",
+    "noneNoDate": "A backup was found on this device.\n\nDo you want to restore it?"
   },
-  "invalidStructure": "Estructura de backup inválida"
+  "invalidStructure": "Invalid Backup Structure"
 }

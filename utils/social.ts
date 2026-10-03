@@ -1,3 +1,4 @@
+import i18n from '../i18n';
 import { supabase } from './supabase';
 
 // ─── NORMALIZACIÓN ────────────────────────────────────────────────────────────
@@ -83,7 +84,11 @@ function parseFoundUser(data: unknown): FoundUser | null {
 // ─── SOLICITUDES DE COMPARTIR ─────────────────────────────────────────────────
 
 export type ShareRequestType = 'request_access' | 'offer_share';
-export type ShareScope = 'realized' | 'wishlist' | 'both';
+// Valores técnicos exactos del contrato del backend: create_share_request,
+// respond_share_request, los CHECK de share_requests/share_relationships y la
+// policy de shared_trips (que compara `scope = tipo`) solo aceptan estos tres.
+// El copy visible ("REALIZADOS"/"VISITED") vive en social.json, nunca acá.
+export type ShareScope = 'real' | 'wishlist' | 'both';
 
 // create_share_request ya está instalado (no se creó ni modificó acá). Firma
 // confirmada con la misma técnica no invasiva que find_user_exact: probing
@@ -134,19 +139,26 @@ function isShareRequestType(v: unknown): v is ShareRequestType {
 }
 
 function isShareScope(v: unknown): v is ShareScope {
-  return v === 'realized' || v === 'wishlist' || v === 'both';
+  return v === 'real' || v === 'wishlist' || v === 'both';
 }
 
 // SELECT de solo lectura a share_requests (nunca INSERT/UPDATE directo): la
 // policy ya permite al receiver leer sus propias solicitudes. Se trae solo lo
 // necesario, filtrado por receiver_id + status=pending — nada de historial ni
 // de solicitudes enviadas por mí.
+//
+// El backend vence las solicitudes de forma perezosa: una fila puede seguir
+// en status='pending' con expires_at ya pasado hasta que alguien la toque
+// (respond_share_request la pasa a 'expired' y devuelve 'expired'). Por eso
+// se filtra también por expires_at — la duración la sigue definiendo el
+// default de la columna en Supabase, acá solo se compara contra ahora.
 export async function fetchPendingShareRequests(myUserId: string): Promise<PendingShareRequest[]> {
   const { data, error } = await supabase
     .from('share_requests')
     .select('id, sender_id, request_type, scope, created_at')
     .eq('receiver_id', myUserId)
-    .eq('status', 'pending');
+    .eq('status', 'pending')
+    .gt('expires_at', new Date().toISOString());
 
   if (error) {
     if (__DEV__) console.warn('[social] fetchPendingShareRequests error', error.code, error.message);
@@ -177,7 +189,7 @@ export async function fetchPendingShareRequests(myUserId: string): Promise<Pendi
   return valid.map((r) => ({
     id: r.id as string,
     senderId: r.sender_id as string,
-    senderUsername: usernames.get(r.sender_id as string) ?? 'Usuario',
+    senderUsername: usernames.get(r.sender_id as string) ?? i18n.t('social:fallbackUsername'),
     requestType: r.request_type as ShareRequestType,
     scope: (r.scope as ShareScope | null) ?? null,
     createdAt: r.created_at as string,
@@ -228,12 +240,19 @@ async function resolveUsernames(userIds: string[]): Promise<Map<string, string>>
 // para offer_share se omite y el servidor respeta el scope ya elegido por
 // quien ofreció, tal como pide la arquitectura (nunca se cambia scope desde
 // el cliente).
+//
+// La RPC NO lanza excepción para todos los desenlaces: devuelve el texto
+// 'accepted' | 'rejected' | 'expired'. 'expired' (solicitud vencida, que el
+// servidor marca como tal en ese mismo llamado) NO crea relación, así que el
+// llamador tiene que mirar este valor — "no hubo error" no alcanza acá.
+export type ShareResponseOutcome = 'accepted' | 'rejected' | 'expired';
+
 export async function respondShareRequest(params: {
   requestId: string;
   accept: boolean;
   scope?: ShareScope;
-}): Promise<void> {
-  const { error } = await supabase.rpc('respond_share_request', {
+}): Promise<ShareResponseOutcome> {
+  const { data, error } = await supabase.rpc('respond_share_request', {
     p_accept: params.accept,
     p_request_id: params.requestId,
     p_scope: params.scope ?? null,
@@ -243,98 +262,126 @@ export async function respondShareRequest(params: {
     if (__DEV__) console.warn('[social] respond_share_request error', error.code, error.message);
     throw error;
   }
+
+  if (data === 'accepted' || data === 'rejected' || data === 'expired') {
+    return data;
+  }
+
+  // Un valor fuera del contrato nunca se interpreta como éxito: se trata como
+  // error genérico (ver getShareRequestErrorMessage).
+  if (__DEV__) console.warn('[social] respond_share_request respuesta inesperada', data);
+  throw new Error('UNEXPECTED_RESPONSE');
 }
 
 // ─── ERRORES ──────────────────────────────────────────────────────────────────
-// Los errores de RPC/Postgrest son PostgrestError (code/details/hint/message
-// crudos de Postgres), no AuthError — nunca se muestra `message`/`hint` tal
-// cual al usuario.
+// supabase.rpc()/from() NO devuelven instancias de Error: con throwOnError
+// apagado (el default), postgrest-js entrega `error` como objeto plano
+// ({ code, message, details, hint }), tanto para errores de Postgres como
+// para fallos de red (code '' y message tipo "TypeError: Network request
+// failed"). Por eso nunca se usa `instanceof Error` acá: se lee code/message
+// de cualquier objeto. Nunca se muestra `message`/`hint` tal cual al usuario.
+//
+// Las RPC sociales señalan cada regla de negocio con `raise exception
+// 'CODIGO'`: PostgREST lo devuelve como code 'P0001' y el CODIGO exacto en
+// `message`. Se compara ese código exacto, no palabras sueltas.
 
-function getConnectionOrPermissionMessage(error: Error): string | null {
-  const msg = error.message.toLowerCase();
+interface ErrorInfo {
+  code: string;
+  message: string;
+}
+
+function readErrorInfo(error: unknown): ErrorInfo | null {
+  if (!error || typeof error !== 'object') return null;
+  const e = error as { code?: unknown; message?: unknown };
+  return {
+    code: typeof e.code === 'string' ? e.code : '',
+    message: typeof e.message === 'string' ? e.message.trim() : '',
+  };
+}
+
+function getConnectionOrPermissionMessage(info: ErrorInfo): string | null {
+  const msg = info.message.toLowerCase();
   if (msg.includes('network') || msg.includes('failed to fetch') || msg.includes('fetch failed')) {
-    return 'No pudimos conectar con el servidor. Revisá tu conexión e intentá de nuevo.';
+    return i18n.t('social:errors.connection');
   }
 
-  const code = 'code' in error ? String((error as { code?: unknown }).code ?? '') : '';
-  if (code === '42501') {
-    return 'No tenés permiso para hacer esto en este momento. Confirmá tu email o volvé a iniciar sesión.';
+  // 42501 = permiso de Postgres; AUTH_REQUIRED / EMAIL_NOT_VERIFIED los lanza
+  // require_verified_social_user y se refieren a MI sesión, no al otro usuario.
+  if (info.code === '42501' || info.message === 'AUTH_REQUIRED' || info.message === 'EMAIL_NOT_VERIFIED') {
+    return i18n.t('social:errors.noPermission');
   }
   return null;
 }
 
 export function getSocialErrorMessage(error: unknown): string {
-  if (!(error instanceof Error)) {
-    return 'Ocurrió un error inesperado. Intentá de nuevo.';
+  const info = readErrorInfo(error);
+  if (!info) {
+    return i18n.t('social:errors.unexpected');
   }
 
-  const base = getConnectionOrPermissionMessage(error);
+  const base = getConnectionOrPermissionMessage(info);
   if (base) return base;
 
-  const code = 'code' in error ? String((error as { code?: unknown }).code ?? '') : '';
-  if (code.startsWith('PGRST')) {
-    return 'Ocurrió un error inesperado al buscar. Intentá de nuevo en unos minutos.';
+  if (info.code.startsWith('PGRST')) {
+    return i18n.t('social:errors.searchUnexpected');
   }
 
-  return 'Ocurrió un error al buscar. Intentá de nuevo en unos minutos.';
+  return i18n.t('social:errors.searchGeneric');
 }
+
+// Carga de datos sociales que no es una búsqueda (OtherXP: lista de mundos
+// compartidos y mundo de un owner). Mismo criterio que getSocialErrorMessage,
+// pero sin el texto "al buscar".
+export function getSocialLoadErrorMessage(error: unknown): string {
+  const info = readErrorInfo(error);
+  const base = info ? getConnectionOrPermissionMessage(info) : null;
+  return base ?? i18n.t('social:errors.unexpected');
+}
+
+// 'send'  = create_share_request (FoundUserActions).
+// 'inbox' = bandeja de pendientes: carga + respond_share_request (PendingRequests).
+// Solo INVALID_SCOPE depende del contexto: el texto existente habla de
+// "aceptar esta solicitud", que no aplica al enviar.
+export type ShareRequestErrorContext = 'send' | 'inbox';
 
 // El servidor ya implementa toda la lógica de negocio (pending equivalente,
 // cooldown de 15 días, bloqueo tras 2do/3er rechazo, relación existente,
-// verificación, etc.) — este mapeo NO la duplica, solo interpreta el error
-// que ya devolvió el RPC. No se pudo observar en un caso real qué código o
-// texto exacto usa cada regla (haría falta una segunda cuenta y disparar
-// esos estados en la base real, algo fuera de alcance acá), así que el
-// parsing es prudente: varias palabras clave por categoría, nunca una frase
-// única y frágil, y si nada matchea, un mensaje genérico honesto en vez de
-// inventar un motivo.
-export function getShareRequestErrorMessage(error: unknown): string {
-  if (!(error instanceof Error)) {
-    return 'No pudimos completar la solicitud. Intentá de nuevo más tarde.';
+// verificación, etc.) — este mapeo NO la duplica, solo traduce el código que
+// ya devolvió el RPC. Un código no listado (o un error sin código) cae a un
+// mensaje genérico honesto en vez de inventar un motivo.
+export function getShareRequestErrorMessage(error: unknown, context: ShareRequestErrorContext): string {
+  const info = readErrorInfo(error);
+  if (!info) {
+    return i18n.t('social:errors.requestGeneric');
   }
 
-  const base = getConnectionOrPermissionMessage(error);
+  const base = getConnectionOrPermissionMessage(info);
   if (base) return base;
 
-  const msg = error.message.toLowerCase();
-
-  // Casos específicos de responder (aceptar/rechazar) una solicitud ya
-  // existente — se chequean antes que los de creación porque "ya no está
-  // pending" y "ya existe una pendiente" usan vocabulario parecido y el
-  // orden evita que el genérico de más abajo gane por error.
-  if (/expired|expirad/.test(msg)) {
-    return 'Esta solicitud ya expiró.';
-  }
-  if (/not.?found|no.?encontr|does not exist|no existe/.test(msg)) {
-    return 'Esta solicitud ya no existe.';
-  }
-  if (/already.*respond|ya.*respond|not.*pending|no.*(está|esta).*pending|already.*(accept|reject)/.test(msg)) {
-    return 'Esta solicitud ya fue respondida.';
-  }
-  if (/scope/.test(msg)) {
-    return 'Falta elegir qué vas a compartir para aceptar esta solicitud.';
-  }
-
-  if (/(cooldown|esperar|espera|wait|d[ií]as|days)/.test(msg)) {
-    return 'Tenés que esperar un tiempo antes de volver a intentar con este usuario.';
-  }
-  if (/(bloque|block|permanent)/.test(msg)) {
-    return 'No podés enviar esta solicitud a este usuario.';
-  }
-  if (/(pending|pendiente)/.test(msg)) {
-    return 'Ya existe una solicitud pendiente con este usuario.';
-  }
-  if (/(relation|relaci[oó]n|already.*shar|ya.*compart)/.test(msg)) {
-    return 'Ya existe una relación con este usuario.';
-  }
-  if (/(verif|confirm)/.test(msg)) {
-    return 'Este usuario todavía no puede usar funciones sociales.';
-  }
-  if (/(self|propio|yourself|mismo usuario)/.test(msg)) {
-    return 'No podés hacer esto con tu propio usuario.';
+  switch (info.message) {
+    case 'RELATION_ALREADY_ACTIVE':
+      return i18n.t('social:errors.requestRelationExists');
+    case 'REQUEST_ALREADY_PENDING':
+      return i18n.t('social:errors.requestPending');
+    case 'REQUEST_COOLDOWN_ACTIVE':
+      return i18n.t('social:errors.requestCooldown');
+    case 'REQUEST_PERMANENTLY_BLOCKED':
+      return i18n.t('social:errors.requestBlocked');
+    case 'USER_NOT_FOUND':
+      // El backend no distingue "no existe" de "no verificó su email":
+      // se reutiliza el mismo texto que ya muestra el buscador.
+      return i18n.t('social:userSearch.notFoundResult');
+    case 'CANNOT_SHARE_WITH_SELF':
+      return i18n.t('social:errors.requestSelf');
+    case 'INVALID_SCOPE':
+      return context === 'inbox'
+        ? i18n.t('social:errors.requestMissingScope')
+        : i18n.t('social:errors.requestGeneric');
+    case 'REQUEST_NOT_FOUND':
+      return i18n.t('social:errors.requestNotFound');
+    case 'REQUEST_NOT_PENDING':
+      return i18n.t('social:errors.requestAlreadyResponded');
   }
 
-  // Ni un código conocido ni una palabra clave reconocible: honesto en vez
-  // de adivinar el motivo.
-  return 'No pudimos completar la solicitud. Intentá de nuevo más tarde.';
+  return i18n.t('social:errors.requestGeneric');
 }

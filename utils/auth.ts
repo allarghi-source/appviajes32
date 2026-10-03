@@ -1,4 +1,5 @@
 import { AuthError } from '@supabase/supabase-js';
+import i18n from '../i18n';
 import { supabase } from './supabase';
 
 // ─── USERNAME ─────────────────────────────────────────────────────────────────
@@ -51,7 +52,7 @@ export type AuthErrorContext = 'signup' | 'login' | 'forgot-password' | 'reset-p
 
 export function getAuthErrorMessage(error: unknown, context: AuthErrorContext): string {
   if (!(error instanceof Error)) {
-    return 'Ocurrió un error inesperado. Intentá de nuevo.';
+    return i18n.t('auth:errors.unexpected');
   }
 
   const isAuthError = error instanceof AuthError;
@@ -60,54 +61,54 @@ export function getAuthErrorMessage(error: unknown, context: AuthErrorContext): 
   const msg = error.message.toLowerCase();
 
   if (msg.includes('network') || msg.includes('failed to fetch') || msg.includes('fetch failed')) {
-    return 'No pudimos conectar con el servidor. Revisá tu conexión e intentá de nuevo.';
+    return i18n.t('auth:errors.connection');
   }
 
   switch (code) {
     case 'user_already_exists':
     case 'email_exists':
     case 'identity_already_exists':
-      return 'Ese email ya está registrado. Iniciá sesión o recuperá tu contraseña.';
+      return i18n.t('auth:errors.emailAlreadyRegistered');
     case 'weak_password':
-      return `La contraseña es demasiado débil. Usá al menos ${MIN_PASSWORD_LENGTH} caracteres.`;
+      return i18n.t('auth:errors.weakPassword', { count: MIN_PASSWORD_LENGTH });
     case 'email_address_invalid':
-      return 'El email ingresado no es válido.';
+      return i18n.t('auth:errors.invalidEmailAddress');
     case 'invalid_credentials':
-      return 'Email o contraseña incorrectos.';
+      return i18n.t('auth:errors.invalidCredentials');
     case 'email_not_confirmed':
-      return 'Todavía no confirmaste tu email. Revisá tu casilla de entrada.';
+      return i18n.t('auth:errors.emailNotConfirmed');
     case 'over_email_send_rate_limit':
     case 'over_request_rate_limit':
-      return 'Hiciste demasiados intentos. Esperá unos minutos y volvé a intentar.';
+      return i18n.t('auth:errors.rateLimited');
     case 'bad_code_verifier':
     case 'flow_state_not_found':
     case 'flow_state_expired':
-      return 'Este enlace ya no es válido o expiró. Solicitá uno nuevo.';
+      return i18n.t('auth:errors.linkExpired');
     case 'same_password':
-      return 'La nueva contraseña debe ser distinta a la actual.';
+      return i18n.t('auth:errors.samePassword');
     case 'signup_disabled':
-      return 'El registro no está disponible en este momento.';
+      return i18n.t('auth:errors.signupDisabled');
     case 'validation_failed':
-      return 'Revisá los datos ingresados.';
+      return i18n.t('auth:errors.validationFailed');
   }
 
   // Sin código reconocido: en signup, un error de servidor (5xx) suele venir
   // del trigger que crea `profiles` (típicamente username duplicado), pero no
   // podemos confirmarlo con certeza desde el cliente.
   if (context === 'signup' && typeof status === 'number' && status >= 500) {
-    return 'No pudimos crear la cuenta. Es posible que el nombre de usuario ya esté en uso, o hubo un problema temporal. Probá con otro usuario o intentá de nuevo en unos minutos.';
+    return i18n.t('auth:errors.signupServerError');
   }
   if (msg.includes('username')) {
-    return 'Ese nombre de usuario ya está en uso o no es válido.';
+    return i18n.t('auth:errors.usernameTaken');
   }
   if (msg.includes('password')) {
-    return 'La contraseña ingresada no es válida.';
+    return i18n.t('auth:errors.invalidPassword');
   }
   if (msg.includes('email')) {
-    return 'Revisá el email ingresado.';
+    return i18n.t('auth:errors.checkEmailField');
   }
 
-  return 'Ocurrió un error. Intentá de nuevo en unos minutos.';
+  return i18n.t('auth:errors.generic');
 }
 
 // ─── LOGOUT ───────────────────────────────────────────────────────────────────

@@ -1,36 +1,36 @@
 {
-  "title": "Estadísticas",
-  "subtitle": "Tu resumen de viajero",
-  "loading": "Cargando...",
+  "title": "Stats",
+  "subtitle": "Your Traveler Summary",
+  "loading": "Loading…",
   "rank": {
-    "label": "RANGO ACTUAL",
+    "label": "CURRENT RANK",
     "xpSuffix": " XP",
     "arrow": "→",
-    "maxRank": "MÁXIMO ★",
-    "xpRemaining": "Faltan {{count}} XP para {{nextRank}}"
+    "maxRank": "MAX ★",
+    "xpRemaining": "{{count}} XP to {{nextRank}}"
   },
   "continents": {
-    "label": "CONTINENTES",
+    "label": "CONTINENTS",
     "counter": "{{count}} / {{total}}",
-    "percentExplored": "{{percent}}% del mundo explorado",
-    "notVisited": "Sin visitar",
+    "percentExplored": "{{percent}}% of the world explored",
+    "notVisited": "Not Visited",
     "percentVisited": "{{percent}}%",
     "dash": "—",
-    "tripCount_one": "{{count}} viaje",
-    "tripCount_other": "{{count}} viajes"
+    "tripCount_one": "{{count}} Trip",
+    "tripCount_other": "{{count}} Trips"
   },
   "topCountries": {
-    "label": "TOP PAÍSES MÁS VISITADOS",
+    "label": "TOP MOST VISITED COUNTRIES",
     "empty": "—",
     "rankPrefix": "#",
-    "visitCount_one": "{{count}} vez",
-    "visitCount_other": "{{count}} veces"
+    "visitCount_one": "{{count}} time",
+    "visitCount_other": "{{count}} times"
   },
   "topCities": {
-    "label": "TOP CIUDADES MÁS VISITADAS",
+    "label": "TOP MOST VISITED CITIES",
     "empty": "—",
     "rankPrefix": "#",
-    "tripCount_one": "{{count}} viaje",
-    "tripCount_other": "{{count}} viajes"
+    "tripCount_one": "{{count}} trip",
+    "tripCount_other": "{{count}} trips"
   }
 }

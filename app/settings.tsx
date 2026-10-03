@@ -10,6 +10,7 @@ import {
   parseBackup,
   writeBackup,
 } from '../utils/backupEngine';
+import { useAppLanguage } from '../hooks/use-app-language';
 import { copiarFotoPersistente, PERFIL_DIR, resolveFotoUri } from '../utils/fotoPersistente';
 import { GeoOpcion, geocodeNominatim } from '../utils/geocoding';
 import { buscarPaises, getPaisPorIso2, Pais } from '../utils/paises';
@@ -20,6 +21,7 @@ import Constants from 'expo-constants';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Alert,
   Dimensions,
@@ -68,6 +70,8 @@ type GeoStatus = 'idle' | 'validando' | 'encontrada' | 'no_encontrada' | 'error'
 
 export default function Settings() {
   const router = useRouter();
+  const { language, setLanguage } = useAppLanguage();
+  const { t } = useTranslation(['settings', 'common', 'profile']);
   const [nombre, setNombre] = useState('');
   const [apellido, setApellido] = useState('');
   const [nacionalidad, setNacionalidad] = useState('');
@@ -238,12 +242,12 @@ export default function Settings() {
   const guardarResidencia = () => {
     if (!ubicacionConfirmada || residenciaGuardando) return;
     Alert.alert(
-      'Cambiar residencia',
-      'Tu nueva residencia se usará como punto de partida para calcular los próximos viajes. Los viajes que ya cargaste conservarán sus distancias actuales.',
+      t('settings:residencia.changeAlertTitle'),
+      t('settings:residencia.changeAlertMessage'),
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: t('common:cancel'), style: 'cancel' },
         {
-          text: 'Confirmar cambio',
+          text: t('settings:residencia.confirmChangeButton'),
           onPress: async () => {
             setResidenciaGuardando(true);
             try {
@@ -258,7 +262,7 @@ export default function Settings() {
               setResidenciaGuardadoOk(true);
               setTimeout(() => setResidenciaGuardadoOk(false), 1300);
             } catch {
-              Alert.alert('Error', 'No se pudo guardar la residencia. Intentá de nuevo.');
+              Alert.alert(t('common:error'), t('settings:residencia.saveErrorMessage'));
             } finally {
               setResidenciaGuardando(false);
             }
@@ -270,9 +274,9 @@ export default function Settings() {
 
   const geoErrorMsg =
     geoStatus === 'no_encontrada'
-      ? 'Ciudad no encontrada.'
+      ? t('profile:errors.ciudadNoEncontrada')
       : geoStatus === 'error'
-      ? 'No se pudo validar la ciudad. Verificá tu conexión e intentá nuevamente.'
+      ? t('common:locationValidation.connectionError')
       : '';
   const paisesFiltrados = buscarPaises(paisQuery);
 
@@ -295,14 +299,14 @@ export default function Settings() {
       await AsyncStorage.setItem('userData', JSON.stringify({ ...existing, foto: persistida }));
       setFoto(persistida);
     } catch {
-      Alert.alert('Error', 'No se pudo guardar la foto. Intentá de nuevo.');
+      Alert.alert(t('common:error'), t('profile:alerts.savePhotoError'));
     }
   };
 
   const openGallery = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert('Permiso requerido', 'Necesitás permitir el acceso a la galería.');
+      Alert.alert(t('common:permission.titleRequerido'), t('common:permission.galleryRequerido'));
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -319,7 +323,7 @@ export default function Settings() {
   const openCamera = async () => {
     const perm = await ImagePicker.requestCameraPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert('Permiso requerido', 'Necesitás permitir el acceso a la cámara.');
+      Alert.alert(t('common:permission.titleRequerido'), t('common:permission.cameraRequerido'));
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
@@ -334,27 +338,27 @@ export default function Settings() {
   };
 
   const pickPhoto = () => {
-    Alert.alert('Foto de perfil', 'Elegí una opción', [
-      { text: 'Tomar foto', onPress: openCamera },
-      { text: 'Elegir de galería', onPress: openGallery },
-      { text: 'Cancelar', style: 'cancel' },
+    Alert.alert(t('settings:profile.photoLabel'), t('settings:photoPicker.message'), [
+      { text: t('settings:photoPicker.takePhoto'), onPress: openCamera },
+      { text: t('settings:photoPicker.chooseFromGallery'), onPress: openGallery },
+      { text: t('common:cancel'), style: 'cancel' },
     ]);
   };
 
   const saveBackup = async () => {
     try {
       await writeBackup();
-      setBackupMsg('Backup guardado correctamente ✓');
+      setBackupMsg(t('settings:backup.savedBanner'));
       setTimeout(() => setBackupMsg(''), 3500);
     } catch {
-      Alert.alert('Error', 'No se pudo guardar el backup.');
+      Alert.alert(t('common:error'), t('settings:backup.saveErrorMessage'));
     }
   };
 
   const handleApplyBackup = async (parsed: BackupPayload) => {
     try {
       await applyBackup(parsed);
-      setBackupMsg('Backup restaurado correctamente ✓');
+      setBackupMsg(t('settings:backup.restoredBanner'));
       setTimeout(() => setBackupMsg(''), 3500);
       // Refresh local state from restored data
       if (parsed.userData) {
@@ -364,7 +368,7 @@ export default function Settings() {
         setFoto(parsed.userData.foto);
       }
     } catch {
-      Alert.alert('Error', 'El archivo de backup está dañado o no se puede leer.');
+      Alert.alert(t('common:error'), t('common:backupCorrupt'));
     }
   };
 
@@ -372,7 +376,7 @@ export default function Settings() {
     try {
       const raw = await getRawBackup();
       if (!raw) {
-        Alert.alert('Sin backup', 'No se encontró ningún backup guardado en este dispositivo.');
+        Alert.alert(t('settings:backup.notFoundTitle'), t('settings:backup.notFoundMessage'));
         return;
       }
       const parsed = parseBackup(raw);
@@ -384,31 +388,34 @@ export default function Settings() {
 
       const fecha = parsed.savedAt ? formatBackupDate(parsed.savedAt) : null;
       Alert.alert(
-        'Backup encontrado',
+        t('settings:backup.foundTitle'),
         buildRestoreConfirmMessage(true, fecha),
         [
-          { text: 'Cancelar', style: 'cancel' },
-          { text: 'Cargar Backup', style: 'destructive', onPress: () => handleApplyBackup(parsed) },
+          { text: t('common:cancel'), style: 'cancel' },
+          { text: t('settings:backup.loadButtonLabel'), style: 'destructive', onPress: () => handleApplyBackup(parsed) },
         ]
       );
     } catch {
-      Alert.alert('Error', 'El archivo de backup está dañado o no se puede leer.');
+      Alert.alert(t('common:error'), t('common:backupCorrupt'));
     }
   };
 
   const clearAll = () => {
     Alert.alert(
-      'Borrar todos los datos',
-      'Se eliminarán permanentemente todos tus viajes, estadísticas y datos de perfil. Esta acción no se puede deshacer.',
+      t('settings:danger.confirmTitle'),
+      t('settings:danger.confirmMessage'),
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: t('common:cancel'), style: 'cancel' },
         {
-          text: 'Borrar todo',
+          text: t('settings:danger.confirmButton'),
           style: 'destructive',
           onPress: async () => {
             playSound('borrar_todo');
             await clearAllUserData();
-            router.replace('/onboarding');
+            // clearAllUserData() ya borra app_language (ver STORAGE_KEYS en
+            // utils/backupEngine.ts) -- ir directo a select-language evita
+            // tener que cerrar y reabrir la app para volver al estado inicial.
+            router.replace('/select-language');
           },
         },
       ]
@@ -418,18 +425,18 @@ export default function Settings() {
   const reportarProblema = async () => {
     const appVersion = Constants.expoConfig?.version ?? '1.0.0';
     const deviceInfo = `${Platform.OS === 'ios' ? 'iOS' : 'Android'} ${Platform.Version}`;
-    const subject = 'Reporte de problema - MyWorldXP';
+    const subject = t('settings:support.emailSubject');
     const body = [
-      'Contanos qué ocurrió:',
+      t('settings:support.emailBodyIntro'),
       '',
-      '¿Qué estabas haciendo cuando apareció el problema?',
+      t('settings:support.emailBodyQ1'),
       '',
-      '¿Qué esperabas que pasara?',
+      t('settings:support.emailBodyQ2'),
       '',
-      '¿Qué pasó realmente?',
+      t('settings:support.emailBodyQ3'),
       '',
-      `Modelo de dispositivo: ${deviceInfo}`,
-      `Versión de la app: ${appVersion}`,
+      t('settings:support.emailBodyDevice', { device: deviceInfo }),
+      t('settings:support.emailBodyVersion', { version: appVersion }),
     ].join('\n');
     const mailtoUrl = `mailto:${REPORT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 
@@ -437,16 +444,16 @@ export default function Settings() {
       const supported = await Linking.canOpenURL(mailtoUrl);
       if (!supported) {
         Alert.alert(
-          'No se encontró una app de correo',
-          `Podés escribirnos manualmente a:\n${REPORT_EMAIL}`
+          t('settings:support.noMailAppTitle'),
+          t('settings:support.manualEmailMessage', { email: REPORT_EMAIL })
         );
         return;
       }
       await Linking.openURL(mailtoUrl);
     } catch {
       Alert.alert(
-        'No se pudo abrir el correo',
-        `Podés escribirnos manualmente a:\n${REPORT_EMAIL}`
+        t('settings:support.mailtoFailedTitle'),
+        t('settings:support.manualEmailMessage', { email: REPORT_EMAIL })
       );
     }
   };
@@ -458,7 +465,7 @@ export default function Settings() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.7}>
           <Text style={styles.backArrow}>‹</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Configuración</Text>
+        <Text style={styles.headerTitle}>{t('settings:header.title')}</Text>
         <View style={{ width: 32 }} />
       </View>
 
@@ -472,7 +479,7 @@ export default function Settings() {
         scrollEventThrottle={16}
       >
         {/* ── PERFIL ── */}
-        <Text style={styles.sectionLabel}>PERFIL</Text>
+        <Text style={styles.sectionLabel}>{t('settings:profile.sectionLabel')}</Text>
         <View style={styles.section}>
 
           {/* Foto */}
@@ -485,8 +492,8 @@ export default function Settings() {
               )}
             </View>
             <View style={styles.photoInfo}>
-              <Text style={styles.photoLabel}>Foto de perfil</Text>
-              <Text style={styles.photoHint}>Tocar para tomar foto o elegir de galería</Text>
+              <Text style={styles.photoLabel}>{t('settings:profile.photoLabel')}</Text>
+              <Text style={styles.photoHint}>{t('settings:profile.photoHint')}</Text>
             </View>
             <Text style={styles.photoChevron}>›</Text>
           </TouchableOpacity>
@@ -494,37 +501,37 @@ export default function Settings() {
           <View style={styles.divider} />
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>NOMBRE</Text>
+            <Text style={styles.inputLabel}>{t('settings:profile.nombreLabel')}</Text>
             <TextInput
               style={styles.input}
               value={nombre}
               onChangeText={setNombre}
               placeholderTextColor={MUTED}
-              placeholder="Tu nombre"
+              placeholder={t('settings:profile.nombrePlaceholder')}
               autoCapitalize="words"
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>APELLIDO</Text>
+            <Text style={styles.inputLabel}>{t('settings:profile.apellidoLabel')}</Text>
             <TextInput
               style={styles.input}
               value={apellido}
               onChangeText={setApellido}
               placeholderTextColor={MUTED}
-              placeholder="Tu apellido"
+              placeholder={t('settings:profile.apellidoPlaceholder')}
               autoCapitalize="words"
             />
           </View>
 
           <View style={[styles.inputGroup, { marginBottom: 0 }]}>
-            <Text style={styles.inputLabel}>NACIONALIDAD</Text>
+            <Text style={styles.inputLabel}>{t('settings:profile.nacionalidadLabel')}</Text>
             <TextInput
               style={styles.input}
               value={nacionalidad}
               onChangeText={setNacionalidad}
               placeholderTextColor={MUTED}
-              placeholder="Ej: Argentina"
+              placeholder={t('settings:profile.nacionalidadPlaceholder')}
               autoCapitalize="words"
             />
           </View>
@@ -536,19 +543,19 @@ export default function Settings() {
             onPress={saveUserData}
             activeOpacity={0.8}
           >
-            <Text style={styles.btnPrimaryText}>{saved ? 'Guardado ✓' : 'Guardar cambios'}</Text>
+            <Text style={styles.btnPrimaryText}>{saved ? t('settings:profile.savedButton') : t('settings:profile.saveButton')}</Text>
           </TouchableOpacity>
         </View>
 
         {/* ── RESIDENCIA ── */}
-        <Text style={styles.sectionLabel}>RESIDENCIA</Text>
+        <Text style={styles.sectionLabel}>{t('settings:residencia.sectionLabel')}</Text>
         <View style={styles.section}>
           <Text style={styles.sectionDesc}>
-            Tu ciudad de residencia es el punto de partida para calcular distancias y horas de vuelo de tus próximos viajes.
+            {t('settings:residencia.description')}
           </Text>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>PAÍS</Text>
+            <Text style={styles.inputLabel}>{t('settings:residencia.paisLabel')}</Text>
             <TouchableOpacity
               style={[styles.residInputRow, !residenciaEditMode && styles.residInputRowLocked]}
               onPress={() => {
@@ -558,23 +565,23 @@ export default function Settings() {
               disabled={!residenciaEditMode}
             >
               <Text style={[styles.residInputText, !paisSeleccionado && styles.residInputPlaceholder]}>
-                {paisSeleccionado ? paisSeleccionado.nombre : 'Elegí tu país'}
+                {paisSeleccionado ? paisSeleccionado.nombre : t('common:countryPicker.selectCountry')}
               </Text>
               {residenciaEditMode ? <Text style={styles.photoChevron}>›</Text> : null}
             </TouchableOpacity>
           </View>
 
           <View style={[styles.inputGroup, { marginBottom: 0 }]}>
-            <Text style={styles.inputLabel}>CIUDAD</Text>
+            <Text style={styles.inputLabel}>{t('settings:residencia.ciudadLabel')}</Text>
             <TextInput
               ref={ciudadRef}
               style={[styles.input, !(residenciaEditMode && paisSeleccionado) && { opacity: 0.4 }]}
               value={residenciaCiudad}
               editable={residenciaEditMode && !!paisSeleccionado}
-              placeholder="Ciudad donde residís"
+              placeholder={t('profile:placeholders.ciudad')}
               placeholderTextColor={MUTED}
-              onChangeText={(t) => {
-                setResidenciaCiudad(t);
+              onChangeText={(text) => {
+                setResidenciaCiudad(text);
                 setUbicacionConfirmada(null);
                 setGeoOpciones([]);
                 setGeoStatus('idle');
@@ -587,7 +594,7 @@ export default function Settings() {
               returnKeyType="done"
             />
             {geoStatus === 'validando' ? (
-              <Text style={styles.residHint}>Validando ubicación...</Text>
+              <Text style={styles.residHint}>{t('common:locationValidation.validating')}</Text>
             ) : null}
             {geoErrorMsg ? <Text style={styles.residError}>{geoErrorMsg}</Text> : null}
             {geoStatus === 'multiples' && geoOpciones.length > 0 ? (
@@ -621,14 +628,43 @@ export default function Settings() {
             disabled={residenciaGuardadoOk || residenciaGuardando || (residenciaEditMode && !ubicacionConfirmada)}
           >
             <Text style={styles.btnPrimaryText}>
-              {residenciaGuardadoOk ? 'OK' : residenciaEditMode ? 'Guardar' : 'Editar'}
+              {residenciaGuardadoOk
+                ? t('settings:residencia.okButton')
+                : residenciaEditMode
+                ? t('common:save')
+                : t('settings:residencia.editButton')}
             </Text>
           </TouchableOpacity>
           <View ref={residBottomAnchorRef} />
         </View>
 
+        {/* ── IDIOMA / LANGUAGE ── */}
+        <Text style={styles.sectionLabel}>{t('settings:language.sectionLabel')}</Text>
+        <View style={styles.section}>
+          <View style={styles.langRow}>
+            <TouchableOpacity
+              style={[styles.langOption, language === 'es' && styles.langOptionActive]}
+              activeOpacity={0.85}
+              onPress={() => setLanguage('es')}
+            >
+              <Text style={[styles.langOptionText, language === 'es' && styles.langOptionTextActive]}>
+                {t('settings:language.spanish')}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.langOption, language === 'en' && styles.langOptionActive]}
+              activeOpacity={0.85}
+              onPress={() => setLanguage('en')}
+            >
+              <Text style={[styles.langOptionText, language === 'en' && styles.langOptionTextActive]}>
+                {t('settings:language.english')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* ── BACKUP & RESTORE ── */}
-        <Text style={styles.sectionLabel}>DATOS Y BACKUP</Text>
+        <Text style={styles.sectionLabel}>{t('settings:backup.sectionLabel')}</Text>
         <View style={styles.section}>
           {backupMsg !== '' && (
             <View style={styles.successBanner}>
@@ -637,12 +673,12 @@ export default function Settings() {
           )}
 
           <Text style={styles.sectionDesc}>
-            El backup almacena tu perfil y todos tus viajes localmente en el dispositivo.
+            {t('settings:backup.description')}
           </Text>
 
           <TouchableOpacity style={styles.btnSecondary} onPress={saveBackup} activeOpacity={0.8}>
             <Text style={styles.btnSecondaryIcon}>↓</Text>
-            <Text style={styles.btnSecondaryText}>Guardar backup</Text>
+            <Text style={styles.btnSecondaryText}>{t('settings:backup.saveButton')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -651,34 +687,34 @@ export default function Settings() {
             activeOpacity={0.8}
           >
             <Text style={styles.btnSecondaryIcon}>↑</Text>
-            <Text style={styles.btnSecondaryText}>Cargar backup</Text>
+            <Text style={styles.btnSecondaryText}>{t('settings:backup.loadButton')}</Text>
           </TouchableOpacity>
         </View>
 
         {/* ── ZONA DE PELIGRO ── */}
-        <Text style={styles.sectionLabel}>ZONA DE PELIGRO</Text>
+        <Text style={styles.sectionLabel}>{t('settings:danger.sectionLabel')}</Text>
         <View style={[styles.section, styles.dangerSection]}>
           <Text style={styles.dangerDesc}>
-            Elimina permanentemente todos tus viajes, estadísticas y datos de perfil. No se puede deshacer.
+            {t('settings:danger.description')}
           </Text>
           <TouchableOpacity style={styles.btnDanger} onPress={clearAll} activeOpacity={0.8}>
-            <Text style={styles.btnDangerText}>Borrar todos los datos</Text>
+            <Text style={styles.btnDangerText}>{t('settings:danger.button')}</Text>
           </TouchableOpacity>
         </View>
 
         {/* ── SOPORTE ── */}
-        <Text style={styles.sectionLabel}>SOPORTE</Text>
+        <Text style={styles.sectionLabel}>{t('settings:support.sectionLabel')}</Text>
         <View style={styles.section}>
           <Text style={styles.sectionDesc}>
-            ¿Encontraste un error o algo no funciona como esperabas? Contanos qué pasó.
+            {t('settings:support.description')}
           </Text>
           <TouchableOpacity style={styles.btnSecondary} onPress={reportarProblema} activeOpacity={0.8}>
             <Text style={styles.btnSecondaryIcon}>✉</Text>
-            <Text style={styles.btnSecondaryText}>Reportar problema</Text>
+            <Text style={styles.btnSecondaryText}>{t('settings:support.button')}</Text>
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.version}>MyWorldXP · v1.0</Text>
+        <Text style={styles.version}>{t('settings:footer')}</Text>
         <View style={{ height: 60 }} />
       </ScrollView>
 
@@ -689,16 +725,16 @@ export default function Settings() {
       >
         <View style={styles.paisModalContainer}>
           <View style={styles.paisModalHeader}>
-            <Text style={styles.paisModalTitle}>Elegí tu país</Text>
+            <Text style={styles.paisModalTitle}>{t('common:countryPicker.selectCountry')}</Text>
             <TouchableOpacity onPress={() => setPaisModalVisible(false)}>
-              <Text style={styles.paisModalClose}>Cancelar</Text>
+              <Text style={styles.paisModalClose}>{t('common:cancel')}</Text>
             </TouchableOpacity>
           </View>
           <View style={styles.paisSearchBox}>
             <Feather name="search" size={16} color={GOLD} />
             <TextInput
               style={styles.paisSearchInput}
-              placeholder="Buscar país..."
+              placeholder={t('common:countryPicker.searchPlaceholder')}
               placeholderTextColor="rgba(255,255,255,0.4)"
               value={paisQuery}
               onChangeText={setPaisQuery}
@@ -718,7 +754,7 @@ export default function Settings() {
                 <Text style={styles.paisModalItemText}>{item.nombre}</Text>
               </TouchableOpacity>
             )}
-            ListEmptyComponent={<Text style={styles.paisModalEmpty}>No se encontraron países.</Text>}
+            ListEmptyComponent={<Text style={styles.paisModalEmpty}>{t('common:countryPicker.noResults')}</Text>}
           />
         </View>
       </Modal>
@@ -789,6 +825,32 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: GOLD_BORDER,
     marginVertical: 16,
+  },
+
+  // Idioma / Language
+  langRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  langOption: {
+    flex: 1,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: GOLD_BORDER,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  langOptionActive: {
+    backgroundColor: GOLD_DIM,
+    borderColor: GOLD,
+  },
+  langOptionText: {
+    fontSize: 14,
+    fontFamily: 'Georgia',
+    color: MUTED,
+  },
+  langOptionTextActive: {
+    color: TEXT,
   },
 
   // Photo

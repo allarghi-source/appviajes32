@@ -109,10 +109,11 @@ function evaluate(trips: Trip[], stats: StatsResult): Set<string> {
   const countryVisits = countryVisitsByExperience(real);
   const maxCountryVisits = countryVisits.size > 0 ? Math.max(...countryVisits.values()) : 0;
 
-  // Fulfilled trips: wishlist destination that also has a real trip
-  const wishKeys = new Set(wishlist.map((t) => norm(t.ciudad) + '/' + norm(t.pais)));
-  const realKeys = new Set(real.map((t) => norm(t.ciudad) + '/' + norm(t.pais)));
-  const fulfilled = [...wishKeys].filter((k) => realKeys.has(k)).length;
+  // Fulfilled trips: viajes realizados que nacieron de convertir un viaje
+  // futuro con "¡Lo logré!" (ver Trip.desdeWishlist). Que un wishlist conviva
+  // con un realizado del mismo lugar ("a repetir") NO cuenta: es una
+  // intención futura, todavía no cumplida.
+  const fulfilled = real.filter((t) => t.desdeWishlist === true).length;
 
   // "Sin desarmar la valija": 3+ real trips within any 30-day window
   const dates = real
@@ -149,11 +150,11 @@ for (let i = 1; i < yearsArray.length; i++) {
   }
 }
 
-  // Continent presence
-  const conts   = new Set(stats.continentesNombres);
-  const europa  = conts.has('Europa');
-  const asia    = conts.has('Asia');
-  const america = conts.has('América del Sur') || conts.has('América del Norte');
+  // Continent presence -- por ID estable, no por nombre visible/idioma.
+  const conts   = new Set(stats.continentesIds);
+  const europa  = conts.has('europe');
+  const asia    = conts.has('asia');
+  const america = conts.has('south_america') || conts.has('north_america');
 
   // ── Progreso General ──
   if (real.length >= 1)              earned.add('primer_paso');

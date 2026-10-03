@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Animated,
   Dimensions,
@@ -164,6 +165,8 @@ interface UserData {
 
 export default function PassportOpen({ onClose }: { onClose?: () => void } = {}) {
   const router = useRouter();
+  const { t } = useTranslation('passport');
+  const { t: tRanks } = useTranslation('ranks');
   const { height: wH } = useWindowDimensions();
   const photoScaleAnim = useRef(new Animated.Value(1)).current;
 
@@ -216,8 +219,10 @@ export default function PassportOpen({ onClose }: { onClose?: () => void } = {})
 
   const xpProgress = Math.max(2, Math.round((stats?.progresoRango ?? 0) * 100));
   const _xpNow = stats?.xpTotal ?? 0;
-  const _nextThreshold = RANK_THRESHOLDS.find((t) => t > _xpNow) ?? null;
-  const xpLabel = `+${_nextThreshold !== null ? Math.max(0, _nextThreshold - _xpNow) : 0} XP`;
+  const _nextThreshold = RANK_THRESHOLDS.find((th) => th > _xpNow) ?? null;
+  const xpToNextLabel = t('inside.page2.xpToNext', {
+    count: _nextThreshold !== null ? Math.max(0, _nextThreshold - _xpNow) : 0,
+  });
   const hasKm = stats && stats.kmTotales > 0;
   const _mrzSurname = (userData?.apellido ?? '').toUpperCase().replace(/[^A-Z]/g, '') || 'VIAJERO';
   const _mrzName    = (userData?.nombre   ?? '').toUpperCase().replace(/[^A-Z]/g, '') || 'MWX';
@@ -229,41 +234,54 @@ const formatOneDecimal = (value: number) => {
   return rounded % 1 === 0 ? String(rounded) : rounded.toFixed(1);
 };
 
-const getSpaceReference = (km: number) => {
+const SPACE_REF_KEYS = {
+  moon: 'inside.page1.spaceFact.refs.moon',
+  mars: 'inside.page1.spaceFact.refs.mars',
+  earth: 'inside.page1.spaceFact.refs.earth',
+  neptune: 'inside.page1.spaceFact.refs.neptune',
+} as const;
+
+const getSpaceReference = (km: number, t: ReturnType<typeof useTranslation<'passport'>>['t']) => {
   if (!km || km <= 0) return null;
-const icon = '◉ ';
-  const references = [
-    { name: 'la Luna', emoji: '🌙', km: 10900 },
-    { name: 'Marte', emoji: '🔴', km: 21000 },
-    { name: 'la Tierra', emoji: '🌍', km: 40075 },
-    { name: 'Neptuno', emoji: '🔵', km: 154000 },
+  const references: Array<{ id: keyof typeof SPACE_REF_KEYS; emoji: string; km: number }> = [
+    { id: 'moon', emoji: '🌙', km: 10900 },
+    { id: 'mars', emoji: '🔴', km: 21000 },
+    { id: 'earth', emoji: '🌍', km: 40075 },
+    { id: 'neptune', emoji: '🔵', km: 154000 },
   ];
 
   for (const ref of references) {
     const turns = km / ref.km;
+    const refName = t(SPACE_REF_KEYS[ref.id]);
 
     if (turns < 2) {
       if (turns < 1) {
-        return `${icon}Recorriste el ${Math.round(turns * 100)}% de una vuelta a ${ref.name}`;
+        return t('inside.page1.spaceFact.percentOfLap', {
+          percent: Math.round(turns * 100),
+          ref: refName,
+        });
       }
 
-      return `${icon}Le diste ${formatOneDecimal(turns)} vueltas a ${ref.name}`;
+      return t('inside.page1.spaceFact.laps', {
+        count: formatOneDecimal(turns),
+        ref: refName,
+      });
     }
   }
 
   const moonTrip = km / 384000;
 
   if (moonTrip < 1) {
-    return `${icon}Recorriste el ${Math.round(moonTrip * 100)}% del viaje a la Luna`;
+    return t('inside.page1.spaceFact.moonTripPercent', { percent: Math.round(moonTrip * 100) });
   }
 
   const jupiterTurns = km / 440000;
 
   if (jupiterTurns < 1) {
-    return `${icon}Le diste ${formatOneDecimal(jupiterTurns)} vueltas a Júpiter`;
+    return t('inside.page1.spaceFact.jupiterLaps', { count: formatOneDecimal(jupiterTurns) });
   }
 
-  return `Le diste ${formatOneDecimal(jupiterTurns)} vueltas a Júpiter 🟠`;
+  return t('inside.page1.spaceFact.jupiterLapsFinal', { count: formatOneDecimal(jupiterTurns) });
 };
 
 
@@ -289,33 +307,33 @@ const icon = '◉ ';
           <Stamp size={70} top={120} right={-15} rotate={5} color="rgba(100,30,140,0.09)" label={'DUBAI\nARRIVAL\n2023'} />
 
           {/* Content */}
-          <Text style={styles.pageTitle}>Mi recorrido</Text>
+          <Text style={styles.pageTitle}>{t('inside.page1.title')}</Text>
 
-          <StatRow label="Continentes" value={stats ? String(stats.continentesVisitados) : '0'} />
-          <StatRow label="Países visitados" value={stats ? String(stats.paisesVisitados) : '0'} />
-          <StatRow label="Ciudades visitadas" value={stats ? String(stats.ciudadesVisitadas) : '0'} />
-          <StatRow label="Quiero visitar" value={String(wishlistCount)} />
+          <StatRow label={t('inside.page1.stats.continentes')} value={stats ? String(stats.continentesVisitados) : '0'} />
+          <StatRow label={t('inside.page1.stats.paisesVisitados')} value={stats ? String(stats.paisesVisitados) : '0'} />
+          <StatRow label={t('inside.page1.stats.ciudadesVisitadas')} value={stats ? String(stats.ciudadesVisitadas) : '0'} />
+          <StatRow label={t('inside.page1.stats.quieroVisitar')} value={String(wishlistCount)} />
           <StatRow
-            label="Km recorridos"
-            value={hasKm ? formatKm(stats!.kmTotales) : '—'}
+            label={t('inside.page1.stats.kmRecorridos')}
+            value={hasKm ? formatKm(stats!.kmTotales) : t('inside.page1.stats.dash')}
             dim={!hasKm}
           />
           <StatRow
-            label="Horas de vuelo"
-            value={hasKm ? formatHoras(stats!.horasVuelo) : '—'}
+            label={t('inside.page1.stats.horasDeVuelo')}
+            value={hasKm ? formatHoras(stats!.horasVuelo) : t('inside.page1.stats.dash')}
             dim={!hasKm}
             noBorder
           />
           {stats && stats.kmTotales > 0 ? (
   <View style={styles.spaceBox}>
     <Text style={styles.spaceBoxText}>
-      {getSpaceReference(stats.kmTotales)}
+      {getSpaceReference(stats.kmTotales, t)}
     </Text>
   </View>
 ) : (
   <View style={styles.spaceBox}>
     <Text style={styles.spaceBoxText}>
-      ✦  Cargá tus viajes para ver{'\n'}    tu dato espacial 🚀
+      {t('inside.page1.emptyState')}
     </Text>
   </View>
 )}
@@ -332,8 +350,8 @@ const icon = '◉ ';
 
           {/* Country header */}
           <View style={styles.countryHeader}>
-            <Text style={styles.countryName}>MyWorldXP</Text>
-            <Text style={styles.passportNum}>MWX · 263524</Text>
+            <Text style={styles.countryName}>{t('inside.page2.issuer')}</Text>
+            <Text style={styles.passportNum}>{t('inside.page2.passportNumber')}</Text>
           </View>
 
           <View style={styles.divider} />
@@ -368,11 +386,11 @@ const icon = '◉ ';
 
             {/* Data col */}
             <View style={styles.dataCol}>
-              <Text style={styles.fieldLabel}>Apellido</Text>
+              <Text style={styles.fieldLabel}>{t('inside.page2.fields.apellido')}</Text>
               <Text style={styles.fieldValue} numberOfLines={1} adjustsFontSizeToFit>{userData?.apellido}</Text>
-              <Text style={styles.fieldLabel}>Nombre</Text>
+              <Text style={styles.fieldLabel}>{t('inside.page2.fields.nombre')}</Text>
               <Text style={styles.fieldValue} numberOfLines={1} adjustsFontSizeToFit>{userData?.nombre}</Text>
-              <Text style={styles.fieldLabel}>Nacionalidad</Text>
+              <Text style={styles.fieldLabel}>{t('inside.page2.fields.nacionalidad')}</Text>
               <Text style={[styles.fieldValue, { fontSize: 13 }]} numberOfLines={1} adjustsFontSizeToFit>{userData?.nacionalidad}</Text>
             </View>
 
@@ -384,7 +402,7 @@ const icon = '◉ ';
             >
               <Medal
                 tier={stats?.rangoTier ?? 'bronce'}
-                rank={stats?.rangoActual ?? 'Novato'}
+                rank={tRanks(`names.${stats?.rangoActualId ?? 'novato'}`)}
               />
               {badgeCount > 0 && (
                 <View style={styles.medalBadge}>
@@ -399,22 +417,22 @@ const icon = '◉ ';
 
           {/* XP row */}
           <View style={styles.xpRow}>
-            <Text style={styles.xpLabel}>XP</Text>
+            <Text style={styles.xpLabel}>{t('inside.page2.xpLabel')}</Text>
             <Text style={styles.xpValue}>{stats?.xpTotal ?? 0}</Text>
             <View style={styles.xpBarWrap}>
               <View style={[styles.xpBar, { width: `${xpProgress}%` }]} />
             </View>
-            <Text style={styles.rankText}>{xpLabel}</Text>
+            <Text style={styles.rankText}>{xpToNextLabel}</Text>
           </View>
 
           {/* MRZ */}
           <View style={styles.mrz}>
             <Text style={styles.mrzLine}>{mrzLine1}</Text>
-            <Text style={styles.mrzLine}>MWX263524&lt;ARG9901014M3012315&lt;&lt;&lt;&lt;</Text>
+            <Text style={styles.mrzLine}>{t('inside.page2.mrzLine2Static')}</Text>
           </View>
 
           <TouchableOpacity onPress={onClose ?? (() => router.push('/passportcover'))}>
-            <Text style={styles.closeHint}>Tocar para cerrar</Text>
+            <Text style={styles.closeHint}>{t('inside.page2.tapToClose')}</Text>
           </TouchableOpacity>
         </View>
       </View>

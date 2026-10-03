@@ -1,21 +1,31 @@
 {
-  "cancel": "Cancelar",
+  "cancel": "Cancel",
   "error": "Error",
-  "save": "Guardar",
-  "saving": "Guardando...",
-  "genericSaveError": "No se pudo guardar. Intentá de nuevo.",
-  "genericSaveErrorShort": "No se pudo guardar.",
-  "backupCorrupt": "El archivo de backup está dañado o no se puede leer.",
+  "save": "Save",
+  "saving": "Saving...",
+  "genericSaveError": "Couldn't save. Please try again.",
+  "genericSaveErrorShort": "Couldn't save.",
+  "backupCorrupt": "The backup file is corrupted or can't be read.",
   "photoPicker": {
-    "takePhoto": "Tomar foto",
-    "chooseFromGallery": "Elegir de galería"
+    "takePhoto": "take photo",
+    "chooseFromGallery": "Choose from gallery"
+  },
+  "required": "This field is required.",
+  "countryPicker": {
+    "selectCountry": "Select your country",
+    "searchPlaceholder": "Search for a country...",
+    "noResults": "No countries found."
+  },
+  "locationValidation": {
+    "validating": "Verifying location...",
+    "connectionError": "We couldn't verify the city. Check your connection and try again."
   },
   "permission": {
-    "titleNecesario": "Permiso necesario",
-    "galleryNecesario": "Necesitamos acceso a tu galería.",
-    "cameraNecesario": "Necesitamos acceso a tu cámara.",
-    "titleRequerido": "Permiso requerido",
-    "galleryRequerido": "Necesitás permitir el acceso a la galería.",
-    "cameraRequerido": "Necesitás permitir el acceso a la cámara."
+    "titleNecesario": "Permission required",
+    "galleryNecesario": "We need access to your photo library.",
+    "cameraNecesario": "We need access to your camera.",
+    "titleRequerido": "Permission Required",
+    "galleryRequerido": "You need to allow access to your photo library.",
+    "cameraRequerido": "You need to allow access to your camera."
   }
 }

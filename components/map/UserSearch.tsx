@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { findUserExact, getSocialErrorMessage, normalizeSearchQuery } from '../../utils/social';
@@ -19,6 +20,7 @@ type SearchResult =
 // Buscador exacto por @username o email. Solo confirma visualmente a quién
 // encontró: sin solicitudes, sin scopes, sin acciones sociales todavía.
 export default function UserSearch({ myUserId }: { myUserId: string }) {
+  const { t } = useTranslation('social');
   const [query, setQuery] = useState('');
   const [searching, setSearching] = useState(false);
   const [result, setResult] = useState<SearchResult | null>(null);
@@ -31,7 +33,7 @@ export default function UserSearch({ myUserId }: { myUserId: string }) {
 
     const normalized = normalizeSearchQuery(query);
     if (!normalized) {
-      setErrorMessage('Ingresá un @usuario o email para buscar.');
+      setErrorMessage(t('userSearch.emptyQuery'));
       return;
     }
 
@@ -57,11 +59,11 @@ export default function UserSearch({ myUserId }: { myUserId: string }) {
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.label}>Buscar @usuario o email</Text>
+      <Text style={styles.label}>{t('userSearch.label')}</Text>
       <View style={styles.searchRow}>
         <TextInput
           style={styles.input}
-          placeholder="@usuario o email"
+          placeholder={t('userSearch.placeholder')}
           placeholderTextColor={MUTED}
           value={query}
           onChangeText={setQuery}
@@ -76,7 +78,7 @@ export default function UserSearch({ myUserId }: { myUserId: string }) {
           disabled={searching}
           activeOpacity={0.85}
         >
-          <Text style={styles.searchBtnText}>{searching ? '...' : 'BUSCAR'}</Text>
+          <Text style={styles.searchBtnText}>{searching ? '...' : t('userSearch.search')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -90,7 +92,7 @@ export default function UserSearch({ myUserId }: { myUserId: string }) {
         <>
           <View style={styles.resultCard}>
             <Text style={styles.resultUsername}>@{result.username}</Text>
-            <Text style={styles.resultTag}>Usuario encontrado</Text>
+            <Text style={styles.resultTag}>{t('userSearch.foundTag')}</Text>
           </View>
           <FoundUserActions key={result.id} targetId={result.id} targetUsername={result.username} />
         </>
@@ -98,13 +100,13 @@ export default function UserSearch({ myUserId }: { myUserId: string }) {
 
       {!searching && result?.kind === 'self' && (
         <View style={styles.resultBox}>
-          <Text style={styles.resultInfoText}>Ese es tu propio usuario.</Text>
+          <Text style={styles.resultInfoText}>{t('userSearch.selfResult')}</Text>
         </View>
       )}
 
       {!searching && result?.kind === 'not_found' && (
         <View style={styles.resultBox}>
-          <Text style={styles.resultInfoText}>Usuario no encontrado.</Text>
+          <Text style={styles.resultInfoText}>{t('userSearch.notFoundResult')}</Text>
         </View>
       )}
     </View>

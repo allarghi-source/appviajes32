@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { AchievementPopup } from '../components/AchievementPopup';
 import NavBar from '../components/NavBar';
@@ -17,18 +18,28 @@ const BORDER  = '#1e3050';
 const TEXT    = '#e8e0d0';
 const MUTED   = '#4a5a6a';
 
-const CATEGORY_ORDER = [
-  'Progreso',
-  'Continentes',
-  'Comportamiento',
-  'Planificación',
-  'Cumplimiento',
-  'Experiencia',
-  'Actividad',
-  'Especiales',
+// `categoria` en los datos de achievementsEngine.ts sigue en español y se usa
+// tal cual para filtrar (a.categoria === cat.categoria) -- no se toca esa
+// lógica. `key` es el id estable (ya scaffolded en i18n/locales/*/medallero.json
+// categories.*) que solo se usa para resolver el label visible vía i18n, mismo
+// patrón que RankId/ContinentId en statsEngine.ts.
+type MedalleroCategoryKey =
+  | 'progreso' | 'continentes' | 'comportamiento' | 'planificacion'
+  | 'cumplimiento' | 'experiencia' | 'actividad' | 'especiales';
+
+const CATEGORY_ORDER: { categoria: string; key: MedalleroCategoryKey }[] = [
+  { categoria: 'Progreso', key: 'progreso' },
+  { categoria: 'Continentes', key: 'continentes' },
+  { categoria: 'Comportamiento', key: 'comportamiento' },
+  { categoria: 'Planificación', key: 'planificacion' },
+  { categoria: 'Cumplimiento', key: 'cumplimiento' },
+  { categoria: 'Experiencia', key: 'experiencia' },
+  { categoria: 'Actividad', key: 'actividad' },
+  { categoria: 'Especiales', key: 'especiales' },
 ];
 
 export default function Medallero() {
+  const { t } = useTranslation(['medallero', 'achievements']);
   const router = useRouter();
   const [unlocked, setUnlocked] = useState<Set<string>>(new Set());
   const [previewAchievement, setPreviewAchievement] = useState<Achievement | null>(null);
@@ -53,13 +64,13 @@ export default function Medallero() {
       >
         {/* Back */}
         <TouchableOpacity onPress={() => router.replace('/passportinside')} style={styles.backRow}>
-          <Text style={styles.backText}>← Volver</Text>
+          <Text style={styles.backText}>{t('medallero:backButton')}</Text>
         </TouchableOpacity>
 
         {/* Header */}
-        <Text style={styles.title}>Medallero</Text>
+        <Text style={styles.title}>{t('medallero:title')}</Text>
         <Text style={styles.subtitle}>
-          {totalUnlocked} de {totalAll} logros desbloqueados
+          {t('medallero:subtitle', { count: totalUnlocked, total: totalAll })}
         </Text>
 
         {/* Progress bar */}
@@ -69,10 +80,10 @@ export default function Medallero() {
 
         {/* Categories */}
         {CATEGORY_ORDER.map((cat) => {
-          const items = ALL_ACHIEVEMENTS.filter((a) => a.categoria === cat);
+          const items = ALL_ACHIEVEMENTS.filter((a) => a.categoria === cat.categoria);
           return (
-            <View key={cat} style={styles.section}>
-              <Text style={styles.catTitle}>{cat.toUpperCase()}</Text>
+            <View key={cat.categoria} style={styles.section}>
+              <Text style={styles.catTitle}>{t(`medallero:categories.${cat.key}`).toUpperCase()}</Text>
               <View style={styles.grid}>
                 {items.map((a) => {
                   const isUnlocked = unlocked.has(a.id);
@@ -90,14 +101,14 @@ export default function Medallero() {
                         style={[styles.cellName, !isUnlocked && styles.cellNameOff]}
                         numberOfLines={2}
                       >
-                        {isUnlocked ? a.nombre : '???'}
+                        {isUnlocked ? t(`achievements:${a.id}.nombre` as any) : t('medallero:hiddenName')}
                       </Text>
                       {isUnlocked ? (
                         <Text style={styles.cellDesc} numberOfLines={2}>
-                          {a.descripcion}
+                          {t(`achievements:${a.id}.descripcion` as any)}
                         </Text>
                       ) : (
-                        <Text style={styles.cellLocked}>Bloqueado</Text>
+                        <Text style={styles.cellLocked}>{t('medallero:locked')}</Text>
                       )}
                     </CellContainer>
                   );

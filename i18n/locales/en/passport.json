@@ -8,44 +8,44 @@
   },
   "inside": {
     "page1": {
-      "title": "Mi recorrido",
+      "title": "My Journey",
       "stats": {
-        "continentes": "Continentes",
-        "paisesVisitados": "Países visitados",
-        "ciudadesVisitadas": "Ciudades visitadas",
-        "quieroVisitar": "Quiero visitar",
-        "kmRecorridos": "Km recorridos",
-        "horasDeVuelo": "Horas de vuelo",
+        "continentes": "Continents",
+        "paisesVisitados": "Countries visited",
+        "ciudadesVisitadas": "Cities Visited",
+        "quieroVisitar": "Wishlist",
+        "kmRecorridos": "Km Traveled",
+        "horasDeVuelo": "Flight Hours",
         "dash": "—"
       },
       "spaceFact": {
-        "percentOfLap": "◉ Recorriste el {{percent}}% de una vuelta a {{ref}}",
-        "laps": "◉ Le diste {{count}} vueltas a {{ref}}",
-        "moonTripPercent": "◉ Recorriste el {{percent}}% del viaje a la Luna",
-        "jupiterLaps": "◉ Le diste {{count}} vueltas a Júpiter",
-        "jupiterLapsFinal": "Le diste {{count}} vueltas a Júpiter 🟠",
+        "percentOfLap": "◉ You've traveled {{percent}}% of the way around {{ref}}",
+        "laps": "◉ You've traveled around {{ref}} {{count}} times",
+        "moonTripPercent": "◉ You've traveled {{percent}}% of the way to the Moon",
+        "jupiterLaps": "◉ You've traveled around Jupiter {{count}} times",
+        "jupiterLapsFinal": "You've traveled around Jupiter {{count}} times 🟠",
         "refs": {
-          "moon": "la Luna",
-          "mars": "Marte",
-          "earth": "la Tierra",
-          "neptune": "Neptuno"
+          "moon": "the Moon",
+          "mars": "Mars",
+          "earth": "Earth",
+          "neptune": "Neptune"
         }
       },
-      "emptyState": "✦  Cargá tus viajes para ver\n    tu dato espacial 🚀"
+      "emptyState": "✦ Add your trips to see\n your space stats 🚀"
     },
     "page2": {
       "issuer": "MyWorldXP",
       "passportNumber": "MWX · 263524",
       "fields": {
-        "apellido": "Apellido",
-        "nombre": "Nombre",
-        "nacionalidad": "Nacionalidad"
+        "apellido": "Last name",
+        "nombre": "First name",
+        "nacionalidad": "Nationality"
       },
-      "defaultRank": "Novato",
+      "defaultRank": "Rookie",
       "xpLabel": "XP",
       "xpToNext": "+{{count}} XP",
       "mrzLine2Static": "MWX263524<ARG9901014M3012315<<<<",
-      "tapToClose": "Tocar para cerrar"
+      "tapToClose": "Tap to close"
     },
     "decorativeStamps": {
       "_note": "Sellos decorativos en inglés por diseño (estilo visa/pasaporte). No traducir salvo decisión explícita de diseño.",

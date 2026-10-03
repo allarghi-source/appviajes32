@@ -1,11 +1,11 @@
 {
   "names": {
     "novato": "Novato",
-    "corsario": "Corsario",
-    "viajero": "Viajero",
+    "corsario": "Turista",
+    "viajero": "Explorador",
     "trotamundos": "Trotamundos",
-    "navegante": "Navegante",
-    "astronauta": "Astronauta"
+    "navegante": "Señor de los mapas",
+    "astronauta": "Ciudadano del mundo"
   },
   "continents": {
     "americaDelNorte": "América del Norte",

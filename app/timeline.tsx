@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Animated,
   Dimensions,
@@ -207,6 +208,7 @@ function TripCard({
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 
 export default function Timeline() {
+  const { t } = useTranslation('timeline');
   const router = useRouter();
   const [items, setItems] = useState<TimelineItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -259,26 +261,26 @@ export default function Timeline() {
 
   const subtitle =
     items.length > 0
-      ? `${items.length} viaje${items.length !== 1 ? 's' : ''} realizado${items.length !== 1 ? 's' : ''}`
-      : 'Tus viajes realizados';
+      ? t('subtitle.tripCount', { count: items.length })
+      : t('subtitle.fallback');
 
   return (
     <View style={styles.root}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Timeline</Text>
+        <Text style={styles.headerTitle}>{t('title')}</Text>
         <Text style={styles.headerSub}>{subtitle}</Text>
       </View>
 
       {loading ? (
         <View style={styles.center}>
-          <Text style={styles.muted}>Cargando...</Text>
+          <Text style={styles.muted}>{t('loading')}</Text>
         </View>
       ) : items.length === 0 ? (
         <View style={styles.center}>
           <Text style={styles.emptyIcon}>✈</Text>
-          <Text style={styles.emptyTitle}>Todavía no hay viajes</Text>
+          <Text style={styles.emptyTitle}>{t('empty.title')}</Text>
           <Text style={styles.emptyHint}>
-            Cargá tu primer viaje desde la sección Cargar
+            {t('empty.hint')}
           </Text>
         </View>
       ) : (

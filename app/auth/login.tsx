@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -23,6 +24,7 @@ const MUTED = '#6b7a8d';
 const DANGER = '#c0392b';
 
 export default function Login() {
+  const { t } = useTranslation('auth');
   const router = useRouter();
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
@@ -43,11 +45,11 @@ export default function Login() {
 
     const normalizedEmail = normalizeEmail(email);
     if (!isValidEmail(normalizedEmail)) {
-      setErrorMessage('Ingresá un email válido.');
+      setErrorMessage(t('validation.invalidEmail'));
       return;
     }
     if (!password) {
-      setErrorMessage('Ingresá tu contraseña.');
+      setErrorMessage(t('login.missingPassword'));
       return;
     }
 
@@ -87,7 +89,7 @@ export default function Login() {
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <Text style={styles.backIcon}>‹</Text>
-          <Text style={styles.backLabel}>Volver</Text>
+          <Text style={styles.backLabel}>{t('back')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -96,8 +98,8 @@ export default function Login() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>Iniciar sesión</Text>
-        <Text style={styles.subtitle}>Para usar CompartirXP.</Text>
+        <Text style={styles.title}>{t('login.title')}</Text>
+        <Text style={styles.subtitle}>{t('login.subtitle')}</Text>
 
         {errorMessage && (
           <View style={styles.errorBox}>
@@ -105,10 +107,10 @@ export default function Login() {
           </View>
         )}
 
-        <Text style={styles.label}>Email</Text>
+        <Text style={styles.label}>{t('fields.email.label')}</Text>
         <TextInput
           style={styles.input}
-          placeholder="tu@email.com"
+          placeholder={t('fields.email.placeholder')}
           placeholderTextColor={MUTED}
           value={email}
           onChangeText={setEmail}
@@ -117,10 +119,10 @@ export default function Login() {
           keyboardType="email-address"
         />
 
-        <Text style={styles.label}>Contraseña</Text>
+        <Text style={styles.label}>{t('login.passwordLabel')}</Text>
         <TextInput
           style={styles.input}
-          placeholder="Tu contraseña"
+          placeholder={t('login.passwordPlaceholder')}
           placeholderTextColor={MUTED}
           value={password}
           onChangeText={setPassword}
@@ -133,7 +135,7 @@ export default function Login() {
           activeOpacity={0.7}
           style={styles.forgotWrap}
         >
-          <Text style={styles.linkTextGold}>¿Olvidaste tu contraseña?</Text>
+          <Text style={styles.linkTextGold}>{t('login.forgotPassword')}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -142,7 +144,7 @@ export default function Login() {
           disabled={submitting}
           activeOpacity={0.85}
         >
-          <Text style={styles.primaryBtnText}>{submitting ? 'Ingresando...' : 'Iniciar sesión'}</Text>
+          <Text style={styles.primaryBtnText}>{submitting ? t('login.submitting') : t('login.submit')}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -150,7 +152,7 @@ export default function Login() {
           activeOpacity={0.7}
           style={styles.linkWrap}
         >
-          <Text style={styles.linkText}>¿No tenés cuenta? <Text style={styles.linkTextGold}>Crear cuenta</Text></Text>
+          <Text style={styles.linkText}>{t('login.noAccount')}<Text style={styles.linkTextGold}>{t('login.createAccountLink')}</Text></Text>
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>

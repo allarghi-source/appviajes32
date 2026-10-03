@@ -13,6 +13,28 @@
     "savedButton": "Guardado ✓",
     "saveButton": "Guardar cambios"
   },
+  "photoPicker": {
+    "message": "Elegí una opción",
+    "takePhoto": "Tomar foto",
+    "chooseFromGallery": "Elegir de galería"
+  },
+  "language": {
+    "sectionLabel": "IDIOMA",
+    "spanish": "Español",
+    "english": "English"
+  },
+  "residencia": {
+    "sectionLabel": "RESIDENCIA",
+    "description": "Tu ciudad de residencia es el punto de partida para calcular distancias y horas de vuelo de tus próximos viajes.",
+    "paisLabel": "PAÍS",
+    "ciudadLabel": "CIUDAD",
+    "okButton": "OK",
+    "editButton": "Editar",
+    "changeAlertTitle": "Cambiar residencia",
+    "changeAlertMessage": "Tu nueva residencia se usará como punto de partida para calcular los próximos viajes. Los viajes que ya cargaste conservarán sus distancias actuales.",
+    "confirmChangeButton": "Confirmar cambio",
+    "saveErrorMessage": "No se pudo guardar la residencia. Intentá de nuevo."
+  },
   "backup": {
     "sectionLabel": "DATOS Y BACKUP",
     "savedBanner": "Backup guardado correctamente ✓",

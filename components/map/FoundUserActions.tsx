@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { createShareRequest, getShareRequestErrorMessage, ShareScope } from '../../utils/social';
@@ -10,11 +11,7 @@ const TEXT = '#e8e0d0';
 const MUTED = '#6b7a8d';
 const DANGER = '#c0392b';
 
-const SCOPE_OPTIONS: { value: ShareScope; label: string }[] = [
-  { value: 'realized', label: 'REALIZADOS' },
-  { value: 'wishlist', label: 'WISHLIST' },
-  { value: 'both', label: 'AMBOS' },
-];
+const SCOPE_VALUES: ShareScope[] = ['real', 'wishlist', 'both'];
 
 // Acciones reales sobre un usuario encontrado: pedir acceso a su mundo u
 // ofrecerle el propio. Solo dispara create_share_request — no crea relación
@@ -26,6 +23,7 @@ export default function FoundUserActions({
   targetId: string;
   targetUsername: string;
 }) {
+  const { t } = useTranslation('social');
   const [sendingAccess, setSendingAccess] = useState(false);
   const [accessSent, setAccessSent] = useState(false);
 
@@ -44,7 +42,7 @@ export default function FoundUserActions({
       await createShareRequest({ targetId, requestType: 'request_access' });
       setAccessSent(true);
     } catch (err) {
-      setErrorMessage(getShareRequestErrorMessage(err));
+      setErrorMessage(getShareRequestErrorMessage(err, 'send'));
     } finally {
       setSendingAccess(false);
     }
@@ -70,7 +68,7 @@ export default function FoundUserActions({
       setOfferSent(true);
       setChoosingScope(false);
     } catch (err) {
-      setErrorMessage(getShareRequestErrorMessage(err));
+      setErrorMessage(getShareRequestErrorMessage(err, 'send'));
     } finally {
       setSendingOffer(false);
     }
@@ -86,7 +84,7 @@ export default function FoundUserActions({
 
       {accessSent ? (
         <View style={styles.doneBox}>
-          <Text style={styles.doneText}>Solicitud enviada.</Text>
+          <Text style={styles.doneText}>{t('foundUserActions.accessSentMessage')}</Text>
         </View>
       ) : (
         <TouchableOpacity
@@ -96,14 +94,14 @@ export default function FoundUserActions({
           activeOpacity={0.85}
         >
           <Text style={styles.actionBtnText}>
-            {sendingAccess ? 'Enviando...' : 'QUIERO VER SU MUNDO'}
+            {sendingAccess ? t('common.sending') : t('foundUserActions.requestAccess')}
           </Text>
         </TouchableOpacity>
       )}
 
       {offerSent ? (
         <View style={styles.doneBox}>
-          <Text style={styles.doneText}>Invitación enviada.</Text>
+          <Text style={styles.doneText}>{t('foundUserActions.offerSentMessage')}</Text>
         </View>
       ) : !choosingScope ? (
         <TouchableOpacity
@@ -112,23 +110,23 @@ export default function FoundUserActions({
           disabled={sendingAccess}
           activeOpacity={0.85}
         >
-          <Text style={styles.actionBtnSecondaryText}>COMPARTIR MI MUNDO</Text>
+          <Text style={styles.actionBtnSecondaryText}>{t('foundUserActions.shareMyWorld')}</Text>
         </TouchableOpacity>
       ) : (
         <View style={styles.scopeWrap}>
-          <Text style={styles.scopeLabel}>¿Qué querés compartir con @{targetUsername}?</Text>
+          <Text style={styles.scopeLabel}>{t('foundUserActions.chooseScopeWith', { username: targetUsername })}</Text>
           <View style={styles.scopeRow}>
-            {SCOPE_OPTIONS.map((opt) => {
-              const isSelected = selectedScope === opt.value;
+            {SCOPE_VALUES.map((value) => {
+              const isSelected = selectedScope === value;
               return (
                 <TouchableOpacity
-                  key={opt.value}
+                  key={value}
                   style={[styles.scopeOption, isSelected && styles.scopeOptionSelected]}
-                  onPress={() => setSelectedScope(opt.value)}
+                  onPress={() => setSelectedScope(value)}
                   activeOpacity={0.8}
                 >
                   <Text style={[styles.scopeOptionText, isSelected && styles.scopeOptionTextSelected]}>
-                    {opt.label}
+                    {t(`scopes.options.${value}`)}
                   </Text>
                 </TouchableOpacity>
               );
@@ -141,7 +139,7 @@ export default function FoundUserActions({
               disabled={sendingOffer}
               activeOpacity={0.7}
             >
-              <Text style={styles.scopeCancelText}>Cancelar</Text>
+              <Text style={styles.scopeCancelText}>{t('common.cancel')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.actionBtn, styles.scopeSendBtn, (!selectedScope || sendingOffer) && styles.btnDisabled]}
@@ -150,7 +148,7 @@ export default function FoundUserActions({
               activeOpacity={0.85}
             >
               <Text style={styles.actionBtnText}>
-                {sendingOffer ? 'Enviando...' : 'ENVIAR INVITACIÓN'}
+                {sendingOffer ? t('common.sending') : t('foundUserActions.sendInvite')}
               </Text>
             </TouchableOpacity>
           </View>

@@ -15,6 +15,7 @@
     "9": "SEP", "10": "OCT", "11": "NOV", "12": "DIC"
   },
   "datePlaceholders": { "dd": "DD", "mm": "Mes", "yyyy": "AAAA" },
+  "dateSectionLabel": "Fecha de inicio",
   "photoPickerModal": {
     "title": "Fotos del viaje",
     "done": "Listo ({{count}})",
@@ -51,7 +52,9 @@
     "setCoverMessage": "¿Deseás asignar esta foto como portada?",
     "setCoverConfirm": "Asignar",
     "coverBadge": "Portada",
-    "firstPhotoHint": "La primera foto será la portada del viaje."
+    "firstPhotoHint": "La primera foto será la portada del viaje.",
+    "chooseFromGallery": "Elegir de galería",
+    "takePhoto": "Tomar foto"
   },
   "note": {
     "label": "Nota",
@@ -75,9 +78,14 @@
     "finish": "Finalizar viaje"
   },
   "alerts": {
-    "missingInfoTitle": "Falta información",
-    "notValidatedTitle": "Destino sin validar",
-    "invalidDateTitle": "Fecha inválida",
+    "residenceRequiredTitle": "Residencia requerida",
+    "residenceRequiredMessage": "Para calcular correctamente tus distancias, primero confirmá tu ciudad de residencia en Configuración.",
+    "missingInfoTitleMulti": "Falta información",
+    "missingInfoTitleSingle": "Falta información",
+    "notValidatedTitleMulti": "Destino sin validar",
+    "notValidatedTitleSingle": "Destino sin validar",
+    "invalidDateTitleMulti": "Fecha inválida",
+    "invalidDateTitleSingle": "Fecha inválida",
     "missingCityMulti": "Destino {{n}}: la ciudad es obligatoria.",
     "missingCountryMulti": "Destino {{n}}: el país es obligatorio.",
     "notValidatedMulti": "Destino {{n}}: presioná \"VALIDAR\" antes de guardar.",
@@ -92,6 +100,8 @@
     "savedMultiMessage": "Tu viaje con {{count}} ciudades fue guardado correctamente.",
     "savedSingleMessage_real": "Tu viaje fue guardado correctamente.",
     "savedSingleMessage_wishlist": "Tu destino fue guardado correctamente.",
+    "saveErrorMulti": "No se pudo guardar. Intentá de nuevo.",
+    "saveErrorSingle": "No se pudo guardar. Intentá de nuevo.",
     "missingCityCountryTitle": "Faltan datos",
     "missingCityCountryMessage": "Ingresá ciudad y país antes de validar el destino.",
     "countryNotFoundTitle": "País no encontrado",

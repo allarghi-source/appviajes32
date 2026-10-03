@@ -1,0 +1,88 @@
+{
+  "title": "CompartirXP",
+  "loading": "Cargando...",
+  "fallbackUsername": "Usuario",
+  "loggedOut": {
+    "body": "Creá una cuenta para compartir tu mundo de viajes con otros usuarios de MyWorldXP y ver los mundos que compartan con vos.",
+    "createAccount": "CREAR CUENTA",
+    "login": "INICIAR SESIÓN"
+  },
+  "emailUnconfirmed": {
+    "body": "Falta confirmar tu email.",
+    "hint": "Revisá tu correo y tocá el enlace de confirmación para activar CompartirXP.",
+    "viewInstructions": "VER INSTRUCCIONES"
+  },
+  "verified": {
+    "loadingUsername": "Cargando tu usuario...",
+    "noUsername": "Todavía no tenés un nombre de usuario configurado.",
+    "signOut": "CERRAR SESIÓN",
+    "signingOut": "Cerrando sesión...",
+    "signOutErrorTitle": "No se pudo cerrar sesión",
+    "signOutErrorMessage": "Intentá de nuevo."
+  },
+  "common": {
+    "cancel": "Cancelar",
+    "sending": "Enviando..."
+  },
+  "scopes": {
+    "options": {
+      "real": "REALIZADOS",
+      "wishlist": "WISHLIST",
+      "both": "AMBOS"
+    },
+    "labels": {
+      "real": "Realizados",
+      "wishlist": "Wishlist",
+      "both": "Ambos"
+    }
+  },
+  "pendingRequests": {
+    "sectionTitle": "Solicitudes pendientes",
+    "refresh": "↻ Actualizar",
+    "loadingList": "Cargando solicitudes...",
+    "empty": "No tenés solicitudes pendientes.",
+    "groupAccess": "Quieren ver mi mundo",
+    "groupOffer": "Me compartieron su mundo",
+    "accessSubtitle": "Quiere ver tu mundo",
+    "offerSubtitle": "Te ofrece compartir: {{scope}}",
+    "chooseScope": "¿Qué le vas a compartir?",
+    "confirm": "CONFIRMAR",
+    "reject": "RECHAZAR",
+    "accept": "ACEPTAR"
+  },
+  "userSearch": {
+    "label": "Buscar @usuario o email",
+    "placeholder": "@usuario o email",
+    "search": "BUSCAR",
+    "emptyQuery": "Ingresá un @usuario o email para buscar.",
+    "foundTag": "Usuario encontrado",
+    "selfResult": "Ese es tu propio usuario.",
+    "notFoundResult": "Usuario no encontrado."
+  },
+  "foundUserActions": {
+    "accessSentMessage": "Solicitud enviada.",
+    "requestAccess": "QUIERO VER SU MUNDO",
+    "offerSentMessage": "Invitación enviada.",
+    "shareMyWorld": "COMPARTIR MI MUNDO",
+    "chooseScopeWith": "¿Qué querés compartir con @{{username}}?",
+    "sendInvite": "ENVIAR INVITACIÓN"
+  },
+  "errors": {
+    "unexpected": "Ocurrió un error inesperado. Intentá de nuevo.",
+    "connection": "No pudimos conectar con el servidor. Revisá tu conexión e intentá de nuevo.",
+    "noPermission": "No tenés permiso para hacer esto en este momento. Confirmá tu email o volvé a iniciar sesión.",
+    "searchUnexpected": "Ocurrió un error inesperado al buscar. Intentá de nuevo en unos minutos.",
+    "searchGeneric": "Ocurrió un error al buscar. Intentá de nuevo en unos minutos.",
+    "requestGeneric": "No pudimos completar la solicitud. Intentá de nuevo más tarde.",
+    "requestExpired": "Esta solicitud ya expiró.",
+    "requestNotFound": "Esta solicitud ya no existe.",
+    "requestAlreadyResponded": "Esta solicitud ya fue respondida.",
+    "requestMissingScope": "Falta elegir qué vas a compartir para aceptar esta solicitud.",
+    "requestCooldown": "Tenés que esperar un tiempo antes de volver a intentar con este usuario.",
+    "requestBlocked": "No podés enviar esta solicitud a este usuario.",
+    "requestPending": "Ya existe una solicitud pendiente con este usuario.",
+    "requestRelationExists": "Ya existe una relación con este usuario.",
+    "requestNotVerified": "Este usuario todavía no puede usar funciones sociales.",
+    "requestSelf": "No podés hacer esto con tu propio usuario."
+  }
+}

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const GOLD = '#d4af37';
@@ -6,10 +7,10 @@ const INACTIVE = '#6b7a8d';
 
 export type MapSection = 'mine' | 'others' | 'share';
 
-const TABS: { key: MapSection; label: string }[] = [
-  { key: 'mine', label: 'MyWorldXP' },
-  { key: 'others', label: 'OtrosXP' },
-  { key: 'share', label: 'CompartirXP' },
+const TABS: { key: MapSection; labelKey: 'tabs.mine' | 'tabs.others' | 'tabs.share' }[] = [
+  { key: 'mine', labelKey: 'tabs.mine' },
+  { key: 'others', labelKey: 'tabs.others' },
+  { key: 'share', labelKey: 'tabs.share' },
 ];
 
 // Selector tipo carpetas premium para las tres áreas del mapa. Puramente
@@ -21,6 +22,8 @@ export default function SocialTabs({
   active: MapSection;
   onChange: (section: MapSection) => void;
 }) {
+  const { t } = useTranslation('map');
+
   return (
     <View style={styles.wrap}>
       {TABS.map((tab) => {
@@ -33,7 +36,7 @@ export default function SocialTabs({
             activeOpacity={0.8}
           >
             <Text style={[styles.tabText, isActive && styles.tabTextActive]} numberOfLines={1}>
-              {tab.label}
+              {t(tab.labelKey)}
             </Text>
           </TouchableOpacity>
         );

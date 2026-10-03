@@ -3,9 +3,29 @@ import { Animated, Easing, StyleSheet, Text, TouchableOpacity, View } from 'reac
 import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import * as Haptics from 'expo-haptics';
+import { useTranslation } from 'react-i18next';
 import type { Achievement } from '../utils/achievementsEngine';
 
 const GOLD = '#d4af37';
+
+// Mismo criterio estable que ya usamos en Medallero (app/medallero.tsx):
+// `categoria` en achievementsEngine.ts sigue en español y nunca se toca --
+// solo se mapea acá a la clave estable ya scaffolded en
+// i18n/locales/*/medallero.json categories.* para resolver el label visible.
+type MedalleroCategoryKey =
+  | 'progreso' | 'continentes' | 'comportamiento' | 'planificacion'
+  | 'cumplimiento' | 'experiencia' | 'actividad' | 'especiales';
+
+const CATEGORY_KEY_MAP: Record<string, MedalleroCategoryKey> = {
+  'Progreso': 'progreso',
+  'Continentes': 'continentes',
+  'Comportamiento': 'comportamiento',
+  'Planificación': 'planificacion',
+  'Cumplimiento': 'cumplimiento',
+  'Experiencia': 'experiencia',
+  'Actividad': 'actividad',
+  'Especiales': 'especiales',
+};
 
 // Microfeedback "TAC — TAC" al aparecer un logro: golpe suave, pausa breve,
 // golpe un poco más marcado. Duración perceptual total ~250-350ms.
@@ -24,6 +44,7 @@ interface Props {
 }
 
 export function AchievementPopup({ achievements, onDone }: Props) {
+  const { t } = useTranslation(['popups', 'medallero', 'achievements']);
   const [index, setIndex] = useState(0);
   const opacity = useRef(new Animated.Value(0)).current;
   const scale   = useRef(new Animated.Value(0.88)).current;
@@ -113,7 +134,7 @@ export function AchievementPopup({ achievements, onDone }: Props) {
   async function handleShare() {
     try {
       const uri = await captureRef(cardRef, { format: 'png', quality: 0.95 });
-      await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: 'Compartir logro' });
+      await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: t('popups:achievement.shareDialogTitle') });
     } catch (e) {
       console.warn('Error al compartir logro:', e);
     }
@@ -144,7 +165,7 @@ export function AchievementPopup({ achievements, onDone }: Props) {
         >
           {/* Top label row */}
           <View style={styles.topRow}>
-            <Text style={styles.unlockedLabel}>LOGRO DESBLOQUEADO</Text>
+            <Text style={styles.unlockedLabel}>{t('popups:achievement.unlockedLabel')}</Text>
             {achievements.length > 1 && (
               <Text style={styles.counter}>{index + 1} / {achievements.length}</Text>
             )}
@@ -175,34 +196,36 @@ export function AchievementPopup({ achievements, onDone }: Props) {
           </Animated.View>
 
           {/* Categoria */}
-          <Text style={styles.categoria}>{a.categoria.toUpperCase()}</Text>
+          <Text style={styles.categoria}>
+            {t(`medallero:categories.${CATEGORY_KEY_MAP[a.categoria] ?? a.categoria}`).toUpperCase()}
+          </Text>
 
           {/* Name */}
-          <Text style={styles.nombre}>{a.nombre}</Text>
+          <Text style={styles.nombre}>{t(`achievements:${a.id}.nombre` as any)}</Text>
 
           {/* Description */}
-          <Text style={styles.desc}>{a.descripcion}</Text>
+          <Text style={styles.desc}>{t(`achievements:${a.id}.descripcion` as any)}</Text>
 
           {/* XP badge */}
           <View style={styles.xpBadge}>
-            <Text style={styles.xpText}>+{a.xp} XP</Text>
+            <Text style={styles.xpText}>{t('popups:achievement.xpBadge', { xp: a.xp })}</Text>
           </View>
 
           {/* Branding */}
           <View style={styles.brandRow}>
-            <Text style={styles.brandText}>MyWorld</Text>
-            <Text style={[styles.brandText, { color: GOLD }]}>XP</Text>
+            <Text style={styles.brandText}>{t('popups:brand.my')}</Text>
+            <Text style={[styles.brandText, { color: GOLD }]}>{t('popups:brand.xp')}</Text>
           </View>
         </Animated.View>
 
         {/* Share button — outside the captured card */}
         <Animated.View style={{ opacity, width: '100%', alignItems: 'center' }}>
           <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
-            <Text style={styles.shareBtnText}>Compartir logro</Text>
+            <Text style={styles.shareBtnText}>{t('popups:achievement.shareButton')}</Text>
           </TouchableOpacity>
 
           {achievements.length > 1 && (
-            <Text style={styles.hint}>Toca para continuar</Text>
+            <Text style={styles.hint}>{t('popups:achievement.tapToContinue')}</Text>
           )}
         </Animated.View>
       </View>

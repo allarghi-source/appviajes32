@@ -1,33 +1,37 @@
 {
-  "title": "CREÁ TU PERFIL",
-  "subtitle": "Contanos quién sos para empezar tu viaje",
-  "photoHint": "Tocá para agregar tu foto",
+  "title": "CREATE YOUR PROFILE",
+  "subtitle": "Tell us who you are to start your journey",
+  "photoHint": "Tap to add your photo",
   "placeholders": {
-    "nombre": "Nombre",
-    "apellido": "Apellido",
-    "nacionalidad": "Nacionalidad",
-    "ciudad": "Ciudad donde resides",
-    "pais": "País donde resides"
+    "nombre": "First Name",
+    "apellido": "Last name",
+    "nacionalidad": "Nationality",
+    "ciudad": "City of residence",
+    "pais": "Country of residence"
   },
   "errors": {
-    "ciudadNoEncontrada": "Ciudad no encontrada",
-    "paisNoEncontrado": "País no encontrado"
+    "ciudadNoEncontrada": "City not found",
+    "paisNoEncontrado": "Country not found",
+    "photoRequired": "A profile photo is required."
   },
-  "cta": "CONTINUAR →",
+  "cta": "CONTINUE",
   "alerts": {
-    "selectImage": { "title": "Seleccionar imagen", "message": "Elegí una opción" },
-    "savePhotoError": "No se pudo guardar la foto. Intentá de nuevo.",
+    "selectImage": { "title": "Selecto image", "message": "Choose an option" },
+    "savePhotoError": "Couldn't save the photo. Please try again.",
     "missingFields": {
-      "title": "Faltan datos",
-      "intro": "Para continuar debés completar:"
-    }
+      "title": "Complete Required Fields",
+      "intro": "To continue, please complete:"
+    },
+    "noConnectionTitle": "No Connection",
+    "cityNotConfirmedTitle": "City Not Verified",
+    "cityNotConfirmedMessage": "To continue, verify a valid city of residence."
   },
   "fields": {
-    "foto": "Foto de perfil",
-    "nombre": "Nombre",
-    "apellido": "Apellido",
-    "nacionalidad": "Nacionalidad",
-    "ciudad": "Ciudad de residencia",
-    "pais": "País de residencia"
+    "foto": "Profile Photo",
+    "nombre": "First name",
+    "apellido": "Last name",
+    "nacionalidad": "Nationality",
+    "ciudad": "City of residence",
+    "pais": "Country of residence"
   }
 }

@@ -1,5 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { AUTH_FALLBACK_ROUTE, getAuthErrorMessage } from '../../utils/auth';
@@ -17,6 +18,7 @@ type Status = 'verifying' | 'success' | 'error';
 // deep link -- tanto en frío como con la app abierta -- y expone `code` acá
 // mismo vía useLocalSearchParams; no hace falta un listener global de Linking.
 export default function Confirm() {
+  const { t } = useTranslation('auth');
   const router = useRouter();
   const params = useLocalSearchParams<{ code?: string }>();
   const code = Array.isArray(params.code) ? params.code[0] : params.code;
@@ -72,7 +74,7 @@ export default function Confirm() {
 
   const effectiveStatus: Status = !code ? 'error' : status;
   const effectiveErrorMessage = !code
-    ? 'El enlace no es válido: falta el código de confirmación.'
+    ? t('confirm.invalidLink')
     : errorMessage;
 
   function handleContinue() {
@@ -87,17 +89,17 @@ export default function Confirm() {
         {effectiveStatus === 'verifying' && (
           <>
             <ActivityIndicator size="large" color={GOLD} />
-            <Text style={styles.title}>Verificando tu email...</Text>
+            <Text style={styles.title}>{t('confirm.verifying')}</Text>
           </>
         )}
 
         {effectiveStatus === 'success' && (
           <>
             <Text style={styles.icon}>✓</Text>
-            <Text style={styles.title}>Email confirmado</Text>
-            <Text style={styles.body}>Tu cuenta ya está lista.</Text>
+            <Text style={styles.title}>{t('confirm.successTitle')}</Text>
+            <Text style={styles.body}>{t('confirm.successBody')}</Text>
             <TouchableOpacity style={styles.primaryBtn} onPress={handleContinue} activeOpacity={0.85}>
-              <Text style={styles.primaryBtnText}>Continuar</Text>
+              <Text style={styles.primaryBtnText}>{t('common.continue')}</Text>
             </TouchableOpacity>
           </>
         )}
@@ -105,14 +107,14 @@ export default function Confirm() {
         {effectiveStatus === 'error' && (
           <>
             <Text style={[styles.icon, styles.iconError]}>✕</Text>
-            <Text style={styles.title}>No pudimos confirmar tu email</Text>
+            <Text style={styles.title}>{t('confirm.errorTitle')}</Text>
             <Text style={styles.body}>{effectiveErrorMessage}</Text>
             <TouchableOpacity
               style={styles.primaryBtn}
               onPress={() => router.replace('/auth/login')}
               activeOpacity={0.85}
             >
-              <Text style={styles.primaryBtnText}>Ir a iniciar sesión</Text>
+              <Text style={styles.primaryBtnText}>{t('confirm.goToLogin')}</Text>
             </TouchableOpacity>
           </>
         )}

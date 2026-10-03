@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { playSound } from '../utils/soundEngine';
 import {
   applyBackup,
@@ -12,6 +13,7 @@ import {
 import { Alert, Image, ImageBackground, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 export default function Onboarding() {
   const router = useRouter();
+  const { t } = useTranslation(['onboarding', 'common']);
   const [backup, setBackup] = useState<BackupPayload | null>(null);
 
   useEffect(() => {
@@ -23,19 +25,19 @@ export default function Onboarding() {
     const existing = await hasCurrentData();
     const fecha = backup.savedAt ? formatBackupDate(backup.savedAt) : null;
     Alert.alert(
-      'Restaurar backup',
+      t('onboarding:alerts.restoreTitle'),
       buildRestoreConfirmMessage(existing, fecha),
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: t('common:cancel'), style: 'cancel' },
         {
-          text: existing ? 'Cargar Backup' : 'Restaurar',
+          text: existing ? t('onboarding:alerts.restoreButtonLoad') : t('onboarding:alerts.restoreButtonRestore'),
           style: existing ? 'destructive' : 'default',
           onPress: async () => {
             try {
               await applyBackup(backup);
               router.replace('/passportcover');
             } catch {
-              Alert.alert('Error', 'El archivo de backup está dañado o no se puede leer.');
+              Alert.alert(t('common:error'), t('common:backupCorrupt'));
             }
           },
         },
@@ -62,13 +64,13 @@ export default function Onboarding() {
     />
 
     <Text style={styles.title}>
-      <Text style={styles.my}>My </Text>
-      <Text style={styles.world}>World</Text>
-      <Text style={styles.xp}>XP</Text>
+      <Text style={styles.my}>{t('onboarding:brand.my')}</Text>
+      <Text style={styles.world}>{t('onboarding:brand.world')}</Text>
+      <Text style={styles.xp}>{t('onboarding:brand.xp')}</Text>
     </Text>
 
     <Text style={styles.subtitle}>
-      TU MUNDO · TU HISTORIA · TUS LOGROS
+      {t('onboarding:subtitle')}
     </Text>
   </View>
 <View style={styles.features}>
@@ -76,24 +78,24 @@ export default function Onboarding() {
   <View style={styles.featureRow}>
     <Text style={styles.featureIcon}>◎</Text>
     <View>
-      <Text style={styles.featureTitle}>Registrá tus viajes</Text>
-      <Text style={styles.featureDesc}>Cada ciudad, cada país</Text>
+      <Text style={styles.featureTitle}>{t('onboarding:features.trips.title')}</Text>
+      <Text style={styles.featureDesc}>{t('onboarding:features.trips.desc')}</Text>
     </View>
   </View>
 
   <View style={styles.featureRow}>
     <Text style={styles.featureIcon}>★</Text>
     <View>
-      <Text style={styles.featureTitle}>Ganá XP</Text>
-      <Text style={styles.featureDesc}>Subí de nivel viajando</Text>
+      <Text style={styles.featureTitle}>{t('onboarding:features.xp.title')}</Text>
+      <Text style={styles.featureDesc}>{t('onboarding:features.xp.desc')}</Text>
     </View>
   </View>
 
   <View style={styles.featureRow}>
     <Text style={styles.featureIcon}>▣</Text>
     <View>
-      <Text style={styles.featureTitle}>Tu pasaporte</Text>
-      <Text style={styles.featureDesc}>Historial de viajes y stats</Text>
+      <Text style={styles.featureTitle}>{t('onboarding:features.passport.title')}</Text>
+      <Text style={styles.featureDesc}>{t('onboarding:features.passport.desc')}</Text>
     </View>
   </View>
 
@@ -105,7 +107,7 @@ export default function Onboarding() {
     onPress={() => { playSound('piloto'); router.push('/profile'); }}
   >
     <Text style={styles.buttonText}>
-      CREAR MI PASAPORTE →
+      {t('onboarding:cta')}
     </Text>
   </TouchableOpacity>
 
@@ -115,7 +117,7 @@ export default function Onboarding() {
       activeOpacity={0.7}
       onPress={handleRestoreBackup}
     >
-      <Text style={styles.restoreLinkText}>RESTAURAR BACKUP</Text>
+      <Text style={styles.restoreLinkText}>{t('onboarding:restoreLink')}</Text>
     </TouchableOpacity>
   )}
 </View>

@@ -10,6 +10,16 @@
     "takePhoto": "Tomar foto",
     "chooseFromGallery": "Elegir de galería"
   },
+  "required": "Este campo es obligatorio.",
+  "countryPicker": {
+    "selectCountry": "Elegí tu país",
+    "searchPlaceholder": "Buscar país...",
+    "noResults": "No se encontraron países."
+  },
+  "locationValidation": {
+    "validating": "Validando ubicación...",
+    "connectionError": "No se pudo validar la ciudad. Verificá tu conexión e intentá nuevamente."
+  },
   "permission": {
     "titleNecesario": "Permiso necesario",
     "galleryNecesario": "Necesitamos acceso a tu galería.",

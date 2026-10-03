@@ -2,18 +2,24 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
+import { useTranslation } from 'react-i18next';
+import type { RankId } from '../utils/statsEngine';
 
 const GOLD = '#d4af37';
 
 interface Props {
-  prevRango: string;
-  newRango: string;
+  prevRangoId: RankId;
+  newRangoId: RankId;
   xpRestantes: number | null;
   userName: string;
   onDone: () => void;
 }
 
-export function LevelUpPopup({ prevRango, newRango, xpRestantes, userName, onDone }: Props) {
+export function LevelUpPopup({ prevRangoId, newRangoId, xpRestantes, userName, onDone }: Props) {
+  const { t: tRanks } = useTranslation('ranks');
+  const { t } = useTranslation('popups');
+  const prevRango = tRanks(`names.${prevRangoId}`);
+  const newRango = tRanks(`names.${newRangoId}`);
   const opacity = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(0.88)).current;
   const cardRef = useRef<View>(null);
@@ -37,7 +43,7 @@ export function LevelUpPopup({ prevRango, newRango, xpRestantes, userName, onDon
   async function handleShare() {
     try {
       const uri = await captureRef(cardRef, { format: 'png', quality: 0.95 });
-      await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: 'Compartir nivel' });
+      await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: t('levelUp.shareDialogTitle') });
     } catch (e) {
       console.warn('Error al compartir nivel:', e);
     }
@@ -54,34 +60,34 @@ export function LevelUpPopup({ prevRango, newRango, xpRestantes, userName, onDon
 
         <Animated.View ref={cardRef} style={[styles.card, { opacity, transform: [{ scale }] }]}>
           <View style={styles.topRow}>
-            <Text style={styles.unlockedLabel}>SUBISTE DE NIVEL</Text>
+            <Text style={styles.unlockedLabel}>{t('levelUp.leveledUpLabel')}</Text>
           </View>
 
           <Text style={styles.star}>⬆</Text>
 
-          <Text style={styles.categoria}>PROGRESO</Text>
+          <Text style={styles.categoria}>{t('levelUp.categoryLabel')}</Text>
 
-          <Text style={styles.nombre}>Subiste de nivel</Text>
+          <Text style={styles.nombre}>{t('levelUp.title')}</Text>
 
           <Text style={styles.desc}>
-            Pasaste de {prevRango} a {newRango}
+            {t('levelUp.description', { prevRango, newRango })}
           </Text>
 
           {xpRestantes !== null && (
             <View style={styles.xpBadge}>
-              <Text style={styles.xpText}>{xpRestantes} XP para el próximo nivel</Text>
+              <Text style={styles.xpText}>{t('levelUp.xpBadge', { count: xpRestantes })}</Text>
             </View>
           )}
 
           <View style={styles.brandRow}>
-            <Text style={styles.brandText}>MyWorld</Text>
-            <Text style={[styles.brandText, { color: GOLD }]}>XP</Text>
+            <Text style={styles.brandText}>{t('brand.my')}</Text>
+            <Text style={[styles.brandText, { color: GOLD }]}>{t('brand.xp')}</Text>
           </View>
         </Animated.View>
 
         <Animated.View style={{ opacity, width: '100%', alignItems: 'center' }}>
           <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
-            <Text style={styles.shareBtnText}>Compartir nivel</Text>
+            <Text style={styles.shareBtnText}>{t('levelUp.shareButton')}</Text>
           </TouchableOpacity>
         </Animated.View>
       </View>

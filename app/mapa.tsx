@@ -1,14 +1,17 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, Animated, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import MapView, { Marker, MarkerDragStartEndEvent, Region } from 'react-native-maps';
-import Svg, { Circle, Path } from 'react-native-svg';
+import MapView, { Marker, MarkerDragStartEndEvent } from 'react-native-maps';
 import CompartirXpTab from '../components/map/CompartirXpTab';
+import OtrosXpTab from '../components/map/OtrosXpTab';
+import { PinReal, PinWishlist, WORLD } from '../components/map/Pins';
 import SocialTabs, { MapSection } from '../components/map/SocialTabs';
 import NavBar from '../components/NavBar';
 import { STORAGE_KEYS } from '../utils/backupEngine';
 import { resolveFotoUri } from '../utils/fotoPersistente';
+import { futureTripLabel, groupTripsByPlace, PlaceGroup } from '../utils/mapGrouping';
 import { playSound, preloadSounds } from '../utils/soundEngine';
 
 const GOLD = '#d4af37';
@@ -33,54 +36,12 @@ interface Trip {
   coords: { lat: number; lng: number } | null;
 }
 
-interface TripGroup {
-  key: string;
-  lat: number;
-  lng: number;
-  trips: Trip[];
-  hasReal: boolean;
-}
-
-const WORLD: Region = {
-  latitude: 20,
-  longitude: 10,
-  latitudeDelta: 130,
-  longitudeDelta: 130,
-};
-
-// ─── PINES TIPO ALFILER ───────────────────────────────────────────────────────
-
-function PinReal() {
-  return (
-    <Svg width={22} height={30} viewBox="0 0 22 30">
-      <Path
-        d="M11 1C5.5 1 1 5.5 1 11C1 18.5 11 29 11 29C11 29 21 18.5 21 11C21 5.5 16.5 1 11 1Z"
-        fill={GREEN}
-        stroke="#0d2550"
-        strokeWidth={1}
-      />
-      <Circle cx={11} cy={11} r={3.5} fill="rgba(255,255,255,0.9)" />
-    </Svg>
-  );
-}
-
-function PinWishlist() {
-  return (
-    <Svg width={22} height={30} viewBox="0 0 22 30">
-      <Path
-        d="M11 1C5.5 1 1 5.5 1 11C1 18.5 11 29 11 29C11 29 21 18.5 21 11C21 5.5 16.5 1 11 1Z"
-        fill={GOLD}
-        stroke="#a88620"
-        strokeWidth={1}
-      />
-      <Circle cx={11} cy={11} r={3.5} fill="rgba(255,255,255,0.9)" />
-    </Svg>
-  );
-}
+type TripGroup = PlaceGroup<Trip>;
 
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 
 export default function Mapa() {
+  const { t } = useTranslation('map');
   const router = useRouter();
   const [activeSection, setActiveSection] = useState<MapSection>('mine');
   const [trips, setTrips] = useState<Trip[]>([]);
@@ -134,16 +95,16 @@ export default function Mapa() {
   function handleDragEnd(group: TripGroup, event: MarkerDragStartEndEvent) {
     const { latitude, longitude } = event.nativeEvent.coordinate;
     Alert.alert(
-      'Confirmar posición',
-      '¿Guardar esta nueva posición del pin?',
+      t('repositionAlert.title'),
+      t('repositionAlert.message'),
       [
         {
-          text: 'Cancelar',
+          text: t('repositionAlert.cancel'),
           style: 'cancel',
           onPress: () => bumpMarkerVersion(group.key),
         },
         {
-          text: 'Guardar',
+          text: t('repositionAlert.save'),
           onPress: () => {
             persistOverrides({ ...visualOverrides, [group.key]: { lat: latitude, lng: longitude } });
           },
@@ -158,22 +119,7 @@ export default function Mapa() {
   }, []);
 
   // Group trips by rounded coordinate so overlapping pins merge
-  const groups = useMemo<TripGroup[]>(() => {
-    const map: Record<string, Trip[]> = {};
-    for (const t of trips) {
-      if (!t.coords) continue;
-      const key = `${t.coords.lat.toFixed(3)},${t.coords.lng.toFixed(3)}`;
-      if (!map[key]) map[key] = [];
-      map[key].push(t);
-    }
-    return Object.entries(map).map(([key, tripList]) => ({
-      key,
-      lat: tripList[0].coords!.lat,
-      lng: tripList[0].coords!.lng,
-      trips: tripList,
-      hasReal: tripList.some((t) => t.tipo === 'real'),
-    }));
-  }, [trips]);
+  const groups = useMemo<TripGroup[]>(() => groupTripsByPlace(trips), [trips]);
 
   return (
     <View style={styles.root}>
@@ -227,7 +173,7 @@ export default function Mapa() {
                       activeOpacity={0.7}
                       style={styles.resetPinBtn}
                     >
-                      <Text style={styles.resetPinText}>↺  Restablecer posición original del pin</Text>
+                      <Text style={styles.resetPinText}>{t('resetPosition')}</Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -291,13 +237,15 @@ export default function Mapa() {
                           <Text style={styles.tripRowDate}>◆ {trip.fechaInicio}</Text>
                         ) : !isReal ? (
                           <View style={styles.tripRowBadge}>
-                            <Text style={styles.tripRowBadgeText}>PENDIENTE</Text>
+                            <Text style={styles.tripRowBadgeText}>
+                              {futureTripLabel(selectedGroup) === 'repeat' ? t('repeatBadge') : t('wishlistBadge')}
+                            </Text>
                           </View>
                         ) : null}
                       </View>
                       {!isReal && (
                         <View style={styles.logroAction}>
-                          <Text style={styles.logroText}>¡Lo logré!</Text>
+                          <Text style={styles.logroText}>{t('markAchieved')}</Text>
                           <Text style={styles.logroCheck}>✔</Text>
                           <Text style={styles.tripRowArrow}>→</Text>
                         </View>
@@ -313,15 +261,7 @@ export default function Mapa() {
       </Animated.View>
       )}
 
-      {activeSection === 'others' && (
-        <View style={styles.otrosXpWrap}>
-          <Text style={styles.otrosXpTitle}>OtrosXP</Text>
-          <Text style={styles.otrosXpBody}>
-            Acá vas a poder ver los mundos que otros usuarios compartan con vos.
-          </Text>
-          <Text style={styles.otrosXpEmpty}>Todavía no tenés mundos compartidos.</Text>
-        </View>
-      )}
+      {activeSection === 'others' && <OtrosXpTab />}
 
       {activeSection === 'share' && <CompartirXpTab />}
       </View>
@@ -340,32 +280,6 @@ const styles = StyleSheet.create({
   },
   sectionContainer: {
     flex: 1,
-  },
-  otrosXpWrap: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-  },
-  otrosXpTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#e8e0d0',
-  },
-  otrosXpBody: {
-    fontSize: 14,
-    color: '#6b7a8d',
-    textAlign: 'center',
-    marginTop: 14,
-    lineHeight: 21,
-  },
-  otrosXpEmpty: {
-    fontSize: 13,
-    color: '#6b7a8d',
-    textAlign: 'center',
-    marginTop: 24,
-    fontStyle: 'italic',
-    opacity: 0.8,
   },
   mapWrap: {
     flex: 1,

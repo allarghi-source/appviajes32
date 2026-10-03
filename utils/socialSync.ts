@@ -145,7 +145,7 @@ async function runSync(): Promise<void> {
     const { data, error } = await supabase.rpc('sync_shared_world', {
       p_revision: nextRevision(),
       p_xp_total: stats.xpTotal,
-      p_rango_actual: stats.rangoActual,
+      p_rango_actual: stats.rangoActualId,
       p_continentes_visitados: stats.continentesVisitados,
       p_paises_visitados: stats.paisesVisitados,
       p_ciudades_visitadas: stats.ciudadesVisitadas,

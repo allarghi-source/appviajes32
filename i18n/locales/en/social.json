@@ -1,0 +1,88 @@
+{
+  "title": "ShareXP",
+  "loading": "Loading...",
+  "fallbackUsername": "User",
+  "loggedOut": {
+    "body": "Create an account to share your travel world with other MyWorldXP users and see the worlds they share with you.",
+    "createAccount": "CREATE ACCOUNT",
+    "login": "LOG IN"
+  },
+  "emailUnconfirmed": {
+    "body": "You still need to confirm your email.",
+    "hint": "Check your inbox and tap the confirmation link to activate ShareXP.",
+    "viewInstructions": "VIEW INSTRUCTIONS"
+  },
+  "verified": {
+    "loadingUsername": "Loading your username...",
+    "noUsername": "You don't have a username set up yet.",
+    "signOut": "SIGN OUT",
+    "signingOut": "Signing out...",
+    "signOutErrorTitle": "Couldn't sign out",
+    "signOutErrorMessage": "Please try again."
+  },
+  "common": {
+    "cancel": "Cancel",
+    "sending": "Sending..."
+  },
+  "scopes": {
+    "options": {
+      "real": "VISITED",
+      "wishlist": "WISHLIST",
+      "both": "BOTH"
+    },
+    "labels": {
+      "real": "Visited",
+      "wishlist": "Wishlist",
+      "both": "Both"
+    }
+  },
+  "pendingRequests": {
+    "sectionTitle": "Pending Requests",
+    "refresh": "↻ Refresh",
+    "loadingList": "Loading requests...",
+    "empty": "You don't have any pending requests.",
+    "groupAccess": "Want to see my world",
+    "groupOffer": "Shared their world with me",
+    "accessSubtitle": "Wants to see your world",
+    "offerSubtitle": "Offers to share: {{scope}}",
+    "chooseScope": "What will you share with them?",
+    "confirm": "CONFIRM",
+    "reject": "DECLINE",
+    "accept": "ACCEPT"
+  },
+  "userSearch": {
+    "label": "Search @username or email",
+    "placeholder": "@username or email",
+    "search": "SEARCH",
+    "emptyQuery": "Enter a @username or email to search.",
+    "foundTag": "User found",
+    "selfResult": "That's your own account.",
+    "notFoundResult": "User not found."
+  },
+  "foundUserActions": {
+    "accessSentMessage": "Request sent.",
+    "requestAccess": "I WANT TO SEE THEIR WORLD",
+    "offerSentMessage": "Invitation sent.",
+    "shareMyWorld": "SHARE MY WORLD",
+    "chooseScopeWith": "What do you want to share with @{{username}}?",
+    "sendInvite": "SEND INVITATION"
+  },
+  "errors": {
+    "unexpected": "Something unexpected happened. Please try again.",
+    "connection": "We couldn't connect to the server. Check your connection and try again.",
+    "noPermission": "You don't have permission to do this right now. Confirm your email or sign in again.",
+    "searchUnexpected": "Something unexpected happened while searching. Try again in a few minutes.",
+    "searchGeneric": "An error occurred while searching. Try again in a few minutes.",
+    "requestGeneric": "We couldn't complete the request. Please try again later.",
+    "requestExpired": "This request has expired.",
+    "requestNotFound": "This request no longer exists.",
+    "requestAlreadyResponded": "This request has already been answered.",
+    "requestMissingScope": "Choose what you'll share to accept this request.",
+    "requestCooldown": "You need to wait before trying again with this user.",
+    "requestBlocked": "You can't send this request to this user.",
+    "requestPending": "There's already a pending request with this user.",
+    "requestRelationExists": "You already have a connection with this user.",
+    "requestNotVerified": "This user can't use social features yet.",
+    "requestSelf": "You can't do this with your own account."
+  }
+}

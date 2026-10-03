@@ -1,9 +1,27 @@
 {
+  "tabs": {
+    "mine": "MyWorldXP",
+    "others": "OtrosXP",
+    "share": "CompartirXP"
+  },
   "repositionAlert": {
     "title": "Confirmar posición",
-    "message": "¿Guardar esta nueva posición del pin?"
+    "message": "¿Guardar esta nueva posición del pin?",
+    "cancel": "Cancelar",
+    "save": "Guardar"
   },
   "resetPosition": "↺  Restablecer posición original del pin",
   "wishlistBadge": "PENDIENTE",
-  "markAchieved": "¡Lo logré!"
+  "repeatBadge": "A REPETIR",
+  "markAchieved": "¡Lo logré!",
+  "othersSection": {
+    "body": "Acá vas a poder ver los mundos que otros usuarios compartan con vos.",
+    "empty": "Todavía no tenés mundos compartidos.",
+    "refresh": "↻ Actualizar"
+  },
+  "otherWorld": {
+    "title": "Mapa de @{{username}}",
+    "xp": "XP actual: {{xp}}",
+    "stats": "Continentes: {{continents}} · Países: {{countries}} · Ciudades: {{cities}}"
+  }
 }

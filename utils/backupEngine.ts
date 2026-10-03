@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { KEY_BADGE as ACHIEVEMENTS_BADGE_KEY, KEY_UNLOCKED as ACHIEVEMENTS_UNLOCKED_KEY } from './achievementsEngine';
+import i18n from '../i18n';
 import { LANGUAGE_STORAGE_KEY } from '../i18n/languageStorage';
 
 // Lógica compartida de validación y restauración de backup.
@@ -122,7 +123,7 @@ export async function getRawBackup(): Promise<string | null> {
 export function parseBackup(raw: string): BackupPayload {
   const parsed = JSON.parse(raw);
   if (!isValidBackup(parsed)) {
-    throw new Error('Estructura de backup inválida');
+    throw new Error(i18n.t('backup:invalidStructure'));
   }
   return parsed;
 }
@@ -209,10 +210,10 @@ export async function clearAllUserData(): Promise<void> {
 export function buildRestoreConfirmMessage(hasExistingData: boolean, fecha: string | null): string {
   if (hasExistingData) {
     return fecha
-      ? `Se encontró un backup guardado el:\n${fecha}\n\nSi continuás, todos los datos actuales serán reemplazados por el contenido de ese backup.\n\n¿Querés continuar?`
-      : 'Se encontró un backup guardado en este dispositivo.\n\nSi continuás, todos los datos actuales serán reemplazados por el contenido de ese backup.\n\n¿Querés continuar?';
+      ? i18n.t('backup:restoreConfirm.existingWithDate', { fecha })
+      : i18n.t('backup:restoreConfirm.existingNoDate');
   }
   return fecha
-    ? `Se encontró un backup guardado el:\n${fecha}\n\n¿Querés restaurarlo?`
-    : 'Se encontró un backup guardado en este dispositivo.\n\n¿Querés restaurarlo?';
+    ? i18n.t('backup:restoreConfirm.noneWithDate', { fecha })
+    : i18n.t('backup:restoreConfirm.noneNoDate');
 }

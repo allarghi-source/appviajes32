@@ -4,6 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Alert,
   FlatList,
@@ -42,6 +43,7 @@ type ValidacionResultado =
 
 export default function Profile() {
   const router = useRouter();
+  const { t } = useTranslation(['profile', 'common']);
   const [image, setImage] = useState<string | null>(null);
   const [nombre, setNombre] = useState('');
   const [apellido, setApellido] = useState('');
@@ -216,7 +218,7 @@ export default function Profile() {
       setImage(persistida);
       setFotoError(false);
     } catch {
-      Alert.alert('Error', 'No se pudo guardar la foto. Intentá de nuevo.');
+      Alert.alert(t('common:error'), t('profile:alerts.savePhotoError'));
     }
   }
 
@@ -255,16 +257,16 @@ export default function Profile() {
   };
 
   const selectPhoto = () => {
-    Alert.alert('Seleccionar imagen', 'Elegí una opción', [
-      { text: 'Tomar foto', onPress: takePhoto },
-      { text: 'Elegir de galería', onPress: pickImage },
-      { text: 'Cancelar', style: 'cancel', onPress: () => { if (!image) setFotoError(true); } },
+    Alert.alert(t('profile:alerts.selectImage.title'), t('profile:alerts.selectImage.message'), [
+      { text: t('common:photoPicker.takePhoto'), onPress: takePhoto },
+      { text: t('common:photoPicker.chooseFromGallery'), onPress: pickImage },
+      { text: t('common:cancel'), style: 'cancel', onPress: () => { if (!image) setFotoError(true); } },
     ]);
   };
 
   const ciudadErrorMsg =
     geoStatus === 'no_encontrada'
-      ? 'Ciudad no encontrada.'
+      ? t('profile:errors.ciudadNoEncontrada')
       : geoStatus === 'error'
       ? 'No se pudo validar la ciudad. Verificá tu conexión e intentá nuevamente.'
       : '';
@@ -290,11 +292,11 @@ export default function Profile() {
       >
 
         <Text style={styles.title}>
-          CREÁ TU PERFIL
+          {t('profile:title')}
         </Text>
 
         <Text style={styles.subtitle}>
-          Contanos quién sos para empezar tu viaje
+          {t('profile:subtitle')}
         </Text>
         <View style={styles.photoContainer}>
 
@@ -320,10 +322,10 @@ export default function Profile() {
           </View>
 
           <Text style={styles.photoText}>
-            Tocá para agregar tu foto
+            {t('profile:photoHint')}
           </Text>
           {fotoError ? (
-            <Text style={styles.photoErrorText}>La foto de perfil es obligatoria.</Text>
+            <Text style={styles.photoErrorText}>{t('profile:errors.photoRequired')}</Text>
           ) : null}
 
         </View>
@@ -335,7 +337,7 @@ export default function Profile() {
               <View style={styles.divider} />
               <TextInput
                 ref={nombreRef}
-                placeholder="Nombre"
+                placeholder={t('profile:placeholders.nombre')}
                 placeholderTextColor="rgba(255,255,255,0.5)"
                 style={styles.inputText}
                 value={nombre}
@@ -350,7 +352,7 @@ export default function Profile() {
                 onSubmitEditing={() => apellidoRef.current?.focus()}
               />
             </View>
-            {nombreError ? <Text style={styles.errorText}>Este campo es obligatorio.</Text> : null}
+            {nombreError ? <Text style={styles.errorText}>{t('common:required')}</Text> : null}
           </View>
 
           <View>
@@ -359,7 +361,7 @@ export default function Profile() {
               <View style={styles.divider} />
               <TextInput
                 ref={apellidoRef}
-                placeholder="Apellido"
+                placeholder={t('profile:placeholders.apellido')}
                 placeholderTextColor="rgba(255,255,255,0.5)"
                 style={styles.inputText}
                 value={apellido}
@@ -373,7 +375,7 @@ export default function Profile() {
                 onSubmitEditing={() => nacionalidadRef.current?.focus()}
               />
             </View>
-            {apellidoError ? <Text style={styles.errorText}>Este campo es obligatorio.</Text> : null}
+            {apellidoError ? <Text style={styles.errorText}>{t('common:required')}</Text> : null}
           </View>
 
           <View>
@@ -382,7 +384,7 @@ export default function Profile() {
               <View style={styles.divider} />
               <TextInput
                 ref={nacionalidadRef}
-                placeholder="Nacionalidad"
+                placeholder={t('profile:placeholders.nacionalidad')}
                 placeholderTextColor="rgba(255,255,255,0.5)"
                 style={styles.inputText}
                 value={nacionalidad}
@@ -395,7 +397,7 @@ export default function Profile() {
                 returnKeyType="done"
               />
             </View>
-            {nacionalidadError ? <Text style={styles.errorText}>Este campo es obligatorio.</Text> : null}
+            {nacionalidadError ? <Text style={styles.errorText}>{t('common:required')}</Text> : null}
           </View>
 
           {/* País: se elige de una lista cerrada, nunca se escribe libremente. */}
@@ -408,11 +410,11 @@ export default function Profile() {
                 <Feather name="map" size={18} color="#d4af37" />
                 <View style={styles.divider} />
                 <Text style={[styles.inputText, !paisSeleccionado && styles.inputTextPlaceholder]}>
-                  {paisSeleccionado ? paisSeleccionado.nombre : 'País donde resides'}
+                  {paisSeleccionado ? paisSeleccionado.nombre : t('profile:placeholders.pais')}
                 </Text>
               </View>
             </TouchableOpacity>
-            {paisBorderError ? <Text style={styles.errorText}>Este campo es obligatorio.</Text> : null}
+            {paisBorderError ? <Text style={styles.errorText}>{t('common:required')}</Text> : null}
           </View>
 
           {/* Ciudad: texto libre, validado junto con el país ya elegido. */}
@@ -422,7 +424,7 @@ export default function Profile() {
               <View style={styles.divider} />
               <TextInput
                 ref={ciudadRef}
-                placeholder="Ciudad donde residís"
+                placeholder={t('profile:placeholders.ciudad')}
                 placeholderTextColor="rgba(255,255,255,0.5)"
                 style={[styles.inputText, !paisSeleccionado && styles.inputTextPlaceholder]}
                 value={ciudad}
@@ -441,7 +443,7 @@ export default function Profile() {
               />
             </View>
             {geoStatus === 'validando' ? (
-              <Text style={styles.hintText}>Validando ubicación...</Text>
+              <Text style={styles.hintText}>{t('common:locationValidation.validating')}</Text>
             ) : null}
             {ciudadErrorMsg ? <Text style={styles.errorText}>{ciudadErrorMsg}</Text> : null}
             {geoStatus === 'multiples' && geoOpciones.length > 0 ? (
@@ -483,17 +485,17 @@ export default function Profile() {
                 setPaisTouched(true);
 
                 const faltantes: string[] = [];
-                if (fotoVacia) faltantes.push('Foto de perfil');
-                if (nombreVacio) faltantes.push('Nombre');
-                if (apellidoVacio) faltantes.push('Apellido');
-                if (nacionalidadVacia) faltantes.push('Nacionalidad');
-                if (paisVacio) faltantes.push('País de residencia');
-                if (!paisVacio && ciudadVacia) faltantes.push('Ciudad de residencia');
+                if (fotoVacia) faltantes.push(t('profile:fields.foto'));
+                if (nombreVacio) faltantes.push(t('profile:fields.nombre'));
+                if (apellidoVacio) faltantes.push(t('profile:fields.apellido'));
+                if (nacionalidadVacia) faltantes.push(t('profile:fields.nacionalidad'));
+                if (paisVacio) faltantes.push(t('profile:fields.pais'));
+                if (!paisVacio && ciudadVacia) faltantes.push(t('profile:fields.ciudad'));
 
                 if (faltantes.length > 0) {
                   Alert.alert(
-                    'Faltan datos',
-                    `Para continuar debés completar:\n\n${faltantes.map((f) => `• ${f}`).join('\n')}`
+                    t('profile:alerts.missingFields.title'),
+                    `${t('profile:alerts.missingFields.intro')}\n\n${faltantes.map((f) => `• ${f}`).join('\n')}`
                   );
                   return;
                 }
@@ -525,16 +527,16 @@ export default function Profile() {
 
                 if (resultado.tipo === 'error') {
                   Alert.alert(
-                    'Sin conexión',
-                    'No se pudo validar la ciudad. Verificá tu conexión e intentá nuevamente.'
+                    t('profile:alerts.noConnectionTitle'),
+                    t('common:locationValidation.connectionError')
                   );
                   return;
                 }
 
                 if (resultado.tipo === 'indefinido') {
                   Alert.alert(
-                    'Ciudad no confirmada',
-                    'Para continuar debés confirmar una ciudad de residencia válida.'
+                    t('profile:alerts.cityNotConfirmedTitle'),
+                    t('profile:alerts.cityNotConfirmedMessage')
                   );
                   return;
                 }
@@ -558,7 +560,7 @@ export default function Profile() {
                 router.push('/passportcover');
               }}
             >
-              <Text style={styles.buttonText}>CONTINUAR →</Text>
+              <Text style={styles.buttonText}>{t('profile:cta')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -571,16 +573,16 @@ export default function Profile() {
       >
         <View style={styles.paisModalContainer}>
           <View style={styles.paisModalHeader}>
-            <Text style={styles.paisModalTitle}>Elegí tu país</Text>
+            <Text style={styles.paisModalTitle}>{t('common:countryPicker.selectCountry')}</Text>
             <TouchableOpacity onPress={() => setPaisModalVisible(false)}>
-              <Text style={styles.paisModalClose}>Cancelar</Text>
+              <Text style={styles.paisModalClose}>{t('common:cancel')}</Text>
             </TouchableOpacity>
           </View>
           <View style={styles.paisSearchBox}>
             <Feather name="search" size={16} color="#d4af37" />
             <TextInput
               style={styles.paisSearchInput}
-              placeholder="Buscar país..."
+              placeholder={t('common:countryPicker.searchPlaceholder')}
               placeholderTextColor="rgba(255,255,255,0.4)"
               value={paisQuery}
               onChangeText={setPaisQuery}
@@ -600,7 +602,7 @@ export default function Profile() {
                 <Text style={styles.paisModalItemText}>{item.nombre}</Text>
               </TouchableOpacity>
             )}
-            ListEmptyComponent={<Text style={styles.paisModalEmpty}>No se encontraron países.</Text>}
+            ListEmptyComponent={<Text style={styles.paisModalEmpty}>{t('common:countryPicker.noResults')}</Text>}
           />
         </View>
       </Modal>

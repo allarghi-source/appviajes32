@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import {
@@ -16,22 +17,13 @@ const TEXT = '#e8e0d0';
 const MUTED = '#6b7a8d';
 const DANGER = '#c0392b';
 
-const SCOPE_OPTIONS: { value: ShareScope; label: string }[] = [
-  { value: 'realized', label: 'REALIZADOS' },
-  { value: 'wishlist', label: 'WISHLIST' },
-  { value: 'both', label: 'AMBOS' },
-];
-
-const SCOPE_LABELS: Record<ShareScope, string> = {
-  realized: 'Realizados',
-  wishlist: 'Wishlist',
-  both: 'Ambos',
-};
+const SCOPE_VALUES: ShareScope[] = ['real', 'wishlist', 'both'];
 
 // Bandeja de solicitudes pendientes reales dirigidas a mí. Solo lectura +
 // respond_share_request — nunca escribe directo en share_requests ni en
 // share_relationships, nunca abre mapas ajenos ni lee shared_trips.
 export default function PendingRequests({ myUserId }: { myUserId: string }) {
+  const { t } = useTranslation('social');
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
 
@@ -55,7 +47,7 @@ export default function PendingRequests({ myUserId }: { myUserId: string }) {
       .catch((err) => {
         if (!mountedRef.current) return;
         setRequests([]);
-        setLoadError(getShareRequestErrorMessage(err));
+        setLoadError(getShareRequestErrorMessage(err, 'inbox'));
         setFetchedFor(myUserId);
       });
     // reloadToken solo existe para forzar una recarga manual; no participa
@@ -78,14 +70,14 @@ export default function PendingRequests({ myUserId }: { myUserId: string }) {
   return (
     <View style={styles.wrap}>
       <View style={styles.headerRow}>
-        <Text style={styles.sectionTitle}>Solicitudes pendientes</Text>
+        <Text style={styles.sectionTitle}>{t('pendingRequests.sectionTitle')}</Text>
         <TouchableOpacity onPress={handleRefresh} disabled={loading} activeOpacity={0.7}>
-          <Text style={styles.refreshText}>{loading ? 'Cargando...' : '↻ Actualizar'}</Text>
+          <Text style={styles.refreshText}>{loading ? t('loading') : t('pendingRequests.refresh')}</Text>
         </TouchableOpacity>
       </View>
 
       {loading && requests.length === 0 && !loadError && (
-        <Text style={styles.loadingText}>Cargando solicitudes...</Text>
+        <Text style={styles.loadingText}>{t('pendingRequests.loadingList')}</Text>
       )}
 
       {!loading && loadError && (
@@ -95,12 +87,12 @@ export default function PendingRequests({ myUserId }: { myUserId: string }) {
       )}
 
       {!loading && !loadError && requests.length === 0 && (
-        <Text style={styles.emptyText}>No tenés solicitudes pendientes.</Text>
+        <Text style={styles.emptyText}>{t('pendingRequests.empty')}</Text>
       )}
 
       {accessRequests.length > 0 && (
         <View style={styles.group}>
-          <Text style={styles.groupTitle}>Quieren ver mi mundo</Text>
+          <Text style={styles.groupTitle}>{t('pendingRequests.groupAccess')}</Text>
           {accessRequests.map((r) => (
             <RequestCard key={r.id} request={r} onResponded={handleResponded} />
           ))}
@@ -109,7 +101,7 @@ export default function PendingRequests({ myUserId }: { myUserId: string }) {
 
       {offerRequests.length > 0 && (
         <View style={styles.group}>
-          <Text style={styles.groupTitle}>Me compartieron su mundo</Text>
+          <Text style={styles.groupTitle}>{t('pendingRequests.groupOffer')}</Text>
           {offerRequests.map((r) => (
             <RequestCard key={r.id} request={r} onResponded={handleResponded} />
           ))}
@@ -126,28 +118,44 @@ function RequestCard({
   request: PendingShareRequest;
   onResponded: (id: string) => void;
 }) {
+  const { t } = useTranslation('social');
   const isAccessRequest = request.requestType === 'request_access';
 
   const [choosingScope, setChoosingScope] = useState(false);
   const [selectedScope, setSelectedScope] = useState<ShareScope | null>(null);
   const [responding, setResponding] = useState<'accept' | 'reject' | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // La solicitud venció antes de responderla: el servidor ya la marcó
+  // 'expired' y no creó ninguna relación. La tarjeta queda solo con el aviso
+  // (sin acciones) hasta la próxima carga, que ya no la trae.
+  const [expired, setExpired] = useState(false);
 
   async function doRespond(accept: boolean, scope?: ShareScope) {
     setErrorMessage(null);
     setResponding(accept ? 'accept' : 'reject');
     try {
-      await respondShareRequest({ requestId: request.id, accept, scope });
+      const outcome = await respondShareRequest({ requestId: request.id, accept, scope });
+      if (outcome === 'expired') {
+        setExpired(true);
+        setChoosingScope(false);
+        setErrorMessage(t('errors.requestExpired'));
+        return;
+      }
+      if (outcome !== (accept ? 'accepted' : 'rejected')) {
+        // Desenlace que no corresponde a lo pedido: nunca se muestra como éxito.
+        setErrorMessage(t('errors.requestGeneric'));
+        return;
+      }
       onResponded(request.id);
     } catch (err) {
-      setErrorMessage(getShareRequestErrorMessage(err));
+      setErrorMessage(getShareRequestErrorMessage(err, 'inbox'));
     } finally {
       setResponding(null);
     }
   }
 
   function handleAcceptPress() {
-    if (responding) return;
+    if (responding || expired) return;
     setErrorMessage(null);
     if (isAccessRequest) {
       // El dueño del mundo soy yo: elijo el scope recién acá, no antes.
@@ -169,7 +177,7 @@ function RequestCard({
   }
 
   async function handleReject() {
-    if (responding) return;
+    if (responding || expired) return;
     await doRespond(false);
   }
 
@@ -178,8 +186,8 @@ function RequestCard({
       <Text style={styles.cardUsername}>@{request.senderUsername}</Text>
       <Text style={styles.cardSubtitle}>
         {isAccessRequest
-          ? 'Quiere ver tu mundo'
-          : `Te ofrece compartir: ${SCOPE_LABELS[request.scope ?? 'both']}`}
+          ? t('pendingRequests.accessSubtitle')
+          : t('pendingRequests.offerSubtitle', { scope: t(`scopes.labels.${request.scope ?? 'both'}`) })}
       </Text>
 
       {errorMessage && (
@@ -188,21 +196,21 @@ function RequestCard({
         </View>
       )}
 
-      {choosingScope ? (
+      {expired ? null : choosingScope ? (
         <View style={styles.scopeWrap}>
-          <Text style={styles.scopeLabel}>¿Qué le vas a compartir?</Text>
+          <Text style={styles.scopeLabel}>{t('pendingRequests.chooseScope')}</Text>
           <View style={styles.scopeRow}>
-            {SCOPE_OPTIONS.map((opt) => {
-              const isSelected = selectedScope === opt.value;
+            {SCOPE_VALUES.map((value) => {
+              const isSelected = selectedScope === value;
               return (
                 <TouchableOpacity
-                  key={opt.value}
+                  key={value}
                   style={[styles.scopeOption, isSelected && styles.scopeOptionSelected]}
-                  onPress={() => setSelectedScope(opt.value)}
+                  onPress={() => setSelectedScope(value)}
                   activeOpacity={0.8}
                 >
                   <Text style={[styles.scopeOptionText, isSelected && styles.scopeOptionTextSelected]}>
-                    {opt.label}
+                    {t(`scopes.options.${value}`)}
                   </Text>
                 </TouchableOpacity>
               );
@@ -215,7 +223,7 @@ function RequestCard({
               disabled={responding !== null}
               activeOpacity={0.7}
             >
-              <Text style={styles.cancelBtnText}>Cancelar</Text>
+              <Text style={styles.cancelBtnText}>{t('common.cancel')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.confirmBtn, (!selectedScope || responding !== null) && styles.btnDisabled]}
@@ -224,7 +232,7 @@ function RequestCard({
               activeOpacity={0.85}
             >
               <Text style={styles.confirmBtnText}>
-                {responding === 'accept' ? 'Enviando...' : 'CONFIRMAR'}
+                {responding === 'accept' ? t('common.sending') : t('pendingRequests.confirm')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -237,7 +245,7 @@ function RequestCard({
             disabled={responding !== null}
             activeOpacity={0.8}
           >
-            <Text style={styles.rejectBtnText}>{responding === 'reject' ? '...' : 'RECHAZAR'}</Text>
+            <Text style={styles.rejectBtnText}>{responding === 'reject' ? '...' : t('pendingRequests.reject')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.acceptBtn, responding !== null && styles.btnDisabled]}
@@ -245,7 +253,7 @@ function RequestCard({
             disabled={responding !== null}
             activeOpacity={0.85}
           >
-            <Text style={styles.acceptBtnText}>{responding === 'accept' ? 'Enviando...' : 'ACEPTAR'}</Text>
+            <Text style={styles.acceptBtnText}>{responding === 'accept' ? t('common.sending') : t('pendingRequests.accept')}</Text>
           </TouchableOpacity>
         </View>
       )}

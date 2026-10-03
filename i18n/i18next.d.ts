@@ -16,6 +16,8 @@ import navbar from './locales/es/navbar.json';
 import achievements from './locales/es/achievements.json';
 import ranks from './locales/es/ranks.json';
 import backup from './locales/es/backup.json';
+import auth from './locales/es/auth.json';
+import social from './locales/es/social.json';
 
 // Augmentación de tipos de i18next contra el español (idioma base/completo),
 // para que t('namespace:clave.inexistente') sea un error de compilación.
@@ -39,6 +41,8 @@ declare module 'i18next' {
       achievements: typeof achievements;
       ranks: typeof ranks;
       backup: typeof backup;
+      auth: typeof auth;
+      social: typeof social;
     };
   }
 }

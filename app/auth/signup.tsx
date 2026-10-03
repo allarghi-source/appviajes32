@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -32,6 +33,7 @@ const MUTED = '#6b7a8d';
 const DANGER = '#c0392b';
 
 export default function Signup() {
+  const { t } = useTranslation('auth');
   const router = useRouter();
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
@@ -56,19 +58,19 @@ export default function Signup() {
     const normalizedEmail = normalizeEmail(email);
 
     if (!isValidUsername(normalizedUsername)) {
-      setErrorMessage('El usuario debe tener 5 a 15 caracteres: minúsculas, números, punto o guion bajo.');
+      setErrorMessage(t('signup.invalidUsername'));
       return;
     }
     if (!isValidEmail(normalizedEmail)) {
-      setErrorMessage('Ingresá un email válido.');
+      setErrorMessage(t('validation.invalidEmail'));
       return;
     }
     if (!isValidPassword(password)) {
-      setErrorMessage(`La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres.`);
+      setErrorMessage(t('validation.passwordTooShort', { count: MIN_PASSWORD_LENGTH }));
       return;
     }
     if (password !== confirmPassword) {
-      setErrorMessage('Las contraseñas no coinciden.');
+      setErrorMessage(t('validation.passwordsDontMatch'));
       return;
     }
 
@@ -94,7 +96,7 @@ export default function Signup() {
       // cuando el email ya pertenece a una cuenta confirmada (protección
       // anti-enumeración), en vez de un error explícito.
       if (data.user && data.user.identities && data.user.identities.length === 0) {
-        setErrorMessage('Ese email ya está registrado. Iniciá sesión o recuperá tu contraseña.');
+        setErrorMessage(t('errors.emailAlreadyRegistered'));
         return;
       }
 
@@ -117,7 +119,7 @@ export default function Signup() {
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <Text style={styles.backIcon}>‹</Text>
-          <Text style={styles.backLabel}>Volver</Text>
+          <Text style={styles.backLabel}>{t('back')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -126,8 +128,8 @@ export default function Signup() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>Crear cuenta</Text>
-        <Text style={styles.subtitle}>Necesaria solo para CompartirXP.</Text>
+        <Text style={styles.title}>{t('signup.title')}</Text>
+        <Text style={styles.subtitle}>{t('signup.subtitle')}</Text>
 
         {errorMessage && (
           <View style={styles.errorBox}>
@@ -135,23 +137,23 @@ export default function Signup() {
           </View>
         )}
 
-        <Text style={styles.label}>Usuario</Text>
+        <Text style={styles.label}>{t('signup.usernameLabel')}</Text>
         <TextInput
           style={styles.input}
-          placeholder="tu_usuario"
+          placeholder={t('signup.usernamePlaceholder')}
           placeholderTextColor={MUTED}
           value={username}
-          onChangeText={(t) => setUsername(normalizeUsername(t))}
+          onChangeText={(text) => setUsername(normalizeUsername(text))}
           autoCapitalize="none"
           autoCorrect={false}
           maxLength={20}
         />
-        <Text style={styles.hint}>5–15 caracteres: minúsculas, números, punto o guion bajo.</Text>
+        <Text style={styles.hint}>{t('signup.usernameHint')}</Text>
 
-        <Text style={styles.label}>Email</Text>
+        <Text style={styles.label}>{t('fields.email.label')}</Text>
         <TextInput
           style={styles.input}
-          placeholder="tu@email.com"
+          placeholder={t('fields.email.placeholder')}
           placeholderTextColor={MUTED}
           value={email}
           onChangeText={setEmail}
@@ -160,10 +162,10 @@ export default function Signup() {
           keyboardType="email-address"
         />
 
-        <Text style={styles.label}>Contraseña</Text>
+        <Text style={styles.label}>{t('signup.passwordLabel')}</Text>
         <TextInput
           style={styles.input}
-          placeholder="Mínimo 8 caracteres"
+          placeholder={t('fields.passwordCreate.placeholder')}
           placeholderTextColor={MUTED}
           value={password}
           onChangeText={setPassword}
@@ -171,10 +173,10 @@ export default function Signup() {
           autoCapitalize="none"
         />
 
-        <Text style={styles.label}>Repetir contraseña</Text>
+        <Text style={styles.label}>{t('fields.confirmPassword.label')}</Text>
         <TextInput
           style={styles.input}
-          placeholder="Repetí tu contraseña"
+          placeholder={t('fields.confirmPassword.placeholder')}
           placeholderTextColor={MUTED}
           value={confirmPassword}
           onChangeText={setConfirmPassword}
@@ -188,7 +190,7 @@ export default function Signup() {
           disabled={submitting}
           activeOpacity={0.85}
         >
-          <Text style={styles.primaryBtnText}>{submitting ? 'Creando cuenta...' : 'Crear cuenta'}</Text>
+          <Text style={styles.primaryBtnText}>{submitting ? t('signup.submitting') : t('signup.submit')}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -196,7 +198,7 @@ export default function Signup() {
           activeOpacity={0.7}
           style={styles.linkWrap}
         >
-          <Text style={styles.linkText}>¿Ya tenés cuenta? <Text style={styles.linkTextGold}>Iniciar sesión</Text></Text>
+          <Text style={styles.linkText}>{t('signup.haveAccount')}<Text style={styles.linkTextGold}>{t('signup.loginLink')}</Text></Text>
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>

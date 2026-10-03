@@ -1,4 +1,12 @@
+import { getPaisPorIso2, resolverIso2Local } from './paises';
+
 // ─── TIPOS ────────────────────────────────────────────────────────────────────
+
+// Union literal (no sólo `string`) para que `t('names.' + id)` en ranks.json
+// se pueda tipar contra las claves reales del namespace, en vez de contra
+// cualquier string arbitrario.
+export type RankId = 'novato' | 'corsario' | 'viajero' | 'trotamundos' | 'navegante' | 'astronauta';
+export type ContinentId = 'north_america' | 'south_america' | 'europe' | 'africa' | 'asia' | 'oceania';
 
 export interface Trip {
   id: string;
@@ -18,19 +26,36 @@ export interface Trip {
   // nunca lo tienen). Trips viejos sin este campo no aportan km hasta ser migrados
   // por utils/tripOriginMigration.ts — nunca se asume ni se inventa un origen.
   origenCoords?: { lat: number; lng: number } | null;
+  // Identidad geográfica estable (ISO 3166-1 alpha-2), independiente del idioma
+  // en que se guardaron ciudad/pais. Ausente en viajes históricos -- para esos,
+  // calcularStats() resuelve por resolverIso2Local(pais) antes de caer al
+  // comportamiento por texto de siempre. Nunca se migra ni se inventa acá.
+  countryCode?: string;
+  // Solo trips 'real': true si este viaje nació al convertir un viaje futuro
+  // (wishlist o "a repetir") con "¡Lo logré!". Es lo único que hace progresar
+  // los logros de viajes planificados realizados (achievementsEngine). Ausente
+  // en viajes históricos y en cualquier viaje cargado sin "¡Lo logré!".
+  desdeWishlist?: boolean;
 }
 
 export interface StatsResult {
   xpTotal: number;
   rangoActual: string;
+  // ID estable del rango, independiente del nombre visible/idioma. Ver RANKS.
+  rangoActualId: RankId;
   rangoTier: 'bronce' | 'plata' | 'oro';
   siguienteRango: string | null;
+  siguienteRangoId: RankId | null;
   progresoRango: number; // 0–1
 
   paisesVisitados: number;
   ciudadesVisitadas: number;
   continentesVisitados: number;
   continentesNombres: string[];
+  // IDs estables de continente, independientes del nombre visible/idioma
+  // (p.ej. 'europe' en vez de 'Europa'). Usar esto para lógica interna y
+  // logros; continentesNombres queda para lo que ya lo consume tal cual.
+  continentesIds: ContinentId[];
 
   kmTotales: number;
   horasVuelo: number;
@@ -50,13 +75,28 @@ export const ALL_CONTINENTS = [
   'Oceanía',
 ] as const;
 
-const RANKS: Array<{ nombre: string; xpMin: number; tier: 'bronce' | 'plata' | 'oro' }> = [
-  { nombre: 'Novato',      xpMin: 0,    tier: 'bronce' },
-  { nombre: 'Corsario',    xpMin: 500,  tier: 'bronce' },
-  { nombre: 'Viajero',     xpMin: 1000, tier: 'plata'  },
-  { nombre: 'Trotamundos', xpMin: 2000, tier: 'plata'  },
-  { nombre: 'Navegante',   xpMin: 3000, tier: 'oro'    },
-  { nombre: 'Astronauta',  xpMin: 4000, tier: 'oro'    },
+// Mismo orden que ALL_CONTINENTS, en ID estable -- para pantallas que ya
+// resuelven el nombre visible vía i18n en vez de leer ALL_CONTINENTS directo.
+export const ALL_CONTINENT_IDS = [
+  'north_america',
+  'south_america',
+  'europe',
+  'africa',
+  'asia',
+  'oceania',
+] as const;
+
+// `id` es la identidad estable (independiente de idioma, nunca cambia).
+// `nombre` queda solo como referencia interna del motor -- la UI nunca debe
+// leerlo directamente. El texto visible real sale siempre de
+// i18n/locales/{es,en}/ranks.json vía `id` (rangoActualId/siguienteRangoId).
+const RANKS: Array<{ id: RankId; nombre: string; xpMin: number; tier: 'bronce' | 'plata' | 'oro' }> = [
+  { id: 'novato',      nombre: 'Novato',               xpMin: 0,    tier: 'bronce' },
+  { id: 'corsario',    nombre: 'Turista',              xpMin: 500,  tier: 'bronce' },
+  { id: 'viajero',     nombre: 'Explorador',           xpMin: 1000, tier: 'plata'  },
+  { id: 'trotamundos', nombre: 'Trotamundos',          xpMin: 2000, tier: 'plata'  },
+  { id: 'navegante',   nombre: 'Señor de los mapas',   xpMin: 3000, tier: 'oro'    },
+  { id: 'astronauta',  nombre: 'Ciudadano del mundo',  xpMin: 4000, tier: 'oro'    },
 ];
 
 // ─── MAPEO PAÍS → CONTINENTE ──────────────────────────────────────────────────
@@ -307,6 +347,49 @@ export function getContinent(pais: string): string | null {
   return CONTINENT_MAP[normalize(pais)] ?? null;
 }
 
+// ID estable por continente, desacoplado del nombre visible que devuelve
+// getContinent(). CONTINENT_MAP/getContinent quedan intactos -- esto es un
+// mapeo adicional sobre su salida, no un reemplazo.
+const CONTINENT_NAME_TO_ID: Record<string, ContinentId> = {
+  'América del Norte': 'north_america',
+  'América del Sur': 'south_america',
+  'Europa': 'europe',
+  'África': 'africa',
+  'Asia': 'asia',
+  'Oceanía': 'oceania',
+};
+
+export function getContinentId(pais: string): ContinentId | null {
+  const nombre = getContinent(pais);
+  return nombre ? CONTINENT_NAME_TO_ID[nombre] ?? null : null;
+}
+
+// ─── IDENTIDAD GEOGRÁFICA ESTABLE DE UN VIAJE ──────────────────────────────────
+// Única fuente de esta resolución -- calcularStats() y cualquier otra pantalla
+// (ej. app/estadisticas.tsx) deben llamar a esto en vez de reimplementar su
+// propia lógica de país/continente. countryCode nativo (viajes nuevos) o
+// resolución local determinista por nombre (viajes históricos, sin tocar el
+// Trip); solo si ninguna de las dos resuelve cae al comportamiento de siempre
+// por texto -- mismo criterio para la clave de agrupación y para el país que
+// se le pasa a getContinent, así un viaje viejo "Estados Unidos" y uno nuevo
+// "United States" quedan bajo la MISMA identidad, sin importar el idioma.
+export interface TripGeography {
+  countryKey: string;
+  continent: string | null;
+  continentId: ContinentId | null;
+}
+
+export function resolveTripGeography(trip: Pick<Trip, 'pais' | 'countryCode'>): TripGeography {
+  const iso2 = trip.countryCode ?? resolverIso2Local(trip.pais);
+  const countryKey = iso2 ?? normalize(trip.pais);
+  const paisParaContinente = iso2 ? (getPaisPorIso2(iso2)?.nombre ?? trip.pais) : trip.pais;
+  return {
+    countryKey,
+    continent: getContinent(paisParaContinente),
+    continentId: getContinentId(paisParaContinente),
+  };
+}
+
 function parseDate(s: string | null): number {
   if (!s) return 0;
   const p = s.split(/[\/\-]/);
@@ -376,6 +459,7 @@ export function calcularStats(trips: Trip[]): StatsResult {
   const visitedCities = new Map<string, number>();
   const visitedCountries = new Map<string, { displayName: string; count: number }>();
   const visitedContinents = new Set<string>();
+  const visitedContinentIds = new Set<ContinentId>();
   const chainLastCountry = new Map<string, string>();
 
   let xp = 0;
@@ -383,8 +467,7 @@ export function calcularStats(trips: Trip[]): StatsResult {
   // ── XP por viaje ───────────────────────────────────────────────────────────
   for (const trip of realTrips) {
     const cityKey = normalize(trip.ciudad);
-    const countryKey = normalize(trip.pais);
-    const continent = getContinent(trip.pais);
+    const { countryKey, continent, continentId } = resolveTripGeography(trip);
 
     const isNewCity = !visitedCities.has(cityKey);
     const isNewCountry = !visitedCountries.has(countryKey);
@@ -394,6 +477,7 @@ export function calcularStats(trips: Trip[]): StatsResult {
     if (isNewContinent && continent) {
       xp += 100;
       visitedContinents.add(continent);
+      if (continentId) visitedContinentIds.add(continentId);
     }
 
     // País nuevo
@@ -506,14 +590,17 @@ export function calcularStats(trips: Trip[]): StatsResult {
   return {
     xpTotal: xp,
     rangoActual: current.nombre,
+    rangoActualId: current.id,
     rangoTier: current.tier,
     siguienteRango: next?.nombre ?? null,
+    siguienteRangoId: next?.id ?? null,
     progresoRango: progreso,
 
     paisesVisitados: visitedCountries.size,
     ciudadesVisitadas: visitedCities.size,
     continentesVisitados: visitedContinents.size,
     continentesNombres: [...visitedContinents],
+    continentesIds: [...visitedContinentIds],
 
     kmTotales: Math.round(kmTotales),
     horasVuelo: Math.round(horasVuelo * 10) / 10,

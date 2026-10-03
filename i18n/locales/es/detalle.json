@@ -20,10 +20,13 @@
     "notFound": "No se encontró. Revisá los datos.",
     "connectionError": "Error de conexión. Intentá de nuevo.",
     "searching": "Buscando...",
-    "search": "Buscar"
+    "search": "Buscar",
+    "missingDataTitle": "Faltan datos",
+    "missingDataMessage": "Ingresá ciudad y país."
   },
   "date": {
     "label": "FECHA DEL VIAJE",
+    "edit": "Editar",
     "dd": "DD",
     "mm": "MM",
     "yyyy": "AAAA",
@@ -65,5 +68,9 @@
     "savePhotosError": "No se pudieron guardar las fotos.",
     "savePhotoEditsError": "No se pudieron guardar los cambios.",
     "deleteTripError": "No se pudo eliminar el viaje."
+  },
+  "addPhotos": {
+    "chooseFromGallery": "Elegir de galería",
+    "takePhoto": "Tomar foto"
   }
 }

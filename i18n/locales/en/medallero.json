@@ -1,17 +1,17 @@
 {
-  "backButton": "← Volver",
-  "title": "Medallero",
-  "subtitle": "{{count}} de {{total}} logros desbloqueados",
+  "backButton": "← Back",
+  "title": "Achievements",
+  "subtitle": "{{count}} of {{total}} achievements unlocked",
   "categories": {
-    "progreso": "Progreso",
-    "continentes": "Continentes",
-    "comportamiento": "Comportamiento",
-    "planificacion": "Planificación",
-    "cumplimiento": "Cumplimiento",
-    "experiencia": "Experiencia",
-    "actividad": "Actividad",
-    "especiales": "Especiales"
+    "progreso": "Progress",
+    "continentes": "Continents",
+    "comportamiento": "Behavior",
+    "planificacion": "Planning",
+    "cumplimiento": "Completion",
+    "experiencia": "Experience",
+    "actividad": "Activity",
+    "especiales": "Special"
   },
   "hiddenName": "???",
-  "locked": "Bloqueado"
+  "locked": "Locked"
 }

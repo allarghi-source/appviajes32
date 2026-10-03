@@ -4,6 +4,8 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import i18n from '../i18n';
 import { resolveFotoUri } from '../utils/fotoPersistente';
 import { requestSharedWorldSync } from '../utils/socialSync';
 import {
@@ -45,6 +47,7 @@ interface GeoOpcion {
   lat: string;
   lon: string;
   display_name: string;
+  address?: { country_code?: string };
 }
 
 interface Trip {
@@ -64,6 +67,8 @@ interface Trip {
   // Residencia vigente al crear el viaje (solo trips reales). No se toca al
   // editar: el spread de persistTrip/detachAndSave/saveAllInChain ya lo preserva.
   origenCoords?: { lat: number; lng: number } | null;
+  // Identidad geográfica estable (ISO2). Ver utils/statsEngine.ts.
+  countryCode?: string;
 }
 
 function parseDate(s: string | null): Date {
@@ -202,6 +207,7 @@ function CinematicPhotoGallery({ fotos, onInteract }: { fotos: string[]; onInter
 }
 
 export default function DetalleViaje() {
+  const { t } = useTranslation(['detalle', 'common']);
   const params = useLocalSearchParams<{ id: string }>();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
   const router = useRouter();
@@ -232,6 +238,7 @@ export default function DetalleViaje() {
   const [geoStatus, setGeoStatus] = useState<GeoStatus>('idle');
   const [geoOpciones, setGeoOpciones] = useState<GeoOpcion[]>([]);
   const [newCoords, setNewCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [newCountryCode, setNewCountryCode] = useState<string | undefined>(undefined);
 
   // Fotos — sesión de edición con eliminaciones diferidas
   const [editingPhotos, setEditingPhotos] = useState(false);
@@ -262,7 +269,7 @@ export default function DetalleViaje() {
       try {
         const raw = await AsyncStorage.getItem('trips');
         const all: Trip[] = raw ? JSON.parse(raw) : [];
-        const found = all.find((t) => t.id === id) ?? null;
+        const found = all.find((tr) => tr.id === id) ?? null;
         if (found) {
           setTrip(found);
           setNota(found.nota);
@@ -274,7 +281,7 @@ export default function DetalleViaje() {
           ]).start();
         }
       } catch {
-        Alert.alert('Error', 'No se pudo cargar el viaje.');
+        Alert.alert(t('common:error'), t('detalle:errors.loadTrip'));
       }
     })();
   }, [id]);
@@ -286,7 +293,7 @@ export default function DetalleViaje() {
     try {
       const raw = await AsyncStorage.getItem('trips');
       const all: Trip[] = raw ? JSON.parse(raw) : [];
-      const idx = all.findIndex((t) => t.id === updated.id);
+      const idx = all.findIndex((tr) => tr.id === updated.id);
       if (idx !== -1) {
         all[idx] = updated;
         await AsyncStorage.setItem('trips', JSON.stringify(all));
@@ -294,7 +301,7 @@ export default function DetalleViaje() {
         requestSharedWorldSync();
       }
     } catch {
-      Alert.alert('Error', 'No se pudo guardar.');
+      Alert.alert(t('common:error'), t('common:genericSaveErrorShort'));
     } finally {
       setSaving(false);
     }
@@ -322,9 +329,14 @@ export default function DetalleViaje() {
     const raw = await AsyncStorage.getItem('userData');
     const userData = raw ? JSON.parse(raw) : {};
     const nombre = (userData.nombre || '').trim();
-    const texto = `${nombre} de MyWorldXP te recomienda que si visitás ${trip.ciudad}, ${trip.pais} tengas en cuenta:\n\n${tipsViaje.trim()}`;
+    const texto = t('detalle:tips.shareTemplate', {
+      nombre,
+      ciudad: trip.ciudad,
+      pais: trip.pais,
+      tips: tipsViaje.trim(),
+    });
     await Clipboard.setStringAsync(texto);
-    Alert.alert('¡Copiado!', 'Texto copiado. Ahora podés pegarlo donde quieras.');
+    Alert.alert(t('detalle:tips.shareCopiedTitle'), t('detalle:tips.shareCopiedMessage'));
   }
 
   // ─── Fecha ────────────────────────────────────────────────────────────────────
@@ -344,7 +356,7 @@ export default function DetalleViaje() {
     const mes  = editMes.padStart(2, '0');
     const anio = editAnio;
     if (!dia || !mes || !anio || anio.length !== 4) {
-      Alert.alert('Fecha inválida', 'Ingresá una fecha completa (DD, MM y año de 4 dígitos).');
+      Alert.alert(t('detalle:date.invalidTitle'), t('detalle:date.invalidMessage'));
       return;
     }
     const newDate  = buildFechaInicio(dia, mes, anio);
@@ -353,12 +365,12 @@ export default function DetalleViaje() {
 
     if (trip.chainId && yearChanged) {
       Alert.alert(
-        'Viaje de varios destinos',
-        'Este viaje forma parte de un viaje de varios destinos. Estás cambiando el año.\n\n¿Qué querés hacer?',
+        t('detalle:date.chainTitle'),
+        t('detalle:date.chainMessage'),
         [
-          { text: 'Cancelar', style: 'cancel' },
-          { text: 'Solo este destino', onPress: () => detachAndSave(newDate) },
-          { text: 'Cambiar todos',     onPress: () => saveAllInChain(newDate, anio) },
+          { text: t('common:cancel'), style: 'cancel' },
+          { text: t('detalle:date.chainOnlyThis'), onPress: () => detachAndSave(newDate) },
+          { text: t('detalle:date.chainAll'),     onPress: () => saveAllInChain(newDate, anio) },
         ]
       );
       return;
@@ -374,21 +386,21 @@ export default function DetalleViaje() {
     try {
       const raw = await AsyncStorage.getItem('trips');
       const all: Trip[] = raw ? JSON.parse(raw) : [];
-      const chainSiblings = all.filter((t) => t.chainId === trip.chainId && t.id !== trip.id);
+      const chainSiblings = all.filter((tr) => tr.chainId === trip.chainId && tr.id !== trip.id);
 
-      const idx = all.findIndex((t) => t.id === trip.id);
+      const idx = all.findIndex((tr) => tr.id === trip.id);
       if (idx !== -1) all[idx] = { ...trip, fechaInicio: newDate, chainId: null };
 
       // Si queda 1 solo en la cadena, también lo desvinculamos
       if (chainSiblings.length === 1) {
-        const ri = all.findIndex((t) => t.id === chainSiblings[0].id);
+        const ri = all.findIndex((tr) => tr.id === chainSiblings[0].id);
         if (ri !== -1) all[ri] = { ...all[ri], chainId: null };
       }
 
       await AsyncStorage.setItem('trips', JSON.stringify(all));
       setTrip({ ...trip, fechaInicio: newDate, chainId: null });
     } catch {
-      Alert.alert('Error', 'No se pudo guardar.');
+      Alert.alert(t('common:error'), t('common:genericSaveErrorShort'));
     } finally {
       setSaving(false);
       setEditingFecha(false);
@@ -401,17 +413,17 @@ export default function DetalleViaje() {
     try {
       const raw = await AsyncStorage.getItem('trips');
       const all: Trip[] = raw ? JSON.parse(raw) : [];
-      const updated = all.map((t) => {
-        if (t.chainId !== trip.chainId) return t;
-        if (t.id === trip.id) return { ...t, fechaInicio: newDate };
-        if (!t.fechaInicio) return t;
-        const p = t.fechaInicio.split('/');
-        return { ...t, fechaInicio: `${p[0]}/${p[1]}/${newYear}` };
+      const updated = all.map((tr) => {
+        if (tr.chainId !== trip.chainId) return tr;
+        if (tr.id === trip.id) return { ...tr, fechaInicio: newDate };
+        if (!tr.fechaInicio) return tr;
+        const p = tr.fechaInicio.split('/');
+        return { ...tr, fechaInicio: `${p[0]}/${p[1]}/${newYear}` };
       });
       await AsyncStorage.setItem('trips', JSON.stringify(updated));
       setTrip({ ...trip, fechaInicio: newDate });
     } catch {
-      Alert.alert('Error', 'No se pudo guardar.');
+      Alert.alert(t('common:error'), t('common:genericSaveErrorShort'));
     } finally {
       setSaving(false);
       setEditingFecha(false);
@@ -427,26 +439,33 @@ export default function DetalleViaje() {
     setGeoStatus('idle');
     setGeoOpciones([]);
     setNewCoords(null);
+    setNewCountryCode(undefined);
     setEditingLocation(true);
   }
 
   async function buscarUbicacion() {
     if (!editCiudad.trim() || !editPais.trim()) {
-      Alert.alert('Faltan datos', 'Ingresá ciudad y país.');
+      Alert.alert(t('detalle:location.missingDataTitle'), t('detalle:location.missingDataMessage'));
       return;
     }
     setGeoStatus('buscando');
     setGeoOpciones([]);
     setNewCoords(null);
+    setNewCountryCode(undefined);
     try {
       const q = encodeURIComponent(`${editCiudad.trim()}, ${editPais.trim()}`);
+      // Idioma activo de la app, no el del dispositivo -- decisión de producto
+      // ya cerrada. addressdetails=1 no agrega ninguna llamada extra: mismo
+      // request, sólo trae además el country_code que actualiza Trip.countryCode.
+      const lang = i18n.language === 'en' ? 'en' : 'es';
       const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=5`,
-        { headers: { 'User-Agent': 'MyWorldXP/1.0', 'Accept-Language': 'es' } }
+        `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=5&addressdetails=1`,
+        { headers: { 'User-Agent': 'MyWorldXP/1.0', 'Accept-Language': lang } }
       );
       const data: GeoOpcion[] = await res.json();
       if (data.length === 1) {
         setNewCoords({ lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) });
+        setNewCountryCode(data[0].address?.country_code?.toUpperCase());
         setGeoStatus('encontrada');
       } else if (data.length > 1) {
         setGeoStatus('multiples');
@@ -466,6 +485,7 @@ export default function DetalleViaje() {
       ciudad: editCiudad.trim(),
       pais:   editPais.trim(),
       coords: newCoords,
+      countryCode: newCountryCode,
     });
     setEditingLocation(false);
     setGeoStatus('idle');
@@ -508,7 +528,7 @@ export default function DetalleViaje() {
       setToDeleteOnCommit([]);
       setEditingPhotos(false);
     } catch {
-      Alert.alert('Error', 'No se pudieron guardar los cambios.');
+      Alert.alert(t('common:error'), t('detalle:errors.savePhotoEditsError'));
     } finally {
       setSaving(false);
     }
@@ -527,13 +547,13 @@ export default function DetalleViaje() {
     if (!trip) return;
     const currentCount = editingPhotos ? pendingFotos.length : trip.fotos.length;
     if (currentCount >= 4) {
-      Alert.alert('Máximo 4 fotos', 'Ya cargaste el máximo de fotos permitidas.');
+      Alert.alert(t('detalle:errors.maxPhotosTitle'), t('detalle:errors.maxPhotosMessage'));
       return;
     }
-    Alert.alert('Agregar fotos', '', [
-      { text: 'Elegir de galería', onPress: pickFromGallery },
-      { text: 'Tomar foto',        onPress: takePhoto },
-      { text: 'Cancelar',          style: 'cancel' },
+    Alert.alert(t('detalle:errors.addPhotosTitle'), '', [
+      { text: t('detalle:addPhotos.chooseFromGallery'), onPress: pickFromGallery },
+      { text: t('detalle:addPhotos.takePhoto'),         onPress: takePhoto },
+      { text: t('common:cancel'),                       style: 'cancel' },
     ]);
   }
 
@@ -542,7 +562,7 @@ export default function DetalleViaje() {
     const currentCount = editingPhotos ? pendingFotos.length : trip.fotos.length;
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permiso necesario', 'Necesitamos acceso a tu galería.');
+      Alert.alert(t('common:permission.titleNecesario'), t('common:permission.galleryNecesario'));
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -559,7 +579,7 @@ export default function DetalleViaje() {
     if (!trip) return;
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permiso necesario', 'Necesitamos acceso a tu cámara.');
+      Alert.alert(t('common:permission.titleNecesario'), t('common:permission.cameraNecesario'));
       return;
     }
     const result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
@@ -589,7 +609,7 @@ export default function DetalleViaje() {
         await persistTrip({ ...trip, fotos: newFotos, portada: newPortada });
       }
     } catch {
-      Alert.alert('Error', 'No se pudieron guardar las fotos.');
+      Alert.alert(t('common:error'), t('detalle:errors.savePhotosError'));
     } finally {
       setSaving(false);
     }
@@ -600,11 +620,11 @@ export default function DetalleViaje() {
   function handleDeleteTrip() {
     if (!trip) return;
     Alert.alert(
-      '¿Eliminar viaje?',
-      `¿Estás seguro de que querés eliminar el viaje a ${trip.ciudad}?`,
+      t('detalle:delete.confirmTitle'),
+      t('detalle:delete.confirmMessage', { ciudad: trip.ciudad }),
       [
-        { text: 'Cancelar',  style: 'cancel' },
-        { text: 'Eliminar',  style: 'destructive', onPress: doDeleteTrip },
+        { text: t('common:cancel'),         style: 'cancel' },
+        { text: t('detalle:delete.confirmButton'),  style: 'destructive', onPress: doDeleteTrip },
       ]
     );
   }
@@ -615,13 +635,13 @@ export default function DetalleViaje() {
     try {
       const raw  = await AsyncStorage.getItem('trips');
       const all: Trip[] = raw ? JSON.parse(raw) : [];
-      const remaining   = all.filter((t) => t.id !== trip.id);
+      const remaining   = all.filter((tr) => tr.id !== trip.id);
 
       // Si el viaje pertenecía a una cadena y queda 1 solo, lo desvinculamos
       if (trip.chainId) {
-        const chainLeft = remaining.filter((t) => t.chainId === trip.chainId);
+        const chainLeft = remaining.filter((tr) => tr.chainId === trip.chainId);
         if (chainLeft.length === 1) {
-          const ri = remaining.findIndex((t) => t.id === chainLeft[0].id);
+          const ri = remaining.findIndex((tr) => tr.id === chainLeft[0].id);
           if (ri !== -1) remaining[ri] = { ...remaining[ri], chainId: null };
         }
       }
@@ -630,7 +650,7 @@ export default function DetalleViaje() {
       requestSharedWorldSync();
       router.replace('/timeline');
     } catch {
-      Alert.alert('Error', 'No se pudo eliminar el viaje.');
+      Alert.alert(t('common:error'), t('detalle:errors.deleteTripError'));
       setSaving(false);
     }
   }
@@ -643,11 +663,11 @@ export default function DetalleViaje() {
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.7}>
             <Text style={styles.backIcon}>‹</Text>
-            <Text style={styles.backLabel}>Volver</Text>
+            <Text style={styles.backLabel}>{t('detalle:header.back')}</Text>
           </TouchableOpacity>
         </View>
         <View style={styles.loadingCenter}>
-          <Text style={styles.mutedText}>Cargando...</Text>
+          <Text style={styles.mutedText}>{t('detalle:loading')}</Text>
         </View>
       </View>
     );
@@ -674,7 +694,7 @@ export default function DetalleViaje() {
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.7}>
           <Text style={styles.backIcon}>‹</Text>
-          <Text style={styles.backLabel}>Volver</Text>
+          <Text style={styles.backLabel}>{t('detalle:header.back')}</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>{trip.ciudad}</Text>
       </View>
@@ -751,11 +771,11 @@ export default function DetalleViaje() {
                         <View style={styles.photoOverlay} pointerEvents="none" />
                         {isCover ? (
                           <View style={styles.coverBadge}>
-                            <Text style={styles.coverBadgeText}>◆  PORTADA</Text>
+                            <Text style={styles.coverBadgeText}>{t('detalle:gallery.coverBadge')}</Text>
                           </View>
                         ) : (
                           <View style={styles.tapHint}>
-                            <Text style={styles.tapHintText}>Tocar para hacer portada</Text>
+                            <Text style={styles.tapHintText}>{t('detalle:gallery.tapToSetCover')}</Text>
                           </View>
                         )}
                         {isCover && <View style={styles.coverFrame} pointerEvents="none" />}
@@ -773,7 +793,7 @@ export default function DetalleViaje() {
                       onPress={cancelPhotoEdits}
                       activeOpacity={0.7}
                     >
-                      <Text style={styles.photoCtrlBtnText}>Cancelar</Text>
+                      <Text style={styles.photoCtrlBtnText}>{t('common:cancel')}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.photoCtrlBtn, styles.photoCtrlBtnGold, saving && styles.saveBtnDisabled]}
@@ -782,7 +802,7 @@ export default function DetalleViaje() {
                       activeOpacity={0.7}
                     >
                       <Text style={[styles.photoCtrlBtnText, styles.photoCtrlBtnTextGold]}>
-                        {saving ? 'Guardando...' : 'Listo'}
+                        {saving ? t('common:saving') : t('detalle:gallery.done')}
                       </Text>
                     </TouchableOpacity>
                   </>
@@ -790,7 +810,7 @@ export default function DetalleViaje() {
                   <>
                     {trip.fotos.length > 1 && (
                       <View style={styles.photoCount}>
-                        <Text style={styles.photoCountText}>{trip.fotos.length} fotos</Text>
+                        <Text style={styles.photoCountText}>{t('detalle:gallery.photoCount', { count: trip.fotos.length })}</Text>
                       </View>
                     )}
                     <TouchableOpacity
@@ -798,7 +818,7 @@ export default function DetalleViaje() {
                       onPress={openEditPhotos}
                       activeOpacity={0.7}
                     >
-                      <Text style={styles.photoCtrlBtnText}>Editar fotos</Text>
+                      <Text style={styles.photoCtrlBtnText}>{t('detalle:gallery.editPhotos')}</Text>
                     </TouchableOpacity>
                   </>
                 )}
@@ -810,9 +830,9 @@ export default function DetalleViaje() {
           {!hasPhotos && (
             <View style={styles.noCoverWrap}>
               <Text style={styles.noCoverIcon}>✈</Text>
-              <Text style={styles.noCoverText}>Sin fotos</Text>
+              <Text style={styles.noCoverText}>{t('detalle:gallery.noPhotos')}</Text>
               <TouchableOpacity style={styles.photoCtrlBtn} onPress={handleAddPhotos} activeOpacity={0.7}>
-                <Text style={styles.photoCtrlBtnText}>+ Agregar fotos</Text>
+                <Text style={styles.photoCtrlBtnText}>{t('detalle:gallery.addPhotos')}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -826,10 +846,10 @@ export default function DetalleViaje() {
             {/* Ubicación */}
             <View style={[styles.infoCard, styles.locationAccent]}>
               <View style={styles.notaHeader}>
-                <Text style={styles.cardLabel}>UBICACIÓN</Text>
+                <Text style={styles.cardLabel}>{t('detalle:location.label')}</Text>
                 {!editingLocation && (
                   <TouchableOpacity onPress={openEditLocation} activeOpacity={0.7}>
-                    <Text style={styles.editLink}>Editar</Text>
+                    <Text style={styles.editLink}>{t('detalle:location.edit')}</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -840,7 +860,7 @@ export default function DetalleViaje() {
                     style={styles.locationInput}
                     value={editCiudad}
                     onChangeText={(v) => { setEditCiudad(v); setGeoStatus('idle'); }}
-                    placeholder="Ciudad"
+                    placeholder={t('detalle:location.cityPlaceholder')}
                     placeholderTextColor={MUTED}
                     autoCapitalize="words"
                   />
@@ -848,7 +868,7 @@ export default function DetalleViaje() {
                     style={styles.locationInput}
                     value={editPais}
                     onChangeText={(v) => { setEditPais(v); setGeoStatus('idle'); }}
-                    placeholder="País"
+                    placeholder={t('detalle:location.countryPlaceholder')}
                     placeholderTextColor={MUTED}
                     autoCapitalize="words"
                   />
@@ -861,6 +881,7 @@ export default function DetalleViaje() {
                           style={styles.geoOpcion}
                           onPress={() => {
                             setNewCoords({ lat: parseFloat(op.lat), lng: parseFloat(op.lon) });
+                            setNewCountryCode(op.address?.country_code?.toUpperCase());
                             setGeoStatus('encontrada');
                             setGeoOpciones([]);
                           }}
@@ -871,9 +892,9 @@ export default function DetalleViaje() {
                       ))}
                     </View>
                   )}
-                  {geoStatus === 'encontrada'    && <Text style={styles.geoOk}>✓ Ubicación confirmada</Text>}
-                  {geoStatus === 'no_encontrada' && <Text style={styles.geoError}>No se encontró. Revisá los datos.</Text>}
-                  {geoStatus === 'error'         && <Text style={styles.geoError}>Error de conexión. Intentá de nuevo.</Text>}
+                  {geoStatus === 'encontrada'    && <Text style={styles.geoOk}>{t('detalle:location.confirmed')}</Text>}
+                  {geoStatus === 'no_encontrada' && <Text style={styles.geoError}>{t('detalle:location.notFound')}</Text>}
+                  {geoStatus === 'error'         && <Text style={styles.geoError}>{t('detalle:location.connectionError')}</Text>}
 
                   <View style={styles.notaActions}>
                     <TouchableOpacity
@@ -881,7 +902,7 @@ export default function DetalleViaje() {
                       onPress={() => { setEditingLocation(false); setGeoStatus('idle'); }}
                       activeOpacity={0.7}
                     >
-                      <Text style={styles.cancelText}>Cancelar</Text>
+                      <Text style={styles.cancelText}>{t('common:cancel')}</Text>
                     </TouchableOpacity>
                     {geoStatus === 'encontrada' ? (
                       <TouchableOpacity
@@ -890,7 +911,7 @@ export default function DetalleViaje() {
                         disabled={saving}
                         activeOpacity={0.8}
                       >
-                        <Text style={styles.saveText}>{saving ? 'Guardando...' : 'Guardar'}</Text>
+                        <Text style={styles.saveText}>{saving ? t('common:saving') : t('common:save')}</Text>
                       </TouchableOpacity>
                     ) : (
                       <TouchableOpacity
@@ -899,7 +920,7 @@ export default function DetalleViaje() {
                         disabled={geoStatus === 'buscando'}
                         activeOpacity={0.8}
                       >
-                        <Text style={styles.saveText}>{geoStatus === 'buscando' ? 'Buscando...' : 'Buscar'}</Text>
+                        <Text style={styles.saveText}>{geoStatus === 'buscando' ? t('detalle:location.searching') : t('detalle:location.search')}</Text>
                       </TouchableOpacity>
                     )}
                   </View>
@@ -922,10 +943,10 @@ export default function DetalleViaje() {
             {trip.fechaInicio && (
               <View style={styles.infoCard}>
                 <View style={styles.notaHeader}>
-                  <Text style={styles.cardLabel}>FECHA DEL VIAJE</Text>
+                  <Text style={styles.cardLabel}>{t('detalle:date.label')}</Text>
                   {!editingFecha && (
                     <TouchableOpacity onPress={openEditFecha} activeOpacity={0.7}>
-                      <Text style={styles.editLink}>Editar</Text>
+                      <Text style={styles.editLink}>{t('detalle:date.edit')}</Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -937,7 +958,7 @@ export default function DetalleViaje() {
                         style={[styles.dateInput, { flex: 1 }]}
                         value={editDia}
                         onChangeText={setEditDia}
-                        placeholder="DD"
+                        placeholder={t('detalle:date.dd')}
                         placeholderTextColor={MUTED}
                         keyboardType="number-pad"
                         maxLength={2}
@@ -946,7 +967,7 @@ export default function DetalleViaje() {
                         style={[styles.dateInput, { flex: 1 }]}
                         value={editMes}
                         onChangeText={setEditMes}
-                        placeholder="MM"
+                        placeholder={t('detalle:date.mm')}
                         placeholderTextColor={MUTED}
                         keyboardType="number-pad"
                         maxLength={2}
@@ -955,7 +976,7 @@ export default function DetalleViaje() {
                         style={[styles.dateInput, { flex: 2 }]}
                         value={editAnio}
                         onChangeText={setEditAnio}
-                        placeholder="AAAA"
+                        placeholder={t('detalle:date.yyyy')}
                         placeholderTextColor={MUTED}
                         keyboardType="number-pad"
                         maxLength={4}
@@ -968,7 +989,7 @@ export default function DetalleViaje() {
                         onPress={() => setEditingFecha(false)}
                         activeOpacity={0.7}
                       >
-                        <Text style={styles.cancelText}>Cancelar</Text>
+                        <Text style={styles.cancelText}>{t('common:cancel')}</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
@@ -976,7 +997,7 @@ export default function DetalleViaje() {
                         disabled={saving}
                         activeOpacity={0.8}
                       >
-                        <Text style={styles.saveText}>{saving ? 'Guardando...' : 'Guardar'}</Text>
+                        <Text style={styles.saveText}>{saving ? t('common:saving') : t('common:save')}</Text>
                       </TouchableOpacity>
                     </View>
                   </>
@@ -989,10 +1010,10 @@ export default function DetalleViaje() {
             {/* Comentario */}
             <View style={styles.infoCard}>
               <View style={styles.notaHeader}>
-                <Text style={styles.cardLabel}>COMENTARIO</Text>
+                <Text style={styles.cardLabel}>{t('detalle:note.label')}</Text>
                 {!editingNota && (
                   <TouchableOpacity onPress={() => setEditingNota(true)} activeOpacity={0.7}>
-                    <Text style={styles.editLink}>{trip.nota ? 'Editar' : '+ Agregar'}</Text>
+                    <Text style={styles.editLink}>{trip.nota ? t('detalle:note.edit') : t('detalle:note.add')}</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -1004,7 +1025,7 @@ export default function DetalleViaje() {
                     onChangeText={setNota}
                     multiline
                     autoFocus
-                    placeholder="Escribí algo sobre este viaje..."
+                    placeholder={t('detalle:note.placeholder')}
                     placeholderTextColor={MUTED}
                     textAlignVertical="top"
                   />
@@ -1014,7 +1035,7 @@ export default function DetalleViaje() {
                       onPress={() => { setNota(trip.nota); setEditingNota(false); }}
                       activeOpacity={0.7}
                     >
-                      <Text style={styles.cancelText}>Cancelar</Text>
+                      <Text style={styles.cancelText}>{t('common:cancel')}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
@@ -1022,14 +1043,14 @@ export default function DetalleViaje() {
                       disabled={saving}
                       activeOpacity={0.8}
                     >
-                      <Text style={styles.saveText}>{saving ? 'Guardando...' : 'Guardar'}</Text>
+                      <Text style={styles.saveText}>{saving ? t('common:saving') : t('common:save')}</Text>
                     </TouchableOpacity>
                   </View>
                 </>
               ) : trip.nota ? (
                 <Text style={styles.notaText}>{trip.nota}</Text>
               ) : (
-                <Text style={styles.notaEmpty}>Sin comentario</Text>
+                <Text style={styles.notaEmpty}>{t('detalle:note.empty')}</Text>
               )}
             </View>
 
@@ -1039,10 +1060,10 @@ export default function DetalleViaje() {
               onLayout={(e) => { tipsCardYRef.current = e.nativeEvent.layout.y; }}
             >
               <View style={styles.notaHeader}>
-                <Text style={styles.cardLabel}>TIPS DE VIAJE</Text>
+                <Text style={styles.cardLabel}>{t('detalle:tips.label')}</Text>
                 {!editingTips && (
                   <TouchableOpacity onPress={() => setEditingTips(true)} activeOpacity={0.7}>
-                    <Text style={styles.editLink}>{tipsViaje ? 'Editar' : '+ Agregar'}</Text>
+                    <Text style={styles.editLink}>{tipsViaje ? t('detalle:tips.edit') : t('detalle:tips.add')}</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -1063,7 +1084,7 @@ export default function DetalleViaje() {
                     }}
                     multiline
                     maxLength={500}
-                    placeholder="Cargar datos útiles de este destino, bares, restaurantes, lugares imperdibles..."
+                    placeholder={t('detalle:tips.placeholder')}
                     placeholderTextColor="#6fa8dc"
                     textAlignVertical="top"
                   />
@@ -1073,7 +1094,7 @@ export default function DetalleViaje() {
                       onPress={() => { setTipsViaje(trip.tipsViaje || ''); setEditingTips(false); }}
                       activeOpacity={0.7}
                     >
-                      <Text style={styles.cancelText}>Cancelar</Text>
+                      <Text style={styles.cancelText}>{t('common:cancel')}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
@@ -1085,7 +1106,7 @@ export default function DetalleViaje() {
                       disabled={saving}
                       activeOpacity={0.8}
                     >
-                      <Text style={styles.saveText}>{saving ? 'Guardando...' : 'Guardar'}</Text>
+                      <Text style={styles.saveText}>{saving ? t('common:saving') : t('common:save')}</Text>
                     </TouchableOpacity>
                   </View>
                 </>
@@ -1096,13 +1117,13 @@ export default function DetalleViaje() {
                       <Text style={styles.notaText}>{tipsViaje}</Text>
                     ) : (
                       <Text style={[styles.notaEmpty, { color: '#6fa8dc' }]}>
-                        Cargar datos útiles de este destino, bares, restaurantes, lugares imperdibles...
+                        {t('detalle:tips.placeholder')}
                       </Text>
                     )}
                   </TouchableOpacity>
                   {!!tipsViaje && (
                     <TouchableOpacity style={styles.shareBtn} onPress={handleShareTips} activeOpacity={0.8}>
-                      <Text style={styles.shareBtnText}>↑ Compartir tips</Text>
+                      <Text style={styles.shareBtnText}>{t('detalle:tips.share')}</Text>
                     </TouchableOpacity>
                   )}
                 </>
@@ -1116,7 +1137,7 @@ export default function DetalleViaje() {
               activeOpacity={0.7}
               disabled={saving}
             >
-              <Text style={styles.deleteBtnText}>Eliminar viaje</Text>
+              <Text style={styles.deleteBtnText}>{t('detalle:delete.button')}</Text>
             </TouchableOpacity>
 
             <View style={styles.bottomSpacer} />

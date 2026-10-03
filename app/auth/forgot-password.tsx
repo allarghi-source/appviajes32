@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -23,6 +24,7 @@ const MUTED = '#6b7a8d';
 const DANGER = '#c0392b';
 
 export default function ForgotPassword() {
+  const { t } = useTranslation('auth');
   const router = useRouter();
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
@@ -43,7 +45,7 @@ export default function ForgotPassword() {
 
     const normalizedEmail = normalizeEmail(email);
     if (!isValidEmail(normalizedEmail)) {
-      setErrorMessage('Ingresá un email válido.');
+      setErrorMessage(t('validation.invalidEmail'));
       return;
     }
 
@@ -82,7 +84,7 @@ export default function ForgotPassword() {
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <Text style={styles.backIcon}>‹</Text>
-          <Text style={styles.backLabel}>Volver</Text>
+          <Text style={styles.backLabel}>{t('back')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -91,20 +93,20 @@ export default function ForgotPassword() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>Recuperar contraseña</Text>
+        <Text style={styles.title}>{t('forgotPassword.title')}</Text>
 
         {sent ? (
           <>
             <Text style={styles.subtitle}>
-              Si ese email tiene una cuenta, te enviamos un enlace para recuperar tu contraseña.
+              {t('forgotPassword.sentSubtitle')}
             </Text>
             <TouchableOpacity style={styles.primaryBtn} onPress={goBack} activeOpacity={0.85}>
-              <Text style={styles.primaryBtnText}>Volver</Text>
+              <Text style={styles.primaryBtnText}>{t('forgotPassword.backButton')}</Text>
             </TouchableOpacity>
           </>
         ) : (
           <>
-            <Text style={styles.subtitle}>Te enviamos un enlace para recuperar tu contraseña.</Text>
+            <Text style={styles.subtitle}>{t('forgotPassword.subtitle')}</Text>
 
             {errorMessage && (
               <View style={styles.errorBox}>
@@ -112,10 +114,10 @@ export default function ForgotPassword() {
               </View>
             )}
 
-            <Text style={styles.label}>Email</Text>
+            <Text style={styles.label}>{t('fields.email.label')}</Text>
             <TextInput
               style={styles.input}
-              placeholder="tu@email.com"
+              placeholder={t('fields.email.placeholder')}
               placeholderTextColor={MUTED}
               value={email}
               onChangeText={setEmail}
@@ -130,7 +132,7 @@ export default function ForgotPassword() {
               disabled={submitting}
               activeOpacity={0.85}
             >
-              <Text style={styles.primaryBtnText}>{submitting ? 'Enviando...' : 'Enviar enlace'}</Text>
+              <Text style={styles.primaryBtnText}>{submitting ? t('common.sending') : t('forgotPassword.submit')}</Text>
             </TouchableOpacity>
           </>
         )}
