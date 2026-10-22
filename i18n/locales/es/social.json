@@ -26,14 +26,14 @@
   },
   "scopes": {
     "options": {
-      "real": "REALIZADOS",
-      "wishlist": "WISHLIST",
-      "both": "AMBOS"
+      "real": "Viajes",
+      "wishlist": "Wishlist",
+      "both": "Todo"
     },
     "labels": {
-      "real": "Realizados",
+      "real": "Viajes",
       "wishlist": "Wishlist",
-      "both": "Ambos"
+      "both": "Todo"
     }
   },
   "pendingRequests": {
@@ -45,7 +45,7 @@
     "groupOffer": "Me compartieron su mundo",
     "accessSubtitle": "Quiere ver tu mundo",
     "offerSubtitle": "Te ofrece compartir: {{scope}}",
-    "chooseScope": "¿Qué le vas a compartir?",
+    "chooseScope": "¿Qué vas a compartir?",
     "confirm": "CONFIRMAR",
     "reject": "RECHAZAR",
     "accept": "ACEPTAR"
@@ -64,7 +64,7 @@
     "requestAccess": "QUIERO VER SU MUNDO",
     "offerSentMessage": "Invitación enviada.",
     "shareMyWorld": "COMPARTIR MI MUNDO",
-    "chooseScopeWith": "¿Qué querés compartir con @{{username}}?",
+    "chooseScopeWith": "¿Qué vas a compartir con @{{username}}?",
     "sendInvite": "ENVIAR INVITACIÓN"
   },
   "errors": {
@@ -84,5 +84,9 @@
     "requestRelationExists": "Ya existe una relación con este usuario.",
     "requestNotVerified": "Este usuario todavía no puede usar funciones sociales.",
     "requestSelf": "No podés hacer esto con tu propio usuario."
+  },
+  "passport": {
+    "accountLinkedElsewhere": "Esta cuenta está vinculada a otro MyWorldXP. Desde este pasaporte no se pueden publicar viajes.",
+    "passportLinkedToOtherAccount": "Este MyWorldXP ya está vinculado a otra cuenta de CompartirXP. No se pueden publicar viajes con esta cuenta."
   }
 }

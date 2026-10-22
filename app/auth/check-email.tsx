@@ -19,8 +19,10 @@ const RESEND_COOLDOWN_SECONDS = 30;
 export default function CheckEmail() {
   const { t } = useTranslation('auth');
   const router = useRouter();
-  const params = useLocalSearchParams<{ email?: string }>();
+  const params = useLocalSearchParams<{ email?: string; volverA?: string }>();
   const email = Array.isArray(params.email) ? params.email[0] : params.email;
+  // Origen del ingreso (ver AUTH_RETURN_TO_OTROS): se conserva hasta el login.
+  const volverA = Array.isArray(params.volverA) ? params.volverA[0] : params.volverA;
 
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
@@ -38,7 +40,7 @@ export default function CheckEmail() {
   }, [cooldown]);
 
   function goToLogin() {
-    router.replace('/auth/login');
+    router.replace(volverA ? { pathname: '/auth/login', params: { volverA } } : '/auth/login');
   }
 
   async function handleResend() {

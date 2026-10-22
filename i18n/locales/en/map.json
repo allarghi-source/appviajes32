@@ -22,6 +22,9 @@
   "otherWorld": {
     "title": "Map of @{{username}}",
     "xp": "Current XP: {{xp}}",
-    "stats": "Continents: {{continents}} · Countries: {{countries}} · Cities: {{cities}}"
+    "stats": "Continents: {{continents}} · Countries: {{countries}} · Cities: {{cities}}",
+    "continents": "Continents: {{continents}}",
+    "countries": "Countries: {{countries}}",
+    "cities": "Cities: {{cities}}"
   }
 }

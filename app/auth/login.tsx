@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -12,7 +12,13 @@ import {
   View,
 } from 'react-native';
 
-import { AUTH_FALLBACK_ROUTE, getAuthErrorMessage, isValidEmail, normalizeEmail } from '../../utils/auth';
+import {
+  AUTH_FALLBACK_ROUTE,
+  AUTH_RETURN_TO_OTROS,
+  getAuthErrorMessage,
+  isValidEmail,
+  normalizeEmail,
+} from '../../utils/auth';
 import { supabase } from '../../utils/supabase';
 
 const BG = '#01050d';
@@ -26,6 +32,8 @@ const DANGER = '#c0392b';
 export default function Login() {
   const { t } = useTranslation('auth');
   const router = useRouter();
+  const params = useLocalSearchParams<{ volverA?: string }>();
+  const volverA = Array.isArray(params.volverA) ? params.volverA[0] : params.volverA;
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
 
@@ -67,8 +75,16 @@ export default function Login() {
         return;
       }
 
-      // Éxito: todavía no hay un destino social al que entrar (CompartirXP no
-      // está conectado en este bloque), así que solo se sale de Auth.
+      // Éxito desde el acceso a mapas compartidos: al Mapa, en "Otros XP".
+      // dismissTo vuelve a la pantalla Mapa que ya está en el historial
+      // (cerrando login/registro/revisar email que quedaron encima) con el
+      // parámetro nuevo; si no estaba, la abre. Un back() acá volvía al Mapa
+      // recreado en "MyWorldXP", o a la pantalla de registro.
+      if (volverA === AUTH_RETURN_TO_OTROS) {
+        router.dismissTo({ pathname: '/mapa', params: { seccion: AUTH_RETURN_TO_OTROS } });
+        return;
+      }
+      // Cualquier otro acceso: se sale de Auth como siempre.
       if (router.canGoBack()) router.back();
       else router.replace(AUTH_FALLBACK_ROUTE);
     } catch (err) {
@@ -148,7 +164,7 @@ export default function Login() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={() => router.push('/auth/signup')}
+          onPress={() => router.push(volverA ? { pathname: '/auth/signup', params: { volverA } } : '/auth/signup')}
           activeOpacity={0.7}
           style={styles.linkWrap}
         >

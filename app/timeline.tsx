@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import NavBar from '../components/NavBar';
 import { resolveFotoUri } from '../utils/fotoPersistente';
+import { decodeFoco, timelineFocusIndex } from '../utils/postSaveFocus';
 
 const BG = '#01050d';
 const GOLD = '#d4af37';
@@ -222,6 +223,31 @@ export default function Timeline() {
   // al montar la lista (recién ahí "cambia" de nada a la tarjeta inicial).
   const centeredIndexRef = useRef<number | null>(null);
 
+  // Llegada desde Cargar con `foco` (ids del viaje recién guardado, ver
+  // utils/postSaveFocus.ts): se centra ese viaje UNA vez, sin animación (un
+  // desplazamiento animado haría vibrar cada tarjeta que pasa por el centro).
+  // Después se limpia el parámetro para que volver a Timeline no re-centre.
+  const listRef = useRef<FlatList<TimelineItem>>(null);
+  const { foco } = useLocalSearchParams<{ foco?: string }>();
+  const focoHandledRef = useRef(false);
+  const focoRetriesRef = useRef(0);
+
+  useEffect(() => {
+    if (focoHandledRef.current || items.length === 0) return;
+    const ids = decodeFoco(foco);
+    if (ids.length === 0) return;
+    focoHandledRef.current = true;
+    const index = timelineFocusIndex(items, ids);
+    router.setParams({ foco: '' });
+    // No encontrado: Timeline queda como se abre siempre.
+    if (index < 0) return;
+    requestAnimationFrame(() => {
+      // null: el primer valor de scroll fija la tarjeta centrada sin vibrar.
+      centeredIndexRef.current = null;
+      listRef.current?.scrollToIndex({ index, viewPosition: 0.5, animated: false });
+    });
+  }, [items, foco, router]);
+
   useEffect(() => {
     if (items.length === 0) return;
     centeredIndexRef.current = null;
@@ -289,8 +315,21 @@ export default function Timeline() {
           <View style={styles.axisLine} pointerEvents="none" />
 
           <FlatList
+            ref={listRef}
             data={items}
             keyExtractor={(it) => it.trip.id}
+            // Si el viaje a centrar todavía no está medido (lista larga), se
+            // salta a una posición estimada y se reintenta. Máximo 3 veces.
+            onScrollToIndexFailed={(info) => {
+              if (focoRetriesRef.current >= 3) return;
+              focoRetriesRef.current += 1;
+              centeredIndexRef.current = null;
+              listRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: false });
+              setTimeout(() => {
+                centeredIndexRef.current = null;
+                listRef.current?.scrollToIndex({ index: info.index, viewPosition: 0.5, animated: false });
+              }, 100);
+            }}
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
             scrollEventThrottle={16}

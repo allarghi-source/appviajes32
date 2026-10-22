@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -35,6 +35,9 @@ const DANGER = '#c0392b';
 export default function Signup() {
   const { t } = useTranslation('auth');
   const router = useRouter();
+  // Origen del ingreso (ver AUTH_RETURN_TO_OTROS): se conserva hasta el login.
+  const params = useLocalSearchParams<{ volverA?: string }>();
+  const volverA = Array.isArray(params.volverA) ? params.volverA[0] : params.volverA;
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
 
@@ -100,7 +103,10 @@ export default function Signup() {
         return;
       }
 
-      router.push({ pathname: '/auth/check-email', params: { email: normalizedEmail } });
+      router.push({
+        pathname: '/auth/check-email',
+        params: volverA ? { email: normalizedEmail, volverA } : { email: normalizedEmail },
+      });
     } catch (err) {
       if (!mountedRef.current) return;
       setErrorMessage(getAuthErrorMessage(err, 'signup'));
@@ -194,7 +200,7 @@ export default function Signup() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={() => router.push('/auth/login')}
+          onPress={() => router.push(volverA ? { pathname: '/auth/login', params: { volverA } } : '/auth/login')}
           activeOpacity={0.7}
           style={styles.linkWrap}
         >

@@ -26,14 +26,14 @@
   },
   "scopes": {
     "options": {
-      "real": "VISITED",
-      "wishlist": "WISHLIST",
-      "both": "BOTH"
+      "real": "Trips",
+      "wishlist": "Wishlist",
+      "both": "All"
     },
     "labels": {
-      "real": "Visited",
+      "real": "Trips",
       "wishlist": "Wishlist",
-      "both": "Both"
+      "both": "All"
     }
   },
   "pendingRequests": {
@@ -45,7 +45,7 @@
     "groupOffer": "Shared their world with me",
     "accessSubtitle": "Wants to see your world",
     "offerSubtitle": "Offers to share: {{scope}}",
-    "chooseScope": "What will you share with them?",
+    "chooseScope": "What would you like to share?",
     "confirm": "CONFIRM",
     "reject": "DECLINE",
     "accept": "ACCEPT"
@@ -64,7 +64,7 @@
     "requestAccess": "I WANT TO SEE THEIR WORLD",
     "offerSentMessage": "Invitation sent.",
     "shareMyWorld": "SHARE MY WORLD",
-    "chooseScopeWith": "What do you want to share with @{{username}}?",
+    "chooseScopeWith": "What would you like to share with @{{username}}?",
     "sendInvite": "SEND INVITATION"
   },
   "errors": {
@@ -84,5 +84,9 @@
     "requestRelationExists": "You already have a connection with this user.",
     "requestNotVerified": "This user can't use social features yet.",
     "requestSelf": "You can't do this with your own account."
+  },
+  "passport": {
+    "accountLinkedElsewhere": "This account is linked to another MyWorldXP. Trips can't be shared from this passport.",
+    "passportLinkedToOtherAccount": "This MyWorldXP is already linked to another CompartirXP account. Trips can't be shared with this account."
   }
 }

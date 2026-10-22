@@ -1,18 +1,21 @@
 import NavBar from '../components/NavBar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import i18n from '../i18n';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { AchievementPopup } from '../components/AchievementPopup';
 import { LevelUpPopup } from '../components/LevelUpPopup';
 import { Achievement, checkAndSaveAchievements } from '../utils/achievementsEngine';
-import { calcularStats, getXpRestantes, haversineKm, RankId, Trip as StatsTrip } from '../utils/statsEngine';
+import { calcularStats, getXpRestantes, RankId, Trip as StatsTrip } from '../utils/statsEngine';
 import { destinoConvertidoIndex, esConversionDeWishlist } from '../utils/wishlistConversion';
+import { CITY_AUTOCOMPLETE, findCatalogCity } from '../utils/cityCatalog';
+import { geocodeNominatim, GeoOpcion, resolveCityCandidates } from '../utils/geocoding';
+import { resolverIso2Local } from '../utils/paises';
+import { encodeFoco, postSaveScreen, PostSaveScreen } from '../utils/postSaveFocus';
 import { playSound, preloadSounds } from '../utils/soundEngine';
 import { requestSharedWorldSync } from '../utils/socialSync';
 import { TripSavedTransition } from '../components/TripSavedTransition';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -64,14 +67,6 @@ interface TripData {
   countryCode?: string;
   // Ver utils/statsEngine.ts (Trip.desdeWishlist).
   desdeWishlist?: boolean;
-}
-
-interface GeoOpcion {
-  display_name: string;
-  lat: string;
-  lon: string;
-  addresstype?: string;
-  address?: { country_code?: string };
 }
 
 interface DestinoState {
@@ -256,226 +251,12 @@ function hayBrechaExcesiva(destinos: DestinoState[]): boolean {
 }
 
 // ─── CITY AUTOCOMPLETE DATA ───────────────────────────────────────────────────
+// Las sugerencias salen del catálogo de ciudades (utils/cityCatalog.ts): mismas
+// entradas y mismo orden que el antiguo CIUDADES de este archivo.
 
 interface CityEntry { name: string; country: string; }
 
-const CIUDADES: CityEntry[] = [
-  { name: 'Abu Dhabi',           country: 'Emiratos Árabes Unidos' },
-  { name: 'Abiyán',              country: 'Costa de Marfil' },
-  { name: 'Accra',               country: 'Ghana' },
-  { name: 'Addis Abeba',         country: 'Etiopía' },
-  { name: 'Adelaide',            country: 'Australia' },
-  { name: 'Alejandría',          country: 'Egipto' },
-  { name: 'Almaty',              country: 'Kazajistán' },
-  { name: 'Ámsterdam',           country: 'Países Bajos' },
-  { name: 'Amsterdam',           country: 'Países Bajos' },
-  { name: 'Ankara',              country: 'Turquía' },
-  { name: 'Asunción',            country: 'Paraguay' },
-  { name: 'Atenas',              country: 'Grecia' },
-  { name: 'Athens',              country: 'Grecia' },
-  { name: 'Auckland',            country: 'Nueva Zelanda' },
-  { name: 'Bagdad',              country: 'Irak' },
-  { name: 'Baghdad',             country: 'Irak' },
-  { name: 'Baku',                country: 'Azerbaiyán' },
-  { name: 'Bangkok',             country: 'Tailandia' },
-  { name: 'Barcelona',           country: 'España' },
-  { name: 'Barranquilla',        country: 'Colombia' },
-  { name: 'Beirut',              country: 'Líbano' },
-  { name: 'Belgrado',            country: 'Serbia' },
-  { name: 'Belgrade',            country: 'Serbia' },
-  { name: 'Berlín',              country: 'Alemania' },
-  { name: 'Berlin',              country: 'Alemania' },
-  { name: 'Berna',               country: 'Suiza' },
-  { name: 'Bogotá',              country: 'Colombia' },
-  { name: 'Bratislava',          country: 'Eslovaquia' },
-  { name: 'Brisbane',            country: 'Australia' },
-  { name: 'Bruselas',            country: 'Bélgica' },
-  { name: 'Brussels',            country: 'Bélgica' },
-  { name: 'Bucarest',            country: 'Rumania' },
-  { name: 'Bucharest',           country: 'Rumania' },
-  { name: 'Budapest',            country: 'Hungría' },
-  { name: 'Buenos Aires',        country: 'Argentina' },
-  { name: 'El Cairo',            country: 'Egipto' },
-  { name: 'Cairo',               country: 'Egipto' },
-  { name: 'Calcuta',             country: 'India' },
-  { name: 'Calgary',             country: 'Canadá' },
-  { name: 'Cancún',              country: 'México' },
-  { name: 'Cape Town',           country: 'Sudáfrica' },
-  { name: 'Caracas',             country: 'Venezuela' },
-  { name: 'Cartagena',           country: 'Colombia' },
-  { name: 'Casablanca',          country: 'Marruecos' },
-  { name: 'Chennai',             country: 'India' },
-  { name: 'Chicago',             country: 'Estados Unidos' },
-  { name: 'Ciudad de Guatemala', country: 'Guatemala' },
-  { name: 'Ciudad de México',    country: 'México' },
-  { name: 'Ciudad del Cabo',     country: 'Sudáfrica' },
-  { name: 'Colombo',             country: 'Sri Lanka' },
-  { name: 'Copenhague',          country: 'Dinamarca' },
-  { name: 'Copenhagen',          country: 'Dinamarca' },
-  { name: 'Córdoba',             country: 'Argentina' },
-  { name: 'Córdoba',             country: 'España' },
-  { name: 'Dakar',               country: 'Senegal' },
-  { name: 'Damasco',             country: 'Siria' },
-  { name: 'Damascus',            country: 'Siria' },
-  { name: 'Delhi',               country: 'India' },
-  { name: 'Denver',              country: 'Estados Unidos' },
-  { name: 'Doha',                country: 'Catar' },
-  { name: 'Dubái',               country: 'Emiratos Árabes Unidos' },
-  { name: 'Dubai',               country: 'Emiratos Árabes Unidos' },
-  { name: 'Dublín',              country: 'Irlanda' },
-  { name: 'Dublin',              country: 'Irlanda' },
-  { name: 'Durban',              country: 'Sudáfrica' },
-  { name: 'Düsseldorf',          country: 'Alemania' },
-  { name: 'Edmonton',            country: 'Canadá' },
-  { name: 'Estambul',            country: 'Turquía' },
-  { name: 'Istanbul',            country: 'Turquía' },
-  { name: 'Filadelfia',          country: 'Estados Unidos' },
-  { name: 'Philadelphia',        country: 'Estados Unidos' },
-  { name: 'Florencia',           country: 'Italia' },
-  { name: 'Florence',            country: 'Italia' },
-  { name: 'Frankfurt',           country: 'Alemania' },
-  { name: 'Ginebra',             country: 'Suiza' },
-  { name: 'Geneva',              country: 'Suiza' },
-  { name: 'Glasgow',             country: 'Reino Unido' },
-  { name: 'Guadalajara',         country: 'México' },
-  { name: 'Guadalajara',         country: 'España' },
-  { name: 'Guayaquil',           country: 'Ecuador' },
-  { name: 'La Habana',           country: 'Cuba' },
-  { name: 'Havana',              country: 'Cuba' },
-  { name: 'Hamburgo',            country: 'Alemania' },
-  { name: 'Hamburg',             country: 'Alemania' },
-  { name: 'Hanói',               country: 'Vietnam' },
-  { name: 'Hanoi',               country: 'Vietnam' },
-  { name: 'Helsinki',            country: 'Finlandia' },
-  { name: 'Hong Kong',           country: 'China' },
-  { name: 'Houston',             country: 'Estados Unidos' },
-  { name: 'Hyderabad',           country: 'India' },
-  { name: 'Islamabad',           country: 'Pakistán' },
-  { name: 'Jacarta',             country: 'Indonesia' },
-  { name: 'Jakarta',             country: 'Indonesia' },
-  { name: 'Johannesburgo',       country: 'Sudáfrica' },
-  { name: 'Johannesburg',        country: 'Sudáfrica' },
-  { name: 'Kabul',               country: 'Afganistán' },
-  { name: 'Karachi',             country: 'Pakistán' },
-  { name: 'Katmandú',            country: 'Nepal' },
-  { name: 'Kathmandu',           country: 'Nepal' },
-  { name: 'Kiev',                country: 'Ucrania' },
-  { name: 'Kinshasa',            country: 'Congo' },
-  { name: 'Kuala Lumpur',        country: 'Malasia' },
-  { name: 'Lagos',               country: 'Nigeria' },
-  { name: 'La Paz',              country: 'Bolivia' },
-  { name: 'Lima',                country: 'Perú' },
-  { name: 'Lisboa',              country: 'Portugal' },
-  { name: 'Lisbon',              country: 'Portugal' },
-  { name: 'Ljubljana',           country: 'Eslovenia' },
-  { name: 'Londres',             country: 'Reino Unido' },
-  { name: 'London',              country: 'Reino Unido' },
-  { name: 'Los Ángeles',         country: 'Estados Unidos' },
-  { name: 'Los Angeles',         country: 'Estados Unidos' },
-  { name: 'Luanda',              country: 'Angola' },
-  { name: 'Luxemburgo',          country: 'Luxemburgo' },
-  { name: 'Luxembourg',          country: 'Luxemburgo' },
-  { name: 'Madrid',              country: 'España' },
-  { name: 'Managua',             country: 'Nicaragua' },
-  { name: 'Manila',              country: 'Filipinas' },
-  { name: 'Marrakech',           country: 'Marruecos' },
-  { name: 'Medellín',            country: 'Colombia' },
-  { name: 'Melbourne',           country: 'Australia' },
-  { name: 'Mexico City',         country: 'México' },
-  { name: 'Miami',               country: 'Estados Unidos' },
-  { name: 'Milán',               country: 'Italia' },
-  { name: 'Milan',               country: 'Italia' },
-  { name: 'Minsk',               country: 'Bielorrusia' },
-  { name: 'Montevideo',          country: 'Uruguay' },
-  { name: 'Montreal',            country: 'Canadá' },
-  { name: 'Moscú',               country: 'Rusia' },
-  { name: 'Moscow',              country: 'Rusia' },
-  { name: 'Mumbai',              country: 'India' },
-  { name: 'Múnich',              country: 'Alemania' },
-  { name: 'Munich',              country: 'Alemania' },
-  { name: 'Nairobi',             country: 'Kenia' },
-  { name: 'Nápoles',             country: 'Italia' },
-  { name: 'Naples',              country: 'Italia' },
-  { name: 'Nashville',           country: 'Estados Unidos' },
-  { name: 'Nueva Delhi',         country: 'India' },
-  { name: 'New Delhi',           country: 'India' },
-  { name: 'Nueva Orleans',       country: 'Estados Unidos' },
-  { name: 'New Orleans',         country: 'Estados Unidos' },
-  { name: 'Nueva York',          country: 'Estados Unidos' },
-  { name: 'New York',            country: 'Estados Unidos' },
-  { name: 'Osaka',               country: 'Japón' },
-  { name: 'Oslo',                country: 'Noruega' },
-  { name: 'Ottawa',              country: 'Canadá' },
-  { name: 'Panamá',              country: 'Panamá' },
-  { name: 'París',               country: 'Francia' },
-  { name: 'Paris',               country: 'Francia' },
-  { name: 'Pekín',               country: 'China' },
-  { name: 'Beijing',             country: 'China' },
-  { name: 'Perth',               country: 'Australia' },
-  { name: 'Porto Alegre',        country: 'Brasil' },
-  { name: 'Praga',               country: 'República Checa' },
-  { name: 'Prague',              country: 'República Checa' },
-  { name: 'Quito',               country: 'Ecuador' },
-  { name: 'Riga',                country: 'Letonia' },
-  { name: 'Río de Janeiro',      country: 'Brasil' },
-  { name: 'Rio de Janeiro',      country: 'Brasil' },
-  { name: 'Roma',                country: 'Italia' },
-  { name: 'Rome',                country: 'Italia' },
-  { name: 'Rosario',             country: 'Argentina' },
-  { name: 'Rotterdam',           country: 'Países Bajos' },
-  { name: 'Saint Petersburg',    country: 'Rusia' },
-  { name: 'San Francisco',       country: 'Estados Unidos' },
-  { name: 'San José',            country: 'Costa Rica' },
-  { name: 'San Juan',            country: 'Puerto Rico' },
-  { name: 'San Petersburgo',     country: 'Rusia' },
-  { name: 'San Salvador',        country: 'El Salvador' },
-  { name: 'Santiago',            country: 'Chile' },
-  { name: 'Santiago de Chile',   country: 'Chile' },
-  { name: 'Santo Domingo',       country: 'República Dominicana' },
-  { name: 'São Paulo',           country: 'Brasil' },
-  { name: 'Seattle',             country: 'Estados Unidos' },
-  { name: 'Seúl',                country: 'Corea del Sur' },
-  { name: 'Seoul',               country: 'Corea del Sur' },
-  { name: 'Shanghái',            country: 'China' },
-  { name: 'Shanghai',            country: 'China' },
-  { name: 'Singapur',            country: 'Singapur' },
-  { name: 'Singapore',           country: 'Singapur' },
-  { name: 'Sofía',               country: 'Bulgaria' },
-  { name: 'Sofia',               country: 'Bulgaria' },
-  { name: 'Sídney',              country: 'Australia' },
-  { name: 'Sydney',              country: 'Australia' },
-  { name: 'Taipéi',              country: 'Taiwán' },
-  { name: 'Taipei',              country: 'Taiwán' },
-  { name: 'Tallin',              country: 'Estonia' },
-  { name: 'Tallinn',             country: 'Estonia' },
-  { name: 'Tbilisi',             country: 'Georgia' },
-  { name: 'Tegucigalpa',         country: 'Honduras' },
-  { name: 'Teherán',             country: 'Irán' },
-  { name: 'Tehran',              country: 'Irán' },
-  { name: 'Tel Aviv',            country: 'Israel' },
-  { name: 'Tokio',               country: 'Japón' },
-  { name: 'Tokyo',               country: 'Japón' },
-  { name: 'Toronto',             country: 'Canadá' },
-  { name: 'Túnez',               country: 'Túnez' },
-  { name: 'Tunis',               country: 'Túnez' },
-  { name: 'Valencia',            country: 'España' },
-  { name: 'Valencia',            country: 'Venezuela' },
-  { name: 'Vancouver',           country: 'Canadá' },
-  { name: 'Varsovia',            country: 'Polonia' },
-  { name: 'Warsaw',              country: 'Polonia' },
-  { name: 'Venecia',             country: 'Italia' },
-  { name: 'Venice',              country: 'Italia' },
-  { name: 'Viena',               country: 'Austria' },
-  { name: 'Vienna',              country: 'Austria' },
-  { name: 'Vilna',               country: 'Lituania' },
-  { name: 'Vilnius',             country: 'Lituania' },
-  { name: 'Washington D.C.',     country: 'Estados Unidos' },
-  { name: 'Yereván',             country: 'Armenia' },
-  { name: 'Yerevan',             country: 'Armenia' },
-  { name: 'Zagreb',              country: 'Croacia' },
-  { name: 'Zúrich',              country: 'Suiza' },
-  { name: 'Zurich',              country: 'Suiza' },
-];
+const CIUDADES: readonly CityEntry[] = CITY_AUTOCOMPLETE;
 
 function normalizarTexto(s: string): string {
   return s.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -490,69 +271,10 @@ function getPaisesPorCiudad(cityName: string, extra: CityEntry[] = []): string[]
   )];
 }
 
-// ─── GEOCODING (Nominatim) ────────────────────────────────────────────────────
-
-async function geocodeNominatim(query: string, limit: number): Promise<GeoOpcion[]> {
-  const q = encodeURIComponent(query);
-  // Idioma activo de la app, no el del dispositivo -- decisión de producto ya
-  // cerrada. addressdetails=1 no agrega ninguna llamada extra: es el mismo
-  // request, sólo trae además el country_code que puebla TripData.countryCode.
-  const lang = i18n.language === 'en' ? 'en' : 'es';
-  const res = await fetch(
-    `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=${limit}&addressdetails=1`,
-    { headers: { 'User-Agent': 'MyWorldXP/1.0', 'Accept-Language': lang } }
-  );
-  return res.json();
-}
-
-// ─── DEDUPLICACIÓN POR PROXIMIDAD ──────────────────────────────────────────────
-// Nominatim puede devolver varias representaciones administrativas del mismo
-// destino físico (ej: el punto-ciudad y el polígono de la comarca/distrito que
-// la contiene) con display_name distinto pero coordenadas casi idénticas. Se
-// agrupan por distancia (Haversine) en vez de por texto: dentro del umbral son
-// el mismo destino, más allá son localidades realmente distintas. Único punto
-// de esta lógica: lo usan tanto el flujo de viaje simple como el multidestino.
-const GEO_DEDUP_KM = 9;
-
-function agruparResultadosGeo(data: GeoOpcion[]): GeoOpcion[] {
-  const grupos: GeoOpcion[][] = [];
-
-  for (const opt of data) {
-    const lat = parseFloat(opt.lat);
-    const lng = parseFloat(opt.lon);
-    const grupoExistente = grupos.find((g) => {
-      const rep = g[0];
-      return haversineKm({ lat, lng }, { lat: parseFloat(rep.lat), lng: parseFloat(rep.lon) }) <= GEO_DEDUP_KM;
-    });
-    if (grupoExistente) grupoExistente.push(opt);
-    else grupos.push([opt]);
-  }
-
-  // Un representante por grupo: el primero en el orden de relevancia que ya
-  // devuelve Nominatim (primer resultado que originó ese grupo).
-  return grupos.map((g) => g[0]);
-}
-
-// ─── FILTRO DE GRANULARIDAD (CIUDAD VS ENTIDAD ADMINISTRATIVA AMPLIA) ─────────
-// Nominatim puede devolver, para el mismo nombre, tanto la ciudad (addresstype
-// "city"/"town"/"village") como la provincia/estado/país que la contiene
-// (addresstype "state"/"region"/"country"/"province"/"county") con centroides
-// realmente distintos (ej. "Río de Janeiro" ciudad vs "Río de Janeiro" estado,
-// a ~100km de distancia). Es un problema distinto del que resuelve el
-// agrupamiento por distancia: acá no son representaciones equivalentes del
-// mismo lugar, son entidades administrativas distintas con el mismo nombre.
-// Cuando hay al menos un resultado a nivel ciudad, se descartan las entidades
-// administrativas amplias para no ofrecerlas como alternativa real. Único
-// punto de esta lógica: lo usan tanto el flujo de viaje simple como el
-// multidestino, igual que agruparResultadosGeo.
-const GEO_CITY_TYPES = new Set(['city', 'town', 'village', 'municipality', 'hamlet']);
-const GEO_BROAD_ADMIN_TYPES = new Set(['state', 'region', 'country', 'province', 'county']);
-
-function filtrarGranularidadGeo(data: GeoOpcion[]): GeoOpcion[] {
-  const hayResultadoCiudad = data.some((d) => d.addresstype && GEO_CITY_TYPES.has(d.addresstype));
-  if (!hayResultadoCiudad) return data;
-  return data.filter((d) => !(d.addresstype && GEO_BROAD_ADMIN_TYPES.has(d.addresstype)));
-}
+// ─── GEOCODING ────────────────────────────────────────────────────────────────
+// Catálogo primero (coordenada de referencia fija, sin consultar a nadie); si
+// no está, el proveedor compartido con la residencia del perfil, restringido
+// al país escrito cuando se lo reconoce (ver utils/geocoding.ts).
 
 // ─── DROPDOWN LIST COMPONENT ──────────────────────────────────────────────────
 
@@ -777,10 +499,26 @@ function DestinoBlock({
   }
 
   async function verificarUbicacion(ciudadTxt: string, paisTxt: string) {
+    // Ciudad del catálogo: coordenada de referencia fija, sin consultar al
+    // proveedor ni pedir confirmación.
+    const iso2 = resolverIso2Local(paisTxt);
+    const catalogo = findCatalogCity(ciudadTxt, iso2);
+    if (catalogo) {
+      onChange({
+        coords: { lat: catalogo.lat, lng: catalogo.lng },
+        countryCode: catalogo.iso2,
+        geoNombre: `${ciudadTxt}, ${paisTxt}`,
+        geoStatus: 'encontrada',
+        geoOpciones: [],
+        geoSoloPais: false,
+      });
+      onLearnCity(ciudadTxt, paisTxt);
+      return;
+    }
     onChange({ geoStatus: 'buscando', coords: null, countryCode: undefined, geoNombre: '', geoOpciones: [], geoSoloPais: false });
     try {
-      const data = await geocodeNominatim(`${ciudadTxt}, ${paisTxt}`, 5);
-      const agrupados = agruparResultadosGeo(filtrarGranularidadGeo(data));
+      const data = await geocodeNominatim(`${ciudadTxt}, ${paisTxt}`, 5, iso2 ?? undefined);
+      const agrupados = resolveCityCandidates(data, ciudadTxt);
       if (agrupados.length === 1) {
         onChange({
           coords: { lat: parseFloat(agrupados[0].lat), lng: parseFloat(agrupados[0].lon) },
@@ -1060,15 +798,14 @@ function DestinoBlock({
                   <TouchableOpacity
                     key={i}
                     activeOpacity={0.9}
+                    delayLongPress={800}
                     onLongPress={() => {
-                      Alert.alert(
-                        t('cargar:photos.setCoverTitle'),
-                        t('cargar:photos.setCoverMessage'),
-                        [
-                          { text: t('common:cancel'), style: 'cancel' },
-                          { text: t('cargar:photos.setCoverConfirm'), onPress: () => onChange({ portada: uri }) },
-                        ]
-                      );
+                      // Mismo menú que con una ciudad: elegir como portada / cancelar.
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      Alert.alert(isPortada ? t('cargar:photos.alreadyCover') : t('cargar:photos.menuTitle'), undefined, [
+                        ...(isPortada ? [] : [{ text: t('cargar:photos.setCoverOption'), onPress: () => onChange({ portada: uri }) }]),
+                        { text: t('common:cancel'), style: 'cancel' as const },
+                      ]);
                     }}
                     style={styles.photoWrapper}
                   >
@@ -1202,6 +939,7 @@ const THUMB_TRAVEL = TRACK_W - THUMB_D - 4;
 
 export default function CargarViaje() {
   const { t } = useTranslation(['cargar', 'common']);
+  const router = useRouter();
   // Parámetros opcionales cuando se llega desde el mapa (pin wishlist)
   const {
     ciudad: pCiudad = '',
@@ -1256,6 +994,24 @@ export default function CargarViaje() {
   const [activeTransition, setActiveTransition] = useState<'real' | 'wishlist' | null>(null);
   const pendingAchievementsRef = useRef<RankId | null>(null);
 
+  // Navegación después de guardar (ver utils/postSaveFocus.ts): a dónde ir y
+  // qué viajes enfocar. Se arma al guardar y se ejecuta recién cuando la
+  // transición terminó, los logros/nivel ya se evaluaron (`navArmed`) y no
+  // queda ningún aviso en pantalla (`notifQueue` vacía).
+  const pendingNavRef = useRef<{ screen: PostSaveScreen; ids: string[] } | null>(null);
+  const [navArmed, setNavArmed] = useState(false);
+
+  useEffect(() => {
+    if (!navArmed || notifQueue.length > 0) return;
+    const nav = pendingNavRef.current;
+    pendingNavRef.current = null;
+    if (!nav) return;
+    router.push({
+      pathname: nav.screen === 'timeline' ? '/timeline' : '/mapa',
+      params: { foco: encodeFoco(nav.ids) },
+    });
+  }, [navArmed, notifQueue.length, router]);
+
   useEffect(() => {
     AsyncStorage.getItem('learned_cities').then(raw => {
       if (raw) setLearnedCities(JSON.parse(raw));
@@ -1283,11 +1039,14 @@ export default function CargarViaje() {
   // chequeo de logros/nivel pendiente, se dispara -- nunca durante la
   // transición ni detrás de ella. El ref se limpia enseguida para que no
   // pueda disparar dos veces.
-  function handleTransitionDone() {
+  async function handleTransitionDone() {
     setActiveTransition(null);
     const prevRangoId = pendingAchievementsRef.current;
     pendingAchievementsRef.current = null;
-    if (prevRangoId !== null) _checkAchievements(prevRangoId);
+    // Primero se encolan los avisos de logros/nivel (si los hay); recién
+    // después se habilita la navegación, que espera a que se cierren todos.
+    if (prevRangoId !== null) await _checkAchievements(prevRangoId);
+    setNavArmed(true);
   }
 
   const toggleAnim = useRef(new Animated.Value(0)).current;
@@ -1438,6 +1197,7 @@ export default function CargarViaje() {
       const destinoConvertido = esConversionDeWishlist(tripsAntes, pWishlistId, tipo)
         ? destinoConvertidoIndex(tripsAntes, pWishlistId, destinos)
         : -1;
+      const savedIds: string[] = [];
       for (let di = 0; di < destinos.length; di++) {
         const d = destinos[di];
         console.log(`[FinalizarViaje] Step 2: copiando fotos del destino ${di + 1}/${destinos.length}`);
@@ -1466,6 +1226,7 @@ export default function CargarViaje() {
         if (di === destinoConvertido) trip.desdeWishlist = true;
         console.log(`[FinalizarViaje] Step 4: guardando en AsyncStorage destino ${di + 1}`);
         await saveTrip(trip);
+        savedIds.push(trip.id);
         console.log(`[FinalizarViaje] Destino ${di + 1} guardado OK`);
       }
       if (pWishlistId) await deleteWishlistTrip(pWishlistId);
@@ -1487,6 +1248,8 @@ export default function CargarViaje() {
       // handleTransitionDone).
       if (activeTransition === null) {
         pendingAchievementsRef.current = prevStats.rangoActualId;
+        pendingNavRef.current = { screen: postSaveScreen(tipo), ids: savedIds };
+        setNavArmed(false);
         setActiveTransition(tipo);
       }
     } catch (err) {
@@ -1594,9 +1357,21 @@ export default function CargarViaje() {
     setGeoNombre('');
     setGeoOpciones([]);
     setGeoSoloPais(false);
+    // Ciudad del catálogo: coordenada de referencia fija, sin consultar al
+    // proveedor ni pedir confirmación.
+    const iso2 = resolverIso2Local(paisTxt);
+    const catalogo = findCatalogCity(ciudadTxt, iso2);
+    if (catalogo) {
+      setCoords({ lat: catalogo.lat, lng: catalogo.lng });
+      setCountryCode(catalogo.iso2);
+      setGeoNombre(`${ciudadTxt}, ${paisTxt}`);
+      setGeoStatus('encontrada');
+      guardarCiudadAprendida(ciudadTxt, paisTxt);
+      return;
+    }
     try {
-      const data = await geocodeNominatim(`${ciudadTxt}, ${paisTxt}`, 5);
-      const agrupados = agruparResultadosGeo(filtrarGranularidadGeo(data));
+      const data = await geocodeNominatim(`${ciudadTxt}, ${paisTxt}`, 5, iso2 ?? undefined);
+      const agrupados = resolveCityCandidates(data, ciudadTxt);
       if (agrupados.length === 1) {
         setCoords({ lat: parseFloat(agrupados[0].lat), lng: parseFloat(agrupados[0].lon) });
         setCountryCode(agrupados[0].address?.country_code?.toUpperCase());
@@ -1694,6 +1469,16 @@ export default function CargarViaje() {
     const removedUri = fotos[index];
     setFotos((prev) => prev.filter((_, i) => i !== index));
     if (portadaUri === removedUri) setPortadaUri(null);
+  }
+
+  // Menú de una foto (pulsación larga): elegir como portada / cancelar. Si ya
+  // es la portada, el título lo indica y no se vuelve a ofrecer.
+  function openPhotoMenu(uri: string, isPortada: boolean) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Alert.alert(isPortada ? t('cargar:photos.alreadyCover') : t('cargar:photos.menuTitle'), undefined, [
+      ...(isPortada ? [] : [{ text: t('cargar:photos.setCoverOption'), onPress: () => setPortadaUri(uri) }]),
+      { text: t('common:cancel'), style: 'cancel' as const },
+    ]);
   }
 
   function validate(): boolean {
@@ -1841,6 +1626,8 @@ export default function CargarViaje() {
       // termina (ver handleTransitionDone) -- nunca durante ni detrás de ella.
       if (activeTransition === null) {
         pendingAchievementsRef.current = prevStats.rangoActualId;
+        pendingNavRef.current = { screen: postSaveScreen(tipo), ids: [trip.id] };
+        setNavArmed(false);
         setActiveTransition(tipo);
       }
     } catch (err) {
@@ -2080,16 +1867,8 @@ export default function CargarViaje() {
                         <TouchableOpacity
                           key={i}
                           activeOpacity={0.9}
-                          onLongPress={() => {
-                            Alert.alert(
-                              t('cargar:photos.setCoverTitle'),
-                              t('cargar:photos.setCoverMessage'),
-                              [
-                                { text: t('common:cancel'), style: 'cancel' },
-                                { text: t('cargar:photos.setCoverConfirm'), onPress: () => setPortadaUri(uri) },
-                              ]
-                            );
-                          }}
+                          delayLongPress={800}
+                          onLongPress={() => openPhotoMenu(uri, isPortada)}
                           style={styles.photoWrapper}
                         >
                           <Image source={{ uri }} style={styles.photoThumb} />

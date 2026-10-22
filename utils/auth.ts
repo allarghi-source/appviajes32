@@ -41,6 +41,13 @@ export function isValidPassword(password: string): boolean {
 // actual de la app tras el onboarding.
 export const AUTH_FALLBACK_ROUTE = '/passportinside' as const;
 
+// Origen del ingreso: cuando Auth se abre desde CompartirXP (sección Mapa)
+// para acceder a los mapas compartidos, viaja como parámetro `volverA` por
+// login / registro / revisar email. Un login exitoso con este origen vuelve
+// al Mapa directamente en "Otros XP" (ver app/auth/login.tsx y app/mapa.tsx).
+// Sin este origen, Auth se comporta como siempre.
+export const AUTH_RETURN_TO_OTROS = 'otros' as const;
+
 // ─── ERRORES ──────────────────────────────────────────────────────────────────
 // Los AuthError de Supabase traen `code` estructurado para la mayoría de los
 // casos (ver @supabase/auth-js/lib/error-codes.ts), pero un fallo dentro del

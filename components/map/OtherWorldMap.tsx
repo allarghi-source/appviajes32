@@ -6,6 +6,7 @@ import MapView, { Marker } from 'react-native-maps';
 import { getSocialLoadErrorMessage } from '../../utils/social';
 import { buildSharedPlaces, fetchSharedWorld, SharedOwner, SharedWorld } from '../../utils/sharedWorld';
 import { playSound } from '../../utils/soundEngine';
+import PinSheetHeader from './PinSheetHeader';
 import { PinReal, PinWishlist, WORLD } from './Pins';
 
 const GOLD = '#d4af37';
@@ -132,18 +133,29 @@ export default function OtherWorldMap({
           </MapView>
 
           {/* Recuadro flotante: no recibe toques, el mapa sigue navegable. */}
-          <View style={styles.statsCard} pointerEvents="none">
-            <Text style={styles.statsTitle} numberOfLines={1}>
-              {t('map:otherWorld.title', { username })}
-            </Text>
-            <Text style={styles.statsLine}>{t('map:otherWorld.xp', { xp: world.stats.xpTotal })}</Text>
-            <Text style={styles.statsLine}>
-              {t('map:otherWorld.stats', {
-                continents: world.stats.continentes,
-                countries: world.stats.paises,
-                cities: world.stats.ciudades,
-              })}
-            </Text>
+          <View style={styles.statsWrap} pointerEvents="none">
+            <View style={styles.statsCard}>
+              <Text style={styles.statsTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                {t('map:otherWorld.title', { username })}
+              </Text>
+              {/* Etiqueta y número en el mismo <Text>: mismo tamaño siempre. */}
+              <View style={styles.statsRow}>
+                <Text style={styles.statsCell} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                  {t('map:otherWorld.xp', { xp: world.stats.xpTotal })}
+                </Text>
+                <Text style={styles.statsCell} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                  {t('map:otherWorld.continents', { continents: world.stats.continentes })}
+                </Text>
+              </View>
+              <View style={styles.statsRow}>
+                <Text style={styles.statsCell} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                  {t('map:otherWorld.countries', { countries: world.stats.paises })}
+                </Text>
+                <Text style={styles.statsCell} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                  {t('map:otherWorld.cities', { cities: world.stats.ciudades })}
+                </Text>
+              </View>
+            </View>
           </View>
 
           {/* Hoja del pin: solo lugar, fechas realizadas visibles y A REPETIR. */}
@@ -156,23 +168,14 @@ export default function OtherWorldMap({
               />
               <View style={styles.overlayCard}>
                 <View style={styles.overlayHandle} />
-                <View style={styles.overlayHeader}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.overlayCity}>{selectedPlace.ciudad}</Text>
-                    <Text style={styles.overlayCountry}>{selectedPlace.pais}</Text>
-                  </View>
-                  <TouchableOpacity
-                    style={styles.overlayCloseBtn}
-                    onPress={() => setSelectedKey(null)}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  >
-                    <Text style={styles.overlayCloseText}>✕</Text>
-                  </TouchableOpacity>
-                </View>
+                <PinSheetHeader
+                  city={selectedPlace.ciudad}
+                  country={selectedPlace.pais}
+                  onClose={() => setSelectedKey(null)}
+                />
 
                 {(selectedPlace.fechas.length > 0 || selectedPlace.aRepetir) && (
                   <ScrollView
-                    style={styles.overlayScroll}
                     contentContainerStyle={styles.overlayBody}
                     nestedScrollEnabled
                     showsVerticalScrollIndicator={false}
@@ -228,20 +231,28 @@ const styles = StyleSheet.create({
   mapWrap: { flex: 1 },
   map: { flex: 1 },
 
-  statsCard: {
+  // Contenedor de ancho completo (menos márgenes) que centra el cuadro y
+  // le pone un tope en pantallas anchas.
+  statsWrap: {
     position: 'absolute',
     top: 12,
     left: 12,
-    maxWidth: '80%',
+    right: 12,
+    alignItems: 'center',
+  },
+  statsCard: {
+    width: '100%',
+    maxWidth: 460,
     backgroundColor: 'rgba(13,26,46,0.92)',
     borderColor: 'rgba(212,175,55,0.45)',
     borderWidth: 1,
-    borderRadius: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
   },
-  statsTitle: { fontSize: 13, fontWeight: '700', color: GOLD, letterSpacing: 0.3 },
-  statsLine: { fontSize: 11, color: GOLD, opacity: 0.85, marginTop: 3 },
+  statsTitle: { fontSize: 17, fontWeight: '700', color: GOLD, letterSpacing: 0.3 },
+  statsRow: { flexDirection: 'row', marginTop: 8, gap: 12 },
+  statsCell: { flex: 1, fontSize: 15, fontWeight: '600', color: GOLD, opacity: 0.9 },
 
   overlayWrap: {
     position: 'absolute',
@@ -277,38 +288,23 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 4,
   },
-  overlayHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingHorizontal: 18,
-    paddingTop: 10,
-    paddingBottom: 12,
-    borderBottomWidth: 0.5,
-    borderBottomColor: 'rgba(212,175,55,0.12)',
-  },
-  overlayCity: { fontSize: 16, fontWeight: '700', color: '#e8e0d0', letterSpacing: 0.3 },
-  overlayCountry: { fontSize: 12, color: '#4a5a6a', marginTop: 2 },
-  overlayCloseBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.07)',
+  // Fechas y etiqueta centradas bajo el encabezado.
+  overlayBody: {
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 2,
+    gap: 6,
+    paddingHorizontal: 18,
+    paddingTop: 14,
+    paddingBottom: 20,
   },
-  overlayCloseText: { fontSize: 12, color: '#6b7a8d', fontWeight: '700' },
-  overlayScroll: { paddingTop: 4 },
-  overlayBody: { paddingHorizontal: 18, paddingVertical: 12, paddingBottom: 24 },
 
-  dateText: { fontSize: 11, color: GOLD, fontWeight: '600', letterSpacing: 0.3, marginTop: 3 },
+  dateText: { fontSize: 11, color: GOLD, fontWeight: '600', letterSpacing: 0.3, textAlign: 'center' },
   badge: {
-    alignSelf: 'flex-start',
+    alignSelf: 'center',
     backgroundColor: 'rgba(212,175,55,0.12)',
     borderRadius: 4,
     paddingVertical: 2,
     paddingHorizontal: 6,
-    marginTop: 8,
+    marginTop: 2,
   },
   badgeText: { fontSize: 9, color: GOLD, fontWeight: '700', letterSpacing: 1 },
 });

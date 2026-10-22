@@ -18,7 +18,8 @@ import {
   View,
 } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
-import { GeoOpcion, geocodeNominatim } from '../../utils/geocoding';
+import { findCatalogCity } from '../../utils/cityCatalog';
+import { GeoOpcion, geocodeNominatim, resolveCityCandidates } from '../../utils/geocoding';
 import { copiarFotoPersistente, PERFIL_DIR, resolveFotoUri } from '../../utils/fotoPersistente';
 import { buscarPaises, getPaisPorIso2, Pais } from '../../utils/paises';
 
@@ -136,10 +137,29 @@ export default function Profile() {
     const cTrim = cInput.trim();
     if (!cTrim) return { tipo: 'indefinido' };
     if (validandoRef.current) return { tipo: 'indefinido' };
+    // Ciudad del catálogo: coordenada de referencia fija (la misma que usa
+    // Cargar), sin consultar al proveedor ni pedir confirmación.
+    const catalogo = findCatalogCity(cTrim, paisSel.iso2);
+    if (catalogo) {
+      const confirmada: UbicacionConfirmada = {
+        ciudad: cTrim,
+        pais: paisSel.nombre,
+        countryCode: paisSel.iso2,
+        lat: catalogo.lat,
+        lng: catalogo.lng,
+      };
+      setUbicacionConfirmada(confirmada);
+      setGeoStatus('encontrada');
+      setGeoOpciones([]);
+      return { tipo: 'ok', ubicacion: confirmada };
+    }
     validandoRef.current = true;
     setGeoStatus('validando');
     try {
-      const data = await geocodeNominatim(`${cTrim}, ${paisSel.nombre}`, 5, paisSel.iso2);
+      const raw = await geocodeNominatim(`${cTrim}, ${paisSel.nombre}`, 5, paisSel.iso2);
+      // Una opción por localidad realmente distinta: las representaciones
+      // administrativas de una misma ciudad no son opciones (ver utils/geocoding.ts).
+      const data = resolveCityCandidates(raw, cTrim);
 
       // Si el usuario cambió la ciudad o el país mientras esperábamos la respuesta,
       // descartamos el resultado: no puede confirmar una ubicación que ya no está vigente.

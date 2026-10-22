@@ -6,8 +6,8 @@
   "toggle": {
     "real": "Ya lo hice",
     "wishlist": "Lo quiero hacer",
-    "singleCity": "Visité una ciudad",
-    "multiCity": "Visité más de una ciudad"
+    "singleCity": "Una ciudad",
+    "multiCity": "Más de una ciudad"
   },
   "months": {
     "1": "ENE", "2": "FEB", "3": "MAR", "4": "ABR",
@@ -54,7 +54,10 @@
     "coverBadge": "Portada",
     "firstPhotoHint": "La primera foto será la portada del viaje.",
     "chooseFromGallery": "Elegir de galería",
-    "takePhoto": "Tomar foto"
+    "takePhoto": "Tomar foto",
+    "menuTitle": "Foto",
+    "alreadyCover": "Esta foto ya es la portada",
+    "setCoverOption": "Elegir como portada"
   },
   "note": {
     "label": "Nota",

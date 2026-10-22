@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from './backupEngine';
+import { getPassportId } from './passportIdentity';
 import { calcularStats, type Trip } from './statsEngine';
 import { supabase } from './supabase';
 
@@ -107,6 +108,85 @@ async function readLocalTrips(): Promise<Trip[]> {
   return raw ? (JSON.parse(raw) as Trip[]) : [];
 }
 
+// ─── VÍNCULO PASAPORTE ↔ CUENTA ───────────────────────────────────────────────
+// Antes de publicar, la cuenta autenticada tiene que estar vinculada a ESTE
+// pasaporte (public.passport_links, validado en el servidor). Si ninguno de
+// los dos tiene vínculo, se vincula automáticamente y en silencio. Si hay un
+// conflicto, NO se publica y CompartirXP muestra el aviso; los viajes locales
+// no se tocan. Nunca se reasigna un vínculo existente (el servidor lo impide).
+
+export type PassportConflict = 'account_linked_elsewhere' | 'passport_linked_to_other_account';
+
+// Vínculo ya confirmado en este proceso: evita consultar el estado en cada
+// sync. Se invalida solo si cambia la cuenta o el servidor lo rechaza.
+let linkConfirmedFor: { userId: string; passportId: string } | null = null;
+
+let conflictState: { userId: string; conflict: PassportConflict } | null = null;
+const conflictListeners = new Set<() => void>();
+
+function setConflict(next: { userId: string; conflict: PassportConflict } | null) {
+  if (conflictState?.userId === next?.userId && conflictState?.conflict === next?.conflict) return;
+  conflictState = next;
+  conflictListeners.forEach((l) => l());
+}
+
+// Conflicto conocido para esa cuenta (o null). Solo se conoce después de un
+// intento de sync; no se persiste.
+export function getPassportConflict(userId: string | undefined): PassportConflict | null {
+  return userId && conflictState?.userId === userId ? conflictState.conflict : null;
+}
+
+export function subscribePassportConflict(listener: () => void): () => void {
+  conflictListeners.add(listener);
+  return () => {
+    conflictListeners.delete(listener);
+  };
+}
+
+// true solo si la cuenta quedó vinculada a este pasaporte. Un error temporal
+// (red, carrera entre dos vinculaciones) devuelve false SIN marcar conflicto:
+// se reintenta en el próximo disparador natural.
+async function ensurePassportLink(userId: string, passportId: string): Promise<boolean> {
+  if (linkConfirmedFor?.userId === userId && linkConfirmedFor.passportId === passportId) return true;
+
+  const { data: status, error: statusError } = await supabase.rpc('get_passport_link_status', {
+    p_passport_id: passportId,
+  });
+  if (statusError) {
+    if (__DEV__) console.warn('[socialSync] get_passport_link_status error', statusError.code, statusError.message);
+    return false;
+  }
+
+  let outcome: unknown = status;
+  if (status === 'unlinked') {
+    const { data: linked, error: linkError } = await supabase.rpc('link_passport', {
+      p_passport_id: passportId,
+    });
+    if (linkError) {
+      if (linkError.message === 'ACCOUNT_LINKED_TO_OTHER_PASSPORT') outcome = 'account_linked_elsewhere';
+      else if (linkError.message === 'PASSPORT_LINKED_TO_OTHER_ACCOUNT') outcome = 'passport_linked_to_other_account';
+      else {
+        if (__DEV__) console.warn('[socialSync] link_passport error', linkError.code, linkError.message);
+        return false;
+      }
+    } else {
+      outcome = linked === 'linked' || linked === 'already_linked' ? 'linked_here' : null;
+    }
+  }
+
+  if (outcome === 'linked_here') {
+    linkConfirmedFor = { userId, passportId };
+    setConflict(null);
+    return true;
+  }
+  if (outcome === 'account_linked_elsewhere' || outcome === 'passport_linked_to_other_account') {
+    setConflict({ userId, conflict: outcome });
+    return false;
+  }
+  if (__DEV__) console.warn('[socialSync] estado de vínculo inesperado', outcome);
+  return false;
+}
+
 // ─── EJECUCIÓN BEST-EFFORT ─────────────────────────────────────────────────────
 // Un solo sync en curso + una marca "dirty" para repetir una vez más al
 // terminar si llegaron pedidos nuevos mientras corría -- nada más sofisticado
@@ -130,6 +210,18 @@ async function runSync(): Promise<void> {
       return;
     }
 
+    let passportId: string;
+    try {
+      passportId = await getPassportId();
+    } catch (err) {
+      // Nunca se regenera el id por un error de lectura: este sync se omite.
+      if (__DEV__) console.warn('[socialSync] no se pudo leer el id del pasaporte, aborta', err);
+      return;
+    }
+
+    // Sin vínculo confirmado con ESTE pasaporte no se publica nada.
+    if (!(await ensurePassportLink(session.user.id, passportId))) return;
+
     let trips: Trip[];
     try {
       trips = await readLocalTrips();
@@ -142,7 +234,10 @@ async function runSync(): Promise<void> {
     const viajesRealizados = trips.filter((t) => t.tipo === 'real').length;
     const tripsPayload = buildTripsPayload(trips);
 
-    const { data, error } = await supabase.rpc('sync_shared_world', {
+    // Versión que el servidor solo acepta si la cuenta está vinculada a este
+    // pasaporte (misma lógica de publicación que sync_shared_world).
+    const { data, error } = await supabase.rpc('sync_shared_world_v2', {
+      p_passport_id: passportId,
       p_revision: nextRevision(),
       p_xp_total: stats.xpTotal,
       p_rango_actual: stats.rangoActualId,
@@ -154,16 +249,19 @@ async function runSync(): Promise<void> {
     });
 
     if (error) {
+      // El servidor ya no reconoce el vínculo: se vuelve a comprobar en el
+      // próximo sync en vez de confiar en lo confirmado antes.
+      if (error.message === 'PASSPORT_NOT_LINKED') linkConfirmedFor = null;
       // Best-effort: nunca se propaga, nunca rompe nada local. Se reintentará
       // en el próximo disparador natural (otra edición, otra entrada a
       // CompartirXP, otro arranque de la app).
-      if (__DEV__) console.warn('[socialSync] sync_shared_world error', error.code, error.message);
+      if (__DEV__) console.warn('[socialSync] sync_shared_world_v2 error', error.code, error.message);
       return;
     }
 
     // data: 'applied' | 'stale' -- 'stale' no es un error, solo significa que
     // esta foto llegó después de una más nueva y el servidor la ignoró.
-    if (__DEV__) console.log('[socialSync] sync_shared_world ->', data);
+    if (__DEV__) console.log('[socialSync] sync_shared_world_v2 ->', data);
   } catch (err) {
     if (__DEV__) console.warn('[socialSync] fallo inesperado, ignorado (best-effort)', err);
   } finally {

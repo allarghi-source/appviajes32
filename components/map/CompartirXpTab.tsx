@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
@@ -14,9 +14,9 @@ import {
 } from 'react-native';
 
 import { useSession } from '../../contexts/SessionProvider';
-import { signOut } from '../../utils/auth';
+import { AUTH_RETURN_TO_OTROS, signOut } from '../../utils/auth';
 import { getMyUsername, getSocialErrorMessage } from '../../utils/social';
-import { requestSharedWorldSync } from '../../utils/socialSync';
+import { getPassportConflict, requestSharedWorldSync, subscribePassportConflict } from '../../utils/socialSync';
 import PendingRequests from './PendingRequests';
 import UserSearch from './UserSearch';
 
@@ -38,6 +38,10 @@ export default function CompartirXpTab() {
 
   const verified = !!session?.user.email_confirmed_at;
   const userId = session?.user.id;
+
+  // Conflicto de vínculo pasaporte ↔ cuenta detectado por socialSync. Solo
+  // bloquea la publicación: búsqueda, solicitudes y OtherXP siguen igual.
+  const passportConflict = useSyncExternalStore(subscribePassportConflict, () => getPassportConflict(userId));
 
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
@@ -109,14 +113,14 @@ export default function CompartirXpTab() {
         </Text>
         <TouchableOpacity
           style={styles.primaryBtn}
-          onPress={() => router.push('/auth/signup')}
+          onPress={() => router.push({ pathname: '/auth/signup', params: { volverA: AUTH_RETURN_TO_OTROS } })}
           activeOpacity={0.85}
         >
           <Text style={styles.primaryBtnText}>{t('loggedOut.createAccount')}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.secondaryBtn}
-          onPress={() => router.push('/auth/login')}
+          onPress={() => router.push({ pathname: '/auth/login', params: { volverA: AUTH_RETURN_TO_OTROS } })}
           activeOpacity={0.85}
         >
           <Text style={styles.secondaryBtnText}>{t('loggedOut.login')}</Text>
@@ -170,6 +174,16 @@ export default function CompartirXpTab() {
           <Text style={styles.bodySecondary}>{t('verified.noUsername')}</Text>
         )}
 
+        {passportConflict && (
+          <View style={styles.conflictBox}>
+            <Text style={styles.conflictText}>
+              {passportConflict === 'account_linked_elsewhere'
+                ? t('passport.accountLinkedElsewhere')
+                : t('passport.passportLinkedToOtherAccount')}
+            </Text>
+          </View>
+        )}
+
         {userId && <PendingRequests myUserId={userId} />}
 
         {userId && <UserSearch myUserId={userId} />}
@@ -199,6 +213,16 @@ const styles = StyleSheet.create({
   verifiedRoot: { flex: 1 },
   verifiedContent: { flexGrow: 1, paddingHorizontal: 28, paddingTop: 24, paddingBottom: 32 },
   myUsername: { fontSize: 20, fontWeight: '800', color: GOLD, marginTop: 10 },
+
+  conflictBox: {
+    backgroundColor: 'rgba(192,57,43,0.12)',
+    borderColor: 'rgba(192,57,43,0.4)',
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+    marginTop: 16,
+  },
+  conflictText: { color: DANGER, fontSize: 13, lineHeight: 19, textAlign: 'center' },
 
   primaryBtn: {
     marginTop: 28,

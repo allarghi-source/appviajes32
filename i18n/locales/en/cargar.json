@@ -54,7 +54,10 @@
     "coverBadge": "Main Photo",
     "firstPhotoHint": "The first photo will be the main photo of the trip",
     "chooseFromGallery": "Choose from Gallery",
-    "takePhoto": "Take photo"
+    "takePhoto": "Take photo",
+    "menuTitle": "Photo",
+    "alreadyCover": "This is already the main photo",
+    "setCoverOption": "Set as Main Photo"
   },
   "note": {
     "label": "Note",
