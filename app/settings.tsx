@@ -13,9 +13,11 @@ import {
 import { useAppLanguage } from '../hooks/use-app-language';
 import { copiarFotoPersistente, PERFIL_DIR, resolveFotoUri } from '../utils/fotoPersistente';
 import { GeoOpcion, geocodeNominatim } from '../utils/geocoding';
+import { filtrarNacionalidad, limpiarNacionalidad, NACIONALIDAD_MAX } from '../utils/nacionalidad';
 import { buscarPaises, getPaisPorIso2, Pais } from '../utils/paises';
 import { playSound } from '../utils/soundEngine';
 import { runOrigenCoordsMigration } from '../utils/tripOriginMigration';
+import { resetTutorial, TUTORIAL_FROM_CONFIG } from '../utils/tutorialState';
 import { Feather } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import * as ImagePicker from 'expo-image-picker';
@@ -283,10 +285,12 @@ export default function Settings() {
   const saveUserData = async () => {
     const current = await AsyncStorage.getItem('userData');
     const existing: UserData = current ? JSON.parse(current) : {};
+    const nacionalidadLimpia = limpiarNacionalidad(nacionalidad);
     await AsyncStorage.setItem(
       'userData',
-      JSON.stringify({ ...existing, nombre, apellido, nacionalidad, foto })
+      JSON.stringify({ ...existing, nombre, apellido, nacionalidad: nacionalidadLimpia, foto })
     );
+    setNacionalidad(nacionalidadLimpia);
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
   };
@@ -412,6 +416,9 @@ export default function Settings() {
           onPress: async () => {
             playSound('borrar_todo');
             await clearAllUserData();
+            // La bandera del tutorial no es parte de los datos del backup,
+            // pero un nuevo comienzo debe volver a mostrarlo.
+            await resetTutorial();
             // clearAllUserData() ya borra app_language (ver STORAGE_KEYS en
             // utils/backupEngine.ts) -- ir directo a select-language evita
             // tener que cerrar y reabrir la app para volver al estado inicial.
@@ -529,7 +536,8 @@ export default function Settings() {
             <TextInput
               style={styles.input}
               value={nacionalidad}
-              onChangeText={setNacionalidad}
+              onChangeText={(t) => setNacionalidad(filtrarNacionalidad(t))}
+              maxLength={NACIONALIDAD_MAX}
               placeholderTextColor={MUTED}
               placeholder={t('settings:profile.nacionalidadPlaceholder')}
               autoCapitalize="words"
@@ -711,6 +719,13 @@ export default function Settings() {
           <TouchableOpacity style={styles.btnSecondary} onPress={reportarProblema} activeOpacity={0.8}>
             <Text style={styles.btnSecondaryIcon}>✉</Text>
             <Text style={styles.btnSecondaryText}>{t('settings:support.button')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.btnSecondary, { marginTop: 10 }]}
+            onPress={() => router.push({ pathname: '/tutorial', params: { origen: TUTORIAL_FROM_CONFIG } })}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.btnSecondaryText}>{t('settings:support.replayTutorial')}</Text>
           </TouchableOpacity>
         </View>
 

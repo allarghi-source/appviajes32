@@ -2,8 +2,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Redirect } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { getStoredLanguage } from '../../i18n/languageStorage';
+import { isTutorialDone } from '../../utils/tutorialState';
 
-type Destination = '/passportcover' | '/onboarding' | '/select-language';
+type Destination = '/passportcover' | '/onboarding' | '/select-language' | '/tutorial';
 
 export default function TabIndex() {
   const [destination, setDestination] = useState<Destination | null>(null);
@@ -25,8 +26,9 @@ export default function TabIndex() {
           setDestination('/select-language');
         } else {
           // Idioma ya elegido pero onboarding sin terminar (se fue a mitad
-          // de camino): no se le vuelve a preguntar el idioma.
-          setDestination('/onboarding');
+          // de camino): no se le vuelve a preguntar el idioma. Si tampoco
+          // completó ni salteó el tutorial, se retoma desde ahí.
+          setDestination((await isTutorialDone()) ? '/onboarding' : '/tutorial');
         }
       } catch {
         setDestination('/onboarding');

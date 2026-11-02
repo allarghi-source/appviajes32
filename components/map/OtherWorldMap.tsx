@@ -297,7 +297,7 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
 
-  dateText: { fontSize: 11, color: GOLD, fontWeight: '600', letterSpacing: 0.3, textAlign: 'center' },
+  dateText: { fontSize: 13, color: GOLD, fontWeight: '600', letterSpacing: 0.3, alignSelf: 'stretch', textAlign: 'left' },
   badge: {
     alignSelf: 'center',
     backgroundColor: 'rgba(212,175,55,0.12)',

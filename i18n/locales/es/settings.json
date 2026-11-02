@@ -60,6 +60,7 @@
     "sectionLabel": "SOPORTE",
     "description": "¿Encontraste un error o algo no funciona como esperabas? Contanos qué pasó.",
     "button": "Reportar problema",
+    "replayTutorial": "VOLVER A VER EL TUTORIAL",
     "emailSubject": "Reporte de problema - MyWorldXP",
     "emailBodyIntro": "Contanos qué ocurrió:",
     "emailBodyQ1": "¿Qué estabas haciendo cuando apareció el problema?",

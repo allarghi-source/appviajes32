@@ -22,6 +22,7 @@ import esRanks from './locales/es/ranks.json';
 import esBackup from './locales/es/backup.json';
 import esAuth from './locales/es/auth.json';
 import esSocial from './locales/es/social.json';
+import esTutorial from './locales/es/tutorial.json';
 
 import enCommon from './locales/en/common.json';
 import enOnboarding from './locales/en/onboarding.json';
@@ -41,6 +42,7 @@ import enRanks from './locales/en/ranks.json';
 import enBackup from './locales/en/backup.json';
 import enAuth from './locales/en/auth.json';
 import enSocial from './locales/en/social.json';
+import enTutorial from './locales/en/tutorial.json';
 
 export const defaultNS = 'common';
 
@@ -64,6 +66,7 @@ export const resources = {
     backup: esBackup,
     auth: esAuth,
     social: esSocial,
+    tutorial: esTutorial,
   },
   en: {
     common: enCommon,
@@ -84,6 +87,7 @@ export const resources = {
     backup: enBackup,
     auth: enAuth,
     social: enSocial,
+    tutorial: enTutorial,
   },
 } as const;
 

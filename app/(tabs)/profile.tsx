@@ -20,6 +20,7 @@ import {
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { findCatalogCity } from '../../utils/cityCatalog';
 import { GeoOpcion, geocodeNominatim, resolveCityCandidates } from '../../utils/geocoding';
+import { filtrarNacionalidad, limpiarNacionalidad, NACIONALIDAD_MAX } from '../../utils/nacionalidad';
 import { copiarFotoPersistente, PERFIL_DIR, resolveFotoUri } from '../../utils/fotoPersistente';
 import { buscarPaises, getPaisPorIso2, Pais } from '../../utils/paises';
 
@@ -409,11 +410,12 @@ export default function Profile() {
                 style={styles.inputText}
                 value={nacionalidad}
                 onChangeText={(t) => {
-                  const v = soloLetras(t);
+                  const v = filtrarNacionalidad(t);
                   setNacionalidad(v);
                   if (v.trim()) setNacionalidadError(false);
                 }}
                 onBlur={() => setNacionalidadError(!nacionalidad.trim())}
+                maxLength={NACIONALIDAD_MAX}
                 returnKeyType="done"
               />
             </View>
@@ -566,7 +568,7 @@ export default function Profile() {
                 const userData = {
                   nombre,
                   apellido,
-                  nacionalidad,
+                  nacionalidad: limpiarNacionalidad(nacionalidad),
                   foto: image,
                   residencia: {
                     ciudad: confirmada.ciudad,

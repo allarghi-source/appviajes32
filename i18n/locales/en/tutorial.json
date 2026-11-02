@@ -1,0 +1,27 @@
+{
+  "next": "NEXT",
+  "skip": "SKIP",
+  "back": "BACK",
+  "start": "GET STARTED",
+  "finish": "FINISH",
+  "steps": {
+    "profile": "Let’s get started! Add your personal info and choose a photo for your passport.\n\nMake sure your city and country of residence are correct. We’ll use them to calculate your travel distances and stats.",
+    "config": "Welcome to MyWorldXP! This is your personal passport.\n\nTap CONFIG to update your personal info, change your profile photo, choose your language, or back up your data.",
+    "openPassport": "Tap the cover to open your passport and start exploring your world.",
+    "inside": "Inside, you’ll find your personal info, a summary of your trips, and your XP progress bar. Watch your XP grow as you explore the world and unlock new achievements.",
+    "close": "Tap here to close your passport and return to the cover. You can also access CONFIG from there.",
+    "navbar": "Use the navigation bar to get around MyWorldXP. Tap ADD TRIP to add a trip, TIMELINE to revisit your travels, STATS to check your progress, or MAP to see your destinations.",
+    "tripType": "Choose “I've Been There” to add trips you’ve taken, or “I Want to Go” to save destinations you’d love to visit.",
+    "multiCity": "Visited several cities on the same trip? Choose “More Than One” to group them together.",
+    "validate": "Confirm each destination before saving your trip. This helps catch typos and makes sure you’ve picked the right city when more than one place shares the same name.",
+    "timeline": "Your TIMELINE shows all the trips you’ve taken, in date order. Open any trip to see the details and relive your memories.",
+    "detailOpen": "Tap a trip in your TIMELINE to view its details.",
+    "detailInside": "Update your photos, edit the location and dates, add comments, and save travel tips. Capture the details you want to remember or share with friends.",
+    "stats": "Head to STATS to learn more about your travels around the world. Track your XP progress and the achievements you unlock along the way.",
+    "map": "See your world on the MAP: blue pins mark places you’ve visited, and gold pins highlight destinations you’d love to explore.\n\nWant to share your trips and XP with other MyWorldXP users? Create an account and sign in. You only need to do this if you want to share."
+  },
+  "final": {
+    "title": "You’re all set. Your next adventure awaits!",
+    "body": "There are more challenges ahead and so much left to discover.\n\nRelive your trips, celebrate your achievements, and keep building your travel story with MyWorldXP."
+  }
+}

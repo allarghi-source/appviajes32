@@ -27,7 +27,9 @@ export default function SelectLanguage() {
 
   async function handleContinue() {
     await setLanguage(selected);
-    router.replace('/onboarding');
+    // Usuario nuevo: tutorial guiado y, al terminarlo o saltearlo, la
+    // bienvenida oficial (app/tutorial.tsx).
+    router.replace('/tutorial');
   }
 
   return (

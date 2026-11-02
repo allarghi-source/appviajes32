@@ -1,0 +1,27 @@
+{
+  "next": "SIGUIENTE",
+  "skip": "SALTAR",
+  "back": "ATRÁS",
+  "start": "COMENZAR",
+  "finish": "FINALIZAR",
+  "steps": {
+    "profile": "¡Empecemos! Completá todos tus datos personales y elegí una foto para tu pasaporte. Es muy importante que indiques correctamente tu ciudad y país de residencia, porque desde allí calcularemos las distancias y estadísticas de tus viajes.",
+    "config": "¡Bienvenido a MyWorldXP! Este es tu pasaporte personal. Desde el botón CONFIG podés editar tus datos personales, cambiar tu foto de perfil, elegir el idioma y hacer copias de seguridad (backups).",
+    "openPassport": "Tocá la tapa para abrir tu pasaporte y comenzar a descubrir tu mundo.",
+    "inside": "¡Este es el interior de tu pasaporte! Acá vas a encontrar tus datos personales, un resumen de todos tus viajes y tu barra de experiencia (XP), que irá creciendo a medida que recorras el mundo y desbloquees nuevos logros.",
+    "close": "Cuando quieras, podés cerrar tu pasaporte tocando acá. Volverás a la portada, desde donde podrás acceder nuevamente a CONFIG.",
+    "navbar": "Desde esta barra vas a poder navegar por las principales funciones de MyWorldXP: cargar tus viajes, recorrer tu Timeline, descubrir tus estadísticas y explorar tu mapa del mundo.",
+    "tripType": "Acá vas a registrar todos los viajes que ya realizaste, seleccionando «Ya lo hice», y también los destinos que soñás conocer, seleccionando «Lo quiero hacer».",
+    "multiCity": "¿Recorriste varias ciudades durante un mismo viaje? Seleccioná «Más de una ciudad» para registrarlas juntas como parte de una misma aventura.",
+    "validate": "Es muy importante que valides cada destino antes de guardar tu viaje. Así evitamos errores de escritura y podemos distinguir entre ciudades que tienen el mismo nombre en diferentes lugares del mundo.",
+    "timeline": "En Timeline vas a poder ver, en orden cronológico, todos los viajes de tu vida. Tocá cualquiera de ellos para descubrir sus detalles y revivir tus experiencias.",
+    "detailOpen": "Al tocar cualquiera de tus viajes en Timeline, accederás a sus detalles.",
+    "detailInside": "Desde aquí, podés cambiar las fotografías, editar la ubicación y las fechas, agregar comentarios y guardar tips de viaje para recordar tus experiencias o compartirlos con tus amigos.",
+    "stats": "En Estadísticas vas a descubrir un montón de información interesante sobre tus viajes, conocer mejor tu recorrido por el mundo y seguir tu progreso de XP a medida que alcanzás nuevos logros.",
+    "map": "¡Explorá tu propio mundo! En el mapa vas a encontrar pines azules que señalan los lugares que ya visitaste y pines dorados que muestran los destinos que soñás conocer.\n\nY si querés compartir tus viajes y tus XP con otros usuarios de MyWorldXP, también podés hacerlo. Para utilizar esta función, solo necesitás crear una cuenta e iniciar sesión.\n\nCrear una cuenta e iniciar sesión solo es necesario si deseás compartir tus viajes con otros usuarios."
+  },
+  "final": {
+    "title": "¡Todo listo, empezá a disfrutar!",
+    "body": "Hay más desafíos y mucho por descubrir. Empezá a revivir tus viajes, celebrar tus logros y completar tu propio mundo de experiencias con MyWorldXP."
+  }
+}

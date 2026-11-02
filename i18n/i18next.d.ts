@@ -18,6 +18,7 @@ import ranks from './locales/es/ranks.json';
 import backup from './locales/es/backup.json';
 import auth from './locales/es/auth.json';
 import social from './locales/es/social.json';
+import tutorial from './locales/es/tutorial.json';
 
 // Augmentación de tipos de i18next contra el español (idioma base/completo),
 // para que t('namespace:clave.inexistente') sea un error de compilación.
@@ -43,6 +44,7 @@ declare module 'i18next' {
       backup: typeof backup;
       auth: typeof auth;
       social: typeof social;
+      tutorial: typeof tutorial;
     };
   }
 }
